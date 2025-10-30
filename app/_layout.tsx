@@ -13,13 +13,18 @@ export const unstable_settings = {
     anchor: '(tabs)',
 };
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
+// Empêche le SplashScreen de se cacher automatiquement avant le chargement complet des assets
 SplashScreen.preventAutoHideAsync();
 
+/**
+ * Layout racine de l'application
+ * Gère le chargement des fonts avant d'afficher l'interface
+ */
 export default function RootLayout() {
     const colorScheme = useColorScheme();
 
-    const [loaded] = useFonts({
+    // Charge toutes les fonts Ubuntu nécessaires
+    const [loaded, error] = useFonts({
         Ubuntu_Bold: require("@/assets/fonts/Ubuntu-Bold.ttf"),
         Ubuntu_BoldItalic: require("@/assets/fonts/Ubuntu-BoldItalic.ttf"),
         Ubuntu_Italic: require("@/assets/fonts/Ubuntu-Italic.ttf"),
@@ -28,19 +33,22 @@ export default function RootLayout() {
         Ubuntu_Medium: require("@/assets/fonts/Ubuntu-Medium.ttf"),
         Ubuntu_MediumItalic: require("@/assets/fonts/Ubuntu-MediumItalic.ttf"),
         Ubuntu_Regular: require("@/assets/fonts/Ubuntu-Regular.ttf"),
-        
     });
 
+    /**
+     * Cache le SplashScreen uniquement lorsque toutes les fonts sont chargées
+     */
     useEffect(() => {
-        if (loaded) {
-
-            setTimeout(() => {
-                SplashScreen.hideAsync();
-            }, 500);
+        if (loaded || error) {
+            // Cache le SplashScreen une fois que les fonts sont chargées ou en cas d'erreur
+            SplashScreen.hideAsync();
         }
+    }, [loaded, error]);
 
-    }, [loaded]);
-
+    // Ne rend rien jusqu'à ce que les fonts soient chargées
+    if (!loaded && !error) {
+        return null;
+    }
 
     return (
         <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
