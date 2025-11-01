@@ -162,7 +162,7 @@ const Onboard = () => {
                                         marginLeft: 30,
                                         fontFamily: 'Ubuntu_Bold'
                                     }}>
-                                        {item.text_1} <Text key={`text-${index.toString()}`} style={{ color: item?.color_text ? item?.color_text : '#EFE4D2' }}>{item.text_2}</Text>
+                                        {item.text_1} <Text key={`text-${index.toString()}`} style={{ color: item?.color_text ? item?.color_text : '#EFE4D2', fontFamily: 'Ubuntu_Bold' }}>{item.text_2}</Text>
                                     </Text>
                                     <Image
                                         source={item?.person}
