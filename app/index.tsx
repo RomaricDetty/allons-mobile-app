@@ -11,13 +11,18 @@ const Index = () => {
     const checkOnboardingStatus = async () => {
         try {
             const onboardingDone = await AsyncStorage.getItem('onboarding');
+            console.log('onboardingDone value is :', onboardingDone);
             if (onboardingDone === '1') {
+                console.log('onboardingDone is 1, redirecting to tabs');
                 router.replace('/(tabs)');
-            } else {
-                router.replace('/onboard');
+                return false;
             }
+
+            console.log('onboardingDone is not 1, redirecting to onboard');
+            router.replace('/onboard');
+
         } catch (error) {
-            console.error('Error:', error);
+            console.error('Error checking onboarding status:', error);
             router.replace('/onboard');
         }
     };

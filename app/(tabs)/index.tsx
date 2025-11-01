@@ -1,98 +1,172 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
-
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+// @ts-nocheck
+import { ItineraryCard, type ItineraryData } from '@/components/itinerary-card';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useThemeColor } from '@/hooks/use-theme-color';
+import { useState } from 'react';
+import {
+    Platform, Pressable, RefreshControl,
+    ScrollView, StyleSheet, Text, View
+} from 'react-native';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 export default function HomeScreen() {
-    return (
-        <ParallaxScrollView
-            headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-            headerImage={
-                <Image
-                    source={require('@/assets/images/partial-react-logo.png')}
-                    style={styles.reactLogo}
-                />
-            }>
-            <ThemedView style={styles.titleContainer}>
-                <ThemedText type="title">Welcome!</ThemedText>
-                <HelloWave />
-            </ThemedView>
-            <ThemedView style={styles.stepContainer}>
-                <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-                <ThemedText>
-                    Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-                    Press{' '}
-                    <ThemedText type="defaultSemiBold">
-                        {Platform.select({
-                            ios: 'cmd + d',
-                            android: 'cmd + m',
-                            web: 'F12',
-                        })}
-                    </ThemedText>{' '}
-                    to open developer tools.
-                </ThemedText>
-            </ThemedView>
-            <ThemedView style={styles.stepContainer}>
-                <Link href="/modal">
-                    <Link.Trigger>
-                        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-                    </Link.Trigger>
-                    <Link.Preview />
-                    <Link.Menu>
-                        <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-                        <Link.MenuAction
-                            title="Share"
-                            icon="square.and.arrow.up"
-                            onPress={() => alert('Share pressed')}
-                        />
-                        <Link.Menu title="More" icon="ellipsis">
-                            <Link.MenuAction
-                                title="Delete"
-                                icon="trash"
-                                destructive
-                                onPress={() => alert('Delete pressed')}
-                            />
-                        </Link.Menu>
-                    </Link.Menu>
-                </Link>
+    const [refreshing, setRefreshing] = useState(false);
+    const colorScheme = useColorScheme() ?? 'dark';
+    const backgroundColor = useThemeColor({}, 'background');
+    const textColor = useThemeColor({}, 'text');
+    
+    const searchBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#F3F3F7';
+    const searchTextColor = colorScheme === 'dark' ? '#9BA1A6' : '#A6A6AA';
+    const searchIconColor = colorScheme === 'dark' ? '#9BA1A6' : '#A6A6AA';
 
-                <ThemedText>
-                    {`Tap the Explore tab to learn more about what's included in this starter app.`}
-                </ThemedText>
-            </ThemedView>
-            <ThemedView style={styles.stepContainer}>
-                <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-                <ThemedText>
-                    {`When you're ready, run `}
-                    <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-                    <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-                    <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-                    <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-                </ThemedText>
-            </ThemedView>
-        </ParallaxScrollView>
+    const promotions: ItineraryData[] = [
+        {
+            id: 1,
+            route: 'Abidjan → Yamoussoukro',
+            image: require('@/assets/images/basilique.jpg'),
+            compagnie: 'UTB',
+            tarif: '2500 F',
+            duree: '2H',
+            placesDisponibles: 10,
+        },
+        {
+            id: 2,
+            route: 'Abidjan → Bouaké',
+            image: require('@/assets/images/bouake.jpg'),
+            compagnie: 'SBTA',
+            tarif: '3000 F',
+            duree: '3H',
+            placesDisponibles: 20,
+        },
+        {
+            id: 3,
+            route: 'Divo → Bouaké',
+            image: require('@/assets/images/divo.jpg'),
+            compagnie: 'SBTA',
+            tarif: '3500 F',
+            duree: '2H',
+            placesDisponibles: 15,
+        },
+    ];
+
+    const onRefresh = () => {
+        setRefreshing(true);
+        setTimeout(() => setRefreshing(false), 2000);
+    };
+
+    const handleCardPress = (id: number) => {
+        console.log('Itinerary pressed:', id);
+    };
+
+    return (
+        <ScrollView 
+            style={{ backgroundColor }}
+            refreshControl={
+                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            }>
+            <View style={styles.titleContainer}>
+                <Text style={[styles.title, { color: textColor }]}>
+                    Où voulez-vous
+                </Text>
+                <Text style={[styles.title, { color: textColor }]}>
+                    aller ?
+                </Text>
+            </View>
+            
+            <View style={[styles.container, { paddingBottom: 30 }]}>
+                <View style={styles.subContainer}>
+                    <Pressable
+                        onPress={() => console.log('Search button pressed')}
+                        style={[styles.searchContainer, { backgroundColor: searchBackgroundColor }]}>
+                        <View style={styles.searchContent}>
+                            <MaterialCommunityIcons 
+                                size={20} 
+                                name="bus" 
+                                color={searchIconColor} 
+                            />
+                            <Text style={[styles.searchText, { color: searchTextColor }]}>
+                                Rechercher un départ
+                            </Text>
+                        </View>
+                    </Pressable>
+                </View>
+            </View>
+
+            <View style={styles.promotionsSection}>
+                <Text style={[styles.sectionTitle, { color: textColor }]}>
+                    Nos itinéraires en promotion
+                </Text>
+                
+                <View style={styles.cardsContainer}>
+                    {promotions.map(item => (
+                        <ItineraryCard 
+                            key={item.id} 
+                            item={item} 
+                            onPress={handleCardPress}
+                        />
+                    ))}
+                </View>
+            </View>
+        </ScrollView>
     );
 }
 
 const styles = StyleSheet.create({
     titleContainer: {
-        flexDirection: 'row',
+        width: '100%',
+        paddingHorizontal: 20,
+        paddingTop: Platform.OS === 'ios' ? 60 : 60,
+    },
+    title: {
+        fontSize: 30,
+        fontFamily: 'Ubuntu_Bold',
+        textAlign: 'left',
+    },
+    container: {
+        flex: 1,
+        justifyContent: 'flex-start',
         alignItems: 'center',
-        gap: 8,
     },
-    stepContainer: {
-        gap: 8,
-        marginBottom: 8,
+    subContainer: {
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexDirection: 'row',
+        width: '100%',
+        paddingHorizontal: 20,
+        marginTop: 10
     },
-    reactLogo: {
-        height: 178,
-        width: 290,
-        bottom: 0,
-        left: 0,
-        position: 'absolute',
+    searchContainer: {
+        borderRadius: 30,
+        height: 50,
+        width: '100%',
+    },
+    searchContent: {
+        alignItems: 'center',
+        justifyContent: 'flex-start',
+        flexDirection: 'row',
+        height: 50,
+        paddingHorizontal: 20
+    },
+    searchText: {
+        fontSize: 15,
+        marginLeft: 10,
+        fontFamily: "Ubuntu_Regular"
+    },
+    promotionsSection: {
+        width: '100%',
+        paddingHorizontal: 20,
+        paddingBottom: 20,
+    },
+    sectionTitle: {
+        fontSize: 16,
+        fontFamily: 'Ubuntu_Bold',
+        marginBottom: 20,
+        textAlign: 'left',
+    },
+    cardsContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        gap: 15,
     },
 });
