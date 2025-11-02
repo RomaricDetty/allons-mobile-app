@@ -1,11 +1,14 @@
 // @ts-nocheck
 import { getCities } from "@/api/city";
+import { getAvailableDepartures } from "@/api/departure";
 import { BottomSheet } from "@/components/bottom-sheet";
 import { City } from "@/types";
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation } from "@react-navigation/native";
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+    ActivityIndicator,
+    Alert,
     Modal,
     Platform,
     Pressable,
@@ -35,7 +38,7 @@ const TripSearch = () => {
     const [tempDepartureDate, setTempDepartureDate] = useState<Date>(new Date());
     const [tempReturnDate, setTempReturnDate] = useState<Date>(new Date());
     const [numberOfPersons, setNumberOfPersons] = useState<number>(1);
-
+    const [loadingDepartures, setLoadingDepartures] = useState<boolean>(false);
     const [cities, setCities] = useState<Array<City>>([]);
     const [loadingCities, setLoadingCities] = useState<boolean>(false);
 
@@ -44,7 +47,6 @@ const TripSearch = () => {
     const [showArrivalModal, setShowArrivalModal] = useState(false);
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [showReturnDatePicker, setShowReturnDatePicker] = useState(false);
-    const [currentDatePickerType, setCurrentDatePickerType] = useState<'departure' | 'return'>('departure');
     const typeDepartureOptions = [
         { id: 'ONE_WAY', label: 'Aller simple' },
         { id: 'ROUND_TRIP', label: 'Aller-retour' },
@@ -120,57 +122,17 @@ const TripSearch = () => {
         // Sur Android, fermer immédiatement après sélection
         if (Platform.OS === 'android') {
             if (selectedDate) {
-                if (currentDatePickerType === 'departure') {
-                    setDepartureDate(selectedDate);
-                    setShowDatePicker(false);
-                } else {
-                    setReturnDate(selectedDate);
-                    setShowReturnDatePicker(false);
-                }
+                setDepartureDate(selectedDate);
+                setShowDatePicker(false);
             } else {
-                if (currentDatePickerType === 'departure') {
-                    setShowDatePicker(false);
-                } else {
-                    setShowReturnDatePicker(false);
-                }
+                setShowDatePicker(false);
             }
             return;
         }
         
         // Sur iOS, mettre à jour l'état temporaire pour afficher dans le picker
         if (selectedDate) {
-            if (currentDatePickerType === 'departure') {
-                setTempDepartureDate(selectedDate);
-            } else {
-                setTempReturnDate(selectedDate);
-            }
-        }
-    };
-
-    /**
-     * Confirme la sélection de la date (iOS uniquement)
-     */
-    const handleConfirmDate = () => {
-        if (currentDatePickerType === 'departure') {
-            setDepartureDate(tempDepartureDate);
-            setShowDatePicker(false);
-        } else {
-            setReturnDate(tempReturnDate);
-            setShowReturnDatePicker(false);
-        }
-    };
-
-    /**
-     * Annule la sélection de la date (iOS uniquement)
-     */
-    const handleCancelDate = () => {
-        // Réinitialiser les dates temporaires avec les dates actuelles
-        if (currentDatePickerType === 'departure') {
-            setTempDepartureDate(departureDate || new Date());
-            setShowDatePicker(false);
-        } else {
-            setTempReturnDate(returnDate || departureDate || new Date());
-            setShowReturnDatePicker(false);
+            setTempDepartureDate(selectedDate);
         }
     };
 
@@ -184,17 +146,40 @@ const TripSearch = () => {
 
     /**
      * Gère la recherche de trajet
+     * 
      */
-    const handleSearch = () => {
-        // TODO: Implémenter la logique de recherche
-        console.log('Recherche:', {
-            departureCity: departureCity?.name,
-            arrivalCity: arrivalCity?.name,
-            typeDeparture: typeDepartureOptions.find(opt => opt.id === typeDeparture)?.label,
-            departureDate: departureDate?.toISOString(),
-            returnDate: returnDate?.toISOString(),
-            numberOfPersons
+    const handleSearch = async() => {
+
+        // Vérification que tous les champs requis sont remplis (sauf date de retour pour ONE_WAY)
+        if (!departureCity || !arrivalCity || !departureDate) {
+            Alert.alert('Attention !', 'Veuillez sélectionner une ville de départ, une ville d\'arrivée et une date de départ');
+            return;
+        }
+
+        // Pour un aller-retour, vérifier aussi la date de retour
+        if (typeDeparture === 'ROUND_TRIP' && !returnDate) {
+            Alert.alert('Attention !', 'Veuillez sélectionner une date de retour pour un aller-retour');
+            return;
+        }
+
+        // page=1&pageSize=10&cityFromId=4fb8166f-6a31-464d-be16-e9d74198895b&cityToId=c0297edd-7d0f-4799-8cf3-edc9213ee64e&dateFrom=2025-11-01&dateTo=&companyId=&passengerCount=1
+        const queryParams = `page=1&pageSize=10&cityFromId=${departureCity?.id}&cityToId=${arrivalCity?.id}&dateFrom=${departureDate?.toISOString()}&dateTo=${returnDate?.toISOString() || ''}&companyId=&passengerCount=${numberOfPersons}`;
+        console.log('queryParams => ', queryParams);
+
+        setLoadingDepartures(true);
+        const response = await getAvailableDepartures(queryParams).catch((error: any) => {
+            setLoadingDepartures(false);
+            console.error('Erreur dans la récupération des départs : ', error);
+            Alert.alert('Attention !', 'Une erreur est survenue lors de la recherche des départs');
+            return null;
         });
+        console.log('Les départs disponibles : ', response?.data);
+        setLoadingDepartures(false);
+        if (response?.data?.items?.length > 0) {
+            // navigation.navigate('TripList', { departures: response?.data });
+        } else {
+            Alert.alert('Information !', 'Aucun départ disponible pour la recherche');
+        }
     };
 
     /**
@@ -280,9 +265,7 @@ const TripSearch = () => {
                     <Pressable 
                         style={styles.field}
                         onPress={() => {
-                            setCurrentDatePickerType('departure');
-                            // Initialiser la date temporaire avec la date actuelle ou aujourd'hui
-                            setTempDepartureDate(departureDate || new Date());
+                            setDepartureDate(tempDepartureDate);
                             setShowDatePicker(true);
                         }}
                     >
@@ -307,9 +290,7 @@ const TripSearch = () => {
                         <Pressable 
                             style={styles.field}
                             onPress={() => {
-                                setCurrentDatePickerType('return');
-                                // Initialiser la date temporaire avec la date actuelle ou la date de départ
-                                setTempReturnDate(returnDate || departureDate || new Date());
+                                setReturnDate(tempReturnDate);
                                 setShowReturnDatePicker(true);
                             }}
                         >
@@ -346,10 +327,12 @@ const TripSearch = () => {
 
                     {/* Bouton Rechercher */}
                     <Pressable
+                        disabled={loadingDepartures}
                         style={styles.searchButton}
-                        onPress={handleSearch}
+                        onPress={() => handleSearch()}
                     >
-                        <Text style={styles.searchButtonText}>Rechercher</Text>
+                        {loadingDepartures && <ActivityIndicator size="small" color="#FFFFFF" />}
+                        <Text style={[styles.searchButtonText, { opacity: loadingDepartures ? 0.5 : 1 }]}>Rechercher</Text>
                     </Pressable>
                 </View>
                 {/* Formulaire de recherche */}
@@ -476,99 +459,137 @@ const TripSearch = () => {
             />
 
             {/* DatePicker pour la date de départ */}
-            {showDatePicker && (
-                Platform.OS === 'ios' ? (
-                    <Modal
-                        visible={showDatePicker}
-                        transparent={true}
-                        animationType="slide"
-                        onRequestClose={handleCancelDate}
+            {Platform.OS === 'ios' && showDatePicker && (
+                <Modal
+                    visible={showDatePicker}
+                    transparent={true}
+                    animationType="slide"
+                    onRequestClose={() => setShowDatePicker(false)}
+                >
+                    <Pressable
+                        style={styles.datePickerModal}
+                        onPress={() => setShowDatePicker(false)}
                     >
                         <Pressable
-                            style={styles.datePickerModal}
-                            onPress={handleCancelDate}
+                            style={[styles.datePickerContainer, { paddingBottom: insets.bottom + 20 }]}
+                            onPress={(e) => e.stopPropagation()}
                         >
-                            <Pressable
-                                style={styles.datePickerContainer}
-                                onPress={(e) => e.stopPropagation()}
-                            >
-                                <View style={styles.datePickerHeader}>
-                                    <Pressable onPress={handleCancelDate}>
-                                        <Text style={styles.datePickerCancel}>Annuler</Text>
-                                    </Pressable>
-                                    <Text style={styles.datePickerTitle}>Sélectionner une date de départ</Text>
-                                    <Pressable onPress={handleConfirmDate}>
-                                        <Text style={styles.datePickerConfirm}>Confirmer</Text>
-                                    </Pressable>
-                                </View>
+                            <View style={styles.datePickerHeader}>
+                                <Pressable onPress={() => setShowDatePicker(false)}>
+                                    <Text style={styles.datePickerCancel}>Annuler</Text>
+                                </Pressable>
+                                <Text style={styles.datePickerTitle} numberOfLines={1}>
+                                    Date de départ
+                                </Text>
+                                <Pressable onPress={() => {
+                                    setDepartureDate(tempDepartureDate);
+                                    setShowDatePicker(false);
+                                }}>
+                                    <Text style={styles.datePickerConfirm}>Confirmer</Text>
+                                </Pressable>
+                            </View>
+                            <View style={styles.datePickerContent}>
                                 <DateTimePicker
                                     value={tempDepartureDate}
                                     mode="date"
                                     display="spinner"
-                                    onChange={handleDateChange}
+                                    onChange={(event, selectedDate) => {
+                                        if (selectedDate) {
+                                            setTempDepartureDate(selectedDate);
+                                        }
+                                    }}
                                     minimumDate={new Date()}
                                     locale="fr-FR"
+                                    themeVariant="light"
                                 />
-                            </Pressable>
+                            </View>
                         </Pressable>
-                    </Modal>
-                ) : (
-                    <DateTimePicker
-                        value={departureDate || new Date()}
-                        mode="date"
-                        display="default"
-                        onChange={handleDateChange}
-                        minimumDate={new Date()}
-                    />
-                )
+                    </Pressable>
+                </Modal>
+            )}
+
+            {Platform.OS === 'android' && showDatePicker && (
+                <DateTimePicker
+                    value={departureDate || new Date()}
+                    mode="date"
+                    display="default"
+                    onChange={(event, selectedDate) => {
+                        if (selectedDate) {
+                            setDepartureDate(selectedDate);
+                        }
+                        setShowDatePicker(false);
+                    }}
+                    minimumDate={new Date()}
+                />
             )}
 
             {/* DatePicker pour la date de retour */}
-            {showReturnDatePicker && (
-                Platform.OS === 'ios' ? (
-                    <Modal
-                        visible={showReturnDatePicker}
-                        transparent={true}
-                        animationType="slide"
-                        onRequestClose={handleCancelDate}
-                    >
-                        <Pressable
-                            style={styles.datePickerModal}
-                            onPress={handleCancelDate}
+            {typeDeparture === 'ROUND_TRIP' && (
+                <>
+                    {Platform.OS === 'ios' && showReturnDatePicker && (
+                        <Modal
+                            visible={showReturnDatePicker}
+                            transparent={true}
+                            animationType="slide"
+                            onRequestClose={() => setShowReturnDatePicker(false)}
                         >
                             <Pressable
-                                style={styles.datePickerContainer}
-                                onPress={(e) => e.stopPropagation()}
+                                style={styles.datePickerModal}
+                                onPress={() => setShowReturnDatePicker(false)}
                             >
-                                <View style={styles.datePickerHeader}>
-                                    <Pressable onPress={handleCancelDate}>
-                                        <Text style={styles.datePickerCancel}>Annuler</Text>
-                                    </Pressable>
-                                    <Text style={styles.datePickerTitle}>Sélectionner une date de retour</Text>
-                                    <Pressable onPress={handleConfirmDate}>
-                                        <Text style={styles.datePickerConfirm}>Confirmer</Text>
-                                    </Pressable>
-                                </View>
-                                <DateTimePicker
-                                    value={tempReturnDate}
-                                    mode="date"
-                                    display="spinner"
-                                    onChange={handleDateChange}
-                                    minimumDate={departureDate || new Date()}
-                                    locale="fr-FR"
-                                />
+                                <Pressable
+                                    style={[styles.datePickerContainer, { paddingBottom: insets.bottom + 20 }]}
+                                    onPress={(e) => e.stopPropagation()}
+                                >
+                                    <View style={styles.datePickerHeader}>
+                                        <Pressable onPress={() => setShowReturnDatePicker(false)}>
+                                            <Text style={styles.datePickerCancel}>Annuler</Text>
+                                        </Pressable>
+                                        <Text style={styles.datePickerTitle} numberOfLines={1}>
+                                            Date de retour
+                                        </Text>
+                                        <Pressable onPress={() => {
+                                            setReturnDate(tempReturnDate);
+                                            setShowReturnDatePicker(false);
+                                        }}>
+                                            <Text style={styles.datePickerConfirm}>Confirmer</Text>
+                                        </Pressable>
+                                    </View>
+                                    <View style={styles.datePickerContent}>
+                                        <DateTimePicker
+                                            value={tempReturnDate}
+                                            mode="date"
+                                            display="spinner"
+                                            onChange={(event, selectedDate) => {
+                                                if (selectedDate) {
+                                                    setTempReturnDate(selectedDate);
+                                                }
+                                            }}
+                                            minimumDate={departureDate || new Date()}
+                                            locale="fr-FR"
+                                            textColor="#000000"
+                                        />
+                                    </View>
+                                </Pressable>
                             </Pressable>
-                        </Pressable>
-                    </Modal>
-                ) : (
-                    <DateTimePicker
-                        value={returnDate || departureDate || new Date()}
-                        mode="date"
-                        display="default"
-                        onChange={handleDateChange}
-                        minimumDate={departureDate || new Date()}
-                    />
-                )
+                        </Modal>
+                    )}
+
+                    {Platform.OS === 'android' && showReturnDatePicker && (
+                        <DateTimePicker
+                            value={returnDate || departureDate || new Date()}
+                            mode="date"
+                            display="default"
+                            onChange={(event, selectedDate) => {
+                                if (selectedDate) {
+                                    setReturnDate(selectedDate);
+                                }
+                                setShowReturnDatePicker(false);
+                            }}
+                            minimumDate={departureDate || new Date()}
+                        />
+                    )}
+                </>
             )}
         </View>
     );
@@ -642,29 +663,37 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
     },
     datePickerContainer: {
-        backgroundColor: '#FFFFFF',
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
         paddingBottom: 20,
+        minHeight: 320,
+        backgroundColor: '#FFFFFF',
     },
     datePickerHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingVertical: 15,
+        paddingHorizontal: 16,
+        paddingVertical: 16,
         borderBottomWidth: 1,
         borderBottomColor: '#F3F3F7',
+        minHeight: 56,
+        backgroundColor: '#FFFFFF',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
     },
     datePickerCancel: {
         fontSize: 16,
-        color: '#666666',
+        color: '#ff0000',
         fontFamily: 'Ubuntu_Regular',
     },
     datePickerTitle: {
-        fontSize: 18,
+        fontSize: 16,
         fontFamily: 'Ubuntu_Bold',
         color: '#000',
+        flex: 1,
+        textAlign: 'center',
+        paddingHorizontal: 8,
     },
     datePickerConfirm: {
         fontSize: 16,
@@ -674,12 +703,12 @@ const styles = StyleSheet.create({
     searchButton: {
         backgroundColor: '#1776ba',
         borderRadius: 15,
-        height: 50,
+        height: 55,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         gap: 10,
-        marginTop: 5,
+        marginTop: 10,
     },
     searchButtonText: {
         fontSize: 16,
@@ -718,6 +747,13 @@ const styles = StyleSheet.create({
     typeItemTextSelected: {
         color: '#1776ba',
         fontFamily: 'Ubuntu_Medium',
+    },
+    datePickerContent: {
+        height: 216,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingVertical: 8,
+        // backgroundColor: '#000000',
     },
 });
 
