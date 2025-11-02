@@ -177,7 +177,7 @@ const TripSearch = () => {
         setLoadingDepartures(false);
         if (response?.data?.items?.length > 0) {
             // TODO: Afficher la liste des départs disponibles sur une nouvelle page, en l'occurence TripListScreen
-            // navigation.navigate('TripList', { departures: response?.data });
+            navigation.navigate('trip/trip-list', { departures: response?.data });
         } else {
             Alert.alert('Information !', 'Aucun départ disponible pour la recherche');
         }
@@ -207,8 +207,8 @@ const TripSearch = () => {
                     onPress={() => navigation.goBack()}
                     style={styles.backButton}
                 >
-                    <Icon name="arrow-left" size={20} color="#000" />
-                    <Text style={styles.backButtonText}>Retour</Text>
+                    <Icon name="arrow-left" size={25} color="#000" />
+                    {/* <Text style={styles.backButtonText}>Retour</Text> */}
                 </Pressable>
             </View>
             <ScrollView

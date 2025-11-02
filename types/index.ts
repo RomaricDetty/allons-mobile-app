@@ -37,3 +37,38 @@ export type City = {
     id: string;
     name: string;
 };
+
+/**
+ * Type pour un trajet (départ)
+ */
+export type TripItem = {
+    id: string;
+    departureCity: string;
+    arrivalCity: string;
+    departureDateTime: string;
+    departureTime: string;
+    arrivalTime: string;
+    duration: string;
+    price: number;
+    currency: string;
+    companyId: string;
+    company: string;
+    companyLogo: string;
+    companyAbbreviation: string;
+    licencePlate: string;
+    availableSeats: number;
+    totalSeats: number;
+    departureStation: string;
+    arrivalStation: string;
+    options: string[];
+    busType: string;
+};
+
+/**
+ * Type pour les données reçues
+ */
+export type DeparturesData = {
+    items: TripItem[];
+    total: number;
+    filters?: any;
+};
