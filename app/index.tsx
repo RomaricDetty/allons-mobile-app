@@ -2,7 +2,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Dimensions, Image, StyleSheet, View } from 'react-native';
+import { Dimensions, StyleSheet, Text, View } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
 
@@ -59,11 +59,12 @@ const Index = () => {
     if (showSplash && onboardingDone) {
         return (
             <View style={styles.splashContainer}>
-                <Image
+                {/* <Image
                     source={require('@/assets/images/logo-allon-blanc.png')}
                     resizeMode="contain"
                     style={styles.logo}
-                />
+                /> */}
+                <Text style={{ fontSize: 50, fontFamily: 'Ubuntu_Bold', color: '#ffffff' }}>AllOn</Text>
             </View>
         );
     }
@@ -74,7 +75,7 @@ const Index = () => {
 const styles = StyleSheet.create({
     splashContainer: {
         flex: 1,
-        backgroundColor: '#1776BA', // Couleur bleue de la marque
+        backgroundColor: '#1776BA',
         justifyContent: 'center',
         alignItems: 'center',
         width: width,
