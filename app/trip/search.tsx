@@ -176,6 +176,7 @@ const TripSearch = () => {
         console.log('Les départs disponibles : ', response?.data);
         setLoadingDepartures(false);
         if (response?.data?.items?.length > 0) {
+            // TODO: Afficher la liste des départs disponibles sur une nouvelle page, en l'occurence TripListScreen
             // navigation.navigate('TripList', { departures: response?.data });
         } else {
             Alert.alert('Information !', 'Aucun départ disponible pour la recherche');
