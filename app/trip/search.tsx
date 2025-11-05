@@ -3,6 +3,7 @@ import { getCities } from "@/api/city";
 import { getAvailableDepartures } from "@/api/departure";
 import { BottomSheet } from "@/components/bottom-sheet";
 import { City } from "@/types";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation } from "@react-navigation/native";
 import React, { useEffect, useMemo, useState } from 'react';
@@ -129,7 +130,7 @@ const TripSearch = () => {
             }
             return;
         }
-        
+
         // Sur iOS, mettre à jour l'état temporaire pour afficher dans le picker
         if (selectedDate) {
             setTempDepartureDate(selectedDate);
@@ -148,7 +149,7 @@ const TripSearch = () => {
      * Gère la recherche de trajet
      * 
      */
-    const handleSearch = async() => {
+    const handleSearch = async () => {
 
         // Vérification que tous les champs requis sont remplis (sauf date de retour pour ONE_WAY)
         if (!departureCity || !arrivalCity || !departureDate) {
@@ -177,7 +178,7 @@ const TripSearch = () => {
         setLoadingDepartures(false);
         if (response?.data?.items?.length > 0) {
             // TODO: Afficher la liste des départs disponibles sur une nouvelle page, en l'occurence TripListScreen
-            navigation.navigate('trip/trip-list', { departures: response?.data });
+            navigation.navigate('trip/trip-list', { departures: response?.data, searchParams: { numberOfPersons } });
         } else {
             Alert.alert('Information !', 'Aucun départ disponible pour la recherche');
         }
@@ -263,7 +264,7 @@ const TripSearch = () => {
                     </Pressable>
 
                     {/* Départ (date) */}
-                    <Pressable 
+                    <Pressable
                         style={styles.field}
                         onPress={() => {
                             setDepartureDate(tempDepartureDate);
@@ -288,7 +289,7 @@ const TripSearch = () => {
 
                     {/* Date de retour - Affiché uniquement si Aller-retour */}
                     {typeDeparture === 'ROUND_TRIP' && (
-                        <Pressable 
+                        <Pressable
                             style={styles.field}
                             onPress={() => {
                                 setReturnDate(tempReturnDate);
@@ -319,22 +320,34 @@ const TripSearch = () => {
                             styles.fieldText,
                             !numberOfPersons && styles.fieldPlaceholder
                         ]}>
-                            {numberOfPersons 
-                                ? passengerOptions.find(opt => opt.value === numberOfPersons)?.label 
+                            {numberOfPersons
+                                ? passengerOptions.find(opt => opt.value === numberOfPersons)?.label
                                 : 'Nombre de voyageurs'}
                         </Text>
                         <Icon name="chevron-down" size={20} color="#000" />
                     </Pressable>
 
                     {/* Bouton Rechercher */}
-                    <Pressable
-                        disabled={loadingDepartures}
-                        style={styles.searchButton}
-                        onPress={() => handleSearch()}
-                    >
-                        {loadingDepartures && <ActivityIndicator size="small" color="#FFFFFF" />}
-                        <Text style={[styles.searchButtonText, { opacity: loadingDepartures ? 0.5 : 1 }]}>Rechercher</Text>
-                    </Pressable>
+                    <View style={{marginTop: 10}}>
+                        {loadingDepartures &&
+                            <View style={[styles.searchButton, { opacity: 0.5 }]}>
+                                <ActivityIndicator size="small" color="#FFFFFF" />
+                            </View>
+                        }
+
+                        {!loadingDepartures &&
+                            <Pressable
+                                disabled={loadingDepartures}
+                                style={styles.searchButton}
+                                onPress={() => handleSearch()}
+                            >
+                                {/* {loadingDepartures && <ActivityIndicator size="small" color="#FFFFFF" />} */}
+                                {/* <Text style={[styles.searchButtonText, { opacity: loadingDepartures ? 0.5 : 1 }]}>Rechercher</Text> */}
+                                <MaterialIcons name="search" size={30} color="#FFFFFF" />
+                            </Pressable>
+                        }
+                    </View>
+
                 </View>
                 {/* Formulaire de recherche */}
             </ScrollView>
@@ -407,10 +420,10 @@ const TripSearch = () => {
                                 onClose();
                             }}
                         >
-                            <Icon 
-                                name={isSelected ? "check-circle" : "circle-outline"} 
-                                size={24} 
-                                color={isSelected ? "#1776ba" : "#CCCCCC"} 
+                            <Icon
+                                name={isSelected ? "check-circle" : "circle-outline"}
+                                size={24}
+                                color={isSelected ? "#1776ba" : "#CCCCCC"}
                             />
                             <Text style={[
                                 styles.typeItemText,
@@ -442,10 +455,10 @@ const TripSearch = () => {
                                 onClose();
                             }}
                         >
-                            <Icon 
-                                name={isSelected ? "check-circle" : "circle-outline"} 
-                                size={24} 
-                                color={isSelected ? "#1776ba" : "#CCCCCC"} 
+                            <Icon
+                                name={isSelected ? "check-circle" : "circle-outline"}
+                                size={24}
+                                color={isSelected ? "#1776ba" : "#CCCCCC"}
                             />
                             <Text style={[
                                 styles.typeItemText,
@@ -608,7 +621,7 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 20,
         fontFamily: 'Ubuntu_Bold',
-        marginBottom: 20,
+        marginBottom: 10,
         textAlign: 'center',
     },
     backButton: {
@@ -637,15 +650,18 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         padding: 20,
         gap: 15,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     field: {
         backgroundColor: '#F3F3F7',
         borderRadius: 15,
-        height: 55,
+        height: 60,
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 15,
         gap: 12,
+        marginVertical: 3,
     },
     fieldText: {
         flex: 1,
@@ -703,13 +719,12 @@ const styles = StyleSheet.create({
     },
     searchButton: {
         backgroundColor: '#1776ba',
-        borderRadius: 15,
+        borderRadius: 100,
         height: 55,
+        width: 55,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 10,
-        marginTop: 10,
     },
     searchButtonText: {
         fontSize: 16,

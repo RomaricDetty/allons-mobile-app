@@ -31,6 +31,13 @@ export type PopularTrip = {
 };
 
 /**
+ * Type pour la réponse de l'API des trajets populaires
+ */
+export type PopularTripsResponse = {
+    data: PopularTrip[];
+};
+
+/**
  * Type pour les données d'une ville (recherche de trajet)
  */
 export type City = {
@@ -41,7 +48,7 @@ export type City = {
 /**
  * Type pour un trajet (départ)
  */
-export type TripItem = {
+export type Trip = {
     id: string;
     departureCity: string;
     arrivalCity: string;
@@ -67,8 +74,15 @@ export type TripItem = {
 /**
  * Type pour les données reçues
  */
-export type DeparturesData = {
-    items: TripItem[];
+export type Departures = {
+    items: Trip[];
     total: number;
     filters?: any;
+};
+
+/**
+ * Type pour les paramètres de recherche de trajet
+ */
+export type SearchParams = {
+    numberOfPersons: number;
 };

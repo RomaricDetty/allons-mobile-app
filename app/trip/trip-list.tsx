@@ -1,5 +1,7 @@
 // @ts-nocheck
-import { DeparturesData, TripItem } from '@/types';
+import { capitalizeBusType } from '@/constants/functions';
+import { Departures, SearchParams, Trip } from '@/types';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import React, { useState } from 'react';
 import {
@@ -14,7 +16,6 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-
 /**
  * Écran de liste des trajets disponibles
  * Affiche les trajets trouvés avec possibilité de filtres et de tri
@@ -23,43 +24,37 @@ const TripList = () => {
     const route = useRoute();
     const navigation = useNavigation();
     const insets = useSafeAreaInsets();
-    
+
     // Récupération des données passées en paramètre
-    const { departures } = (route.params as { departures?: DeparturesData }) || {};
+    const { departures, searchParams } = (route.params as { departures?: Departures, searchParams?: SearchParams }) || {};
     const trips = departures?.items || [];
     const totalTrips = departures?.total || 0;
-    
+
     // États pour les dropdowns et modals
     const [showFiltersModal, setShowFiltersModal] = useState(false);
     const [showDisplayModal, setShowDisplayModal] = useState(false);
     const [showSortModal, setShowSortModal] = useState(false);
-    
+
     // États pour les filtres
     const [selectedSort, setSelectedSort] = useState('Prix croissant');
-    
+
     // Récupération des villes depuis le premier trajet
     const departureCity = trips[0]?.departureCity || '';
     const arrivalCity = trips[0]?.arrivalCity || '';
-    
-    /**
-     * Capitalise la première lettre du type de bus
-     */
-    const capitalizeBusType = (busType: string) => {
-        return busType.charAt(0).toUpperCase() + busType.slice(1);
-    };
-    
+
+
     /**
      * Gère la sélection d'un trajet
      */
-    const handleSelectTrip = (trip: TripItem) => {
-        // TODO: Navigation vers l'écran de sélection de sièges ou détails
-        console.log('Trajet sélectionné:', trip);
+    const handleSelectTrip = (trip: Trip) => {
+        navigation.navigate('trip/trip-summary', { trip, searchParams });
+
     };
-    
+
     /**
      * Composant pour une carte de trajet
      */
-    const TripCard = ({ item }: { item: TripItem }) => {
+    const TripCard = ({ item }: { item: Trip }) => {
         return (
             <View style={styles.tripCard}>
                 {/* En-tête de la carte : Logo compagnie et Prix */}
@@ -80,7 +75,7 @@ const TripList = () => {
                         <Text style={styles.currency}>{item.currency}</Text>
                     </View>
                 </View>
-                
+
                 {/* Section Départ */}
                 <View style={styles.timeSection}>
                     <View style={styles.departureSection}>
@@ -89,7 +84,7 @@ const TripList = () => {
                         <Text style={styles.city}>{item.departureCity}</Text>
                         <Text style={styles.station}>{item.departureStation}</Text>
                     </View>
-                    
+
                     {/* Timeline */}
                     <View style={styles.timelineContainer}>
                         <View style={styles.timelineDot} />
@@ -97,7 +92,7 @@ const TripList = () => {
                         <View style={styles.timelineDot} />
                         <Text style={styles.duration}>{item.duration}</Text>
                     </View>
-                    
+
                     {/* Section Arrivée */}
                     <View style={styles.arrivalSection}>
                         <Text style={styles.sectionLabel}>ARRIVÉE</Text>
@@ -106,7 +101,7 @@ const TripList = () => {
                         <Text style={styles.station}>{item.arrivalStation}</Text>
                     </View>
                 </View>
-                
+
                 {/* Options et Disponibilité */}
                 <View style={styles.optionsSection}>
                     <View style={styles.optionsRow}>
@@ -117,16 +112,25 @@ const TripList = () => {
                             </View>
                         ))}
                     </View>
-                    
-                    <View style={styles.availabilityBadge}>
-                        <Text style={styles.availabilityText}>
-                            {item.availableSeats} places disponibles
-                        </Text>
+
+                    <View style={
+                        {
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 5,
+                            justifyContent: 'space-between',
+                            marginTop: 20,
+                        }
+                    }>
+                        <View style={styles.availabilityBadge}>
+                            <Text style={styles.availabilityText}>
+                                {item.availableSeats} places disponibles
+                            </Text>
+                        </View>
+                        <Text style={styles.busType}>{capitalizeBusType(item.busType)}</Text>
                     </View>
-                    
-                    <Text style={styles.busType}>{capitalizeBusType(item.busType)}</Text>
                 </View>
-                
+
                 {/* Bouton Réserver */}
                 <Pressable
                     style={styles.selectButton}
@@ -137,7 +141,7 @@ const TripList = () => {
             </View>
         );
     };
-    
+
     return (
         <View style={styles.container}>
             {/* Header avec bouton retour */}
@@ -148,16 +152,16 @@ const TripList = () => {
                 >
                     <Icon name="arrow-left" size={25} color="#000" />
                 </Pressable>
-                
+
                 {/* Bouton Filtres */}
-                <Pressable
+                {/* <Pressable
                     style={styles.filterButton}
                     onPress={() => setShowFiltersModal(true)}
                 >
                     <Icon name="filter-variant" size={20} color="#000" />
                     <Text style={styles.filterButtonText}>Filtres</Text>
-                </Pressable>
-                
+                </Pressable> */}
+
                 {/* Dropdown Afficher */}
                 {/* <Pressable
                     style={styles.displayButton}
@@ -167,7 +171,7 @@ const TripList = () => {
                     <Icon name="chevron-down" size={20} color="#000" />
                 </Pressable> */}
             </View>
-            
+
             <ScrollView
                 style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}
@@ -179,7 +183,7 @@ const TripList = () => {
                     <Icon name="arrow-right" size={24} color="#1776BA" />
                     <Text style={styles.routeCity}>{arrivalCity}</Text>
                 </View>
-                
+
                 {/* Résumé et Tri */}
                 <View style={styles.summaryContainer}>
                     <Text style={styles.summaryText}>
@@ -193,7 +197,7 @@ const TripList = () => {
                         <Icon name="chevron-down" size={16} color="#000" />
                     </Pressable>
                 </View>
-                
+
                 {/* Liste des trajets */}
                 {trips.length > 0 ? (
                     <FlatList
@@ -205,11 +209,12 @@ const TripList = () => {
                     />
                 ) : (
                     <View style={styles.emptyContainer}>
+                        <MaterialIcons name="directions-bus" size={40} color="#1776BA" />
                         <Text style={styles.emptyText}>Aucun trajet disponible</Text>
                     </View>
                 )}
             </ScrollView>
-            
+
             {/* Modal Filtres (à implémenter) */}
             <Modal
                 visible={showFiltersModal}
@@ -235,7 +240,7 @@ const TripList = () => {
                     </View>
                 </Pressable>
             </Modal>
-            
+
             {/* Modal Afficher (à implémenter) */}
             <Modal
                 visible={showDisplayModal}
@@ -261,7 +266,7 @@ const TripList = () => {
                     </View>
                 </Pressable>
             </Modal>
-            
+
             {/* Modal Tri */}
             <Modal
                 visible={showSortModal}
@@ -353,7 +358,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         gap: 12,
-        marginBottom: 20,
+        marginBottom: 15,
+        marginTop: 10,
     },
     routeCity: {
         fontSize: 24,
@@ -364,7 +370,8 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 16,
+        marginBottom: 20,
+        marginTop: 10,
     },
     summaryText: {
         fontSize: 16,
@@ -389,11 +396,11 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         padding: 16,
         marginBottom: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
+        // shadowColor: '#000',
+        // shadowOffset: { width: 0, height: 2 },
+        // shadowOpacity: 0.1,
+        // shadowRadius: 4,
+        // elevation: 3,
     },
     cardHeader: {
         flexDirection: 'row',
@@ -450,7 +457,8 @@ const styles = StyleSheet.create({
     timeSection: {
         flexDirection: 'row',
         alignItems: 'flex-start',
-        marginBottom: 16,
+        marginBottom: 20,
+        marginTop: 10,
         gap: 12,
     },
     departureSection: {
@@ -563,9 +571,10 @@ const styles = StyleSheet.create({
         paddingVertical: 40,
     },
     emptyText: {
-        fontSize: 16,
+        fontSize: 18,
         fontFamily: 'Ubuntu_Regular',
         color: '#666',
+        marginTop: 10,
     },
     modalOverlay: {
         flex: 1,

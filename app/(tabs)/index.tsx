@@ -10,11 +10,12 @@ import { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     FlatList,
-    Platform, Pressable, RefreshControl,
+    Pressable, RefreshControl,
     ScrollView, StyleSheet, Text,
     useWindowDimensions,
     View
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 
@@ -27,6 +28,7 @@ export default function HomeScreen() {
     const colorScheme = useColorScheme() ?? 'dark';
     const backgroundColor = useThemeColor({}, 'background');
     const textColor = useThemeColor({}, 'text');
+    const insets = useSafeAreaInsets();
     const navigation = useNavigation();
     const searchBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#F3F3F7';
     const searchTextColor = colorScheme === 'dark' ? '#9BA1A6' : '#A6A6AA';
@@ -109,7 +111,8 @@ export default function HomeScreen() {
                 </View>
             ) : (
                 <ScrollView
-                    style={{ backgroundColor }}
+                    style={{ backgroundColor, paddingTop: insets.top }}
+                    contentContainerStyle={{ paddingTop: 0 }}
                     refreshControl={
                         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
                     }>
@@ -264,7 +267,6 @@ const styles = StyleSheet.create({
     titleContainer: {
         width: '100%',
         paddingHorizontal: 20,
-        paddingTop: Platform.OS === 'ios' ? 60 : 60,
     },
     title: {
         fontSize: 30,
