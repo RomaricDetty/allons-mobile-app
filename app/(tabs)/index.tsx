@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { getPopularTrips } from '@/api/trip';
-import { ItineraryCard, type ItineraryData } from '@/components/itinerary-card';
-import { formatDuration, formatPrice } from '@/constants/functions';
+import { DepartureCard } from '@/components/departure-card';
+import { ItineraryCard } from '@/components/itinerary-card';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { PopularTrip } from '@/types';
@@ -34,7 +34,7 @@ export default function HomeScreen() {
     const searchTextColor = colorScheme === 'dark' ? '#9BA1A6' : '#A6A6AA';
     const searchIconColor = colorScheme === 'dark' ? '#9BA1A6' : '#A6A6AA';
 
-    const promotions: ItineraryData[] = [
+    const promotions: PopularTrip[] = [
         {
             id: 1,
             route: 'Abidjan → Yamoussoukro',
@@ -73,14 +73,33 @@ export default function HomeScreen() {
         },
     ];
 
+    /**
+     * Fonction pour rafraîchir la liste des trajets populaires
+     * @returns void
+     */
     const onRefresh = () => {
         setRefreshing(true);
         getPopularTripsFunction();
         setTimeout(() => setRefreshing(false), 2000);
     };
 
-    const handleCardPress = (id: number) => {
+    /**
+     * Fonction pour gérer la pression sur une carte d'itinéraire
+     * @param id - L'ID de l'itinéraire
+     * @returns void
+     */
+    const handlePromoCardPress = (id: number) => {
         console.log('Itinerary pressed:', id);
+    };
+
+    /**
+     * Fonction pour gérer la pression sur un trajet populaire
+     * @param item - L'itinéraire
+     * @returns void
+     */
+    const handlePopularTripPress = (item: PopularTrip) => {
+        // console.log('Popular trip pressed:', item);
+        navigation.navigate('trip/search', { popularTrip: item as PopularTrip });
     };
 
     /**
@@ -171,54 +190,13 @@ export default function HomeScreen() {
                                         contentContainerStyle={{ gap: 5 }}
                                         pagingEnabled
                                         renderItem={({ item }) => {
-                                            const route = `${item.stationFrom.cityName} → ${item.stationTo.cityName}`;
-                                            const duration = formatDuration(item.durationMinutes);
-
                                             return (
-                                                <View style={[
-                                                    styles.bannerContainer,
-                                                    {
-                                                        width: width - 45,
-                                                        height: height / 6
-                                                    }
-                                                ]}>
-                                                    {/* Icône en arrière-plan avec opacité réduite */}
-                                                    <View style={styles.bannerBackgroundIcon}>
-                                                        <MaterialCommunityIcons
-                                                            name="bus"
-                                                            size={120}
-                                                            color="#FFFFFF"
-                                                            style={styles.backgroundIconStyle}
-                                                        />
-                                                    </View>
-
-                                                    <View style={styles.contentContainer}>
-                                                        <View style={styles.textContainer}>
-                                                            <Text style={styles.bannerTitle}>
-                                                                {route}
-                                                            </Text>
-                                                            <Text style={styles.bannerSubtitle}>
-                                                                {item.companyName}
-                                                            </Text>
-                                                            <View style={styles.bannerInfo}>
-                                                                <View style={styles.bannerInfoItem}>
-                                                                    <MaterialCommunityIcons
-                                                                        name="clock-outline"
-                                                                        size={14}
-                                                                        color="#FFFFFF"
-                                                                    />
-                                                                    <Text style={styles.bannerInfoText}>{duration}</Text>
-                                                                </View>
-                                                                <Text style={{ color: '#FFFFFF', fontFamily: 'Ubuntu_Medium', fontSize: 14 }}>-</Text>
-                                                                <View style={styles.bannerInfoItem}>
-                                                                    <Text style={styles.bannerInfoText}>
-                                                                        {formatPrice(item.basePrice)}
-                                                                    </Text>
-                                                                </View>
-                                                            </View>
-                                                        </View>
-                                                    </View>
-                                                </View>
+                                                <DepartureCard
+                                                    item={item}
+                                                    width={width}
+                                                    height={height}
+                                                    onPress={handlePopularTripPress}
+                                                />
                                             );
                                         }}
                                     />
@@ -233,7 +211,6 @@ export default function HomeScreen() {
                                             />
                                         ))}
                                     </View>
-
                                 </View>
                             </View>
                         )}
@@ -251,7 +228,9 @@ export default function HomeScreen() {
                                 <ItineraryCard
                                     key={item.id}
                                     item={item}
-                                    onPress={handleCardPress}
+                                    width={width}
+                                    height={height}
+                                    onPress={handlePromoCardPress}
                                 />
                             ))}
                         </View>
@@ -387,6 +366,12 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontFamily: 'Ubuntu_Medium',
         color: '#ffffff',
+    },
+
+    bannerSeparator: {
+        color: '#FFFFFF',
+        fontFamily: 'Ubuntu_Medium',
+        fontSize: 14,
     },
 
     pagination: {

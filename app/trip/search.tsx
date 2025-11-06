@@ -2,10 +2,10 @@
 import { getCities } from "@/api/city";
 import { getAvailableDepartures } from "@/api/departure";
 import { BottomSheet } from "@/components/bottom-sheet";
-import { City } from "@/types";
+import { City, PopularTrip } from "@/types";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import React, { useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
@@ -29,6 +29,8 @@ import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 const TripSearch = () => {
     const insets = useSafeAreaInsets();
     const navigation = useNavigation();
+    const route = useRoute();
+    const { popularTrip } = route.params as { popularTrip?: PopularTrip };
 
     // États pour les champs du formulaire
     const [departureCity, setDepartureCity] = useState<City | null>(null);
@@ -70,6 +72,7 @@ const TripSearch = () => {
     const [showPassengerModal, setShowPassengerModal] = useState<boolean>(false);
     /**
      * Récupère les villes disponibles pour la recherche de trajet
+     * @returns void
      */
     const getCitiesFunction = async () => {
         try {
@@ -84,12 +87,48 @@ const TripSearch = () => {
         }
     }
 
-    useEffect(() => {
-        getCitiesFunction();
-    }, []);
+
+    /**
+     * Pré-remplit les champs du formulaire avec les données du trajet populaire
+     * @param trip - Le trajet populaire
+     * @param citiesList - La liste des villes disponibles
+     * @returns void
+     */
+    const prefillFormFromPopularTrip = (trip: PopularTrip, citiesList: City[]) => {
+        // Trouver la ville de départ
+        const fromCity = citiesList.find(city => city.id === trip.stationFrom.cityId);
+        if (fromCity) {
+            setDepartureCity(fromCity);
+        }
+
+        // Trouver la ville d'arrivée
+        const toCity = citiesList.find(city => city.id === trip.stationTo.cityId);
+        if (toCity) {
+            setArrivalCity(toCity);
+        }
+
+        // Mettre la date du jour par défaut
+        const today = new Date();
+        setDepartureDate(today);
+        setTempDepartureDate(today);
+    }
+
+
+    /**
+     * Vérifie si tous les champs requis sont remplis et lance la recherche automatiquement
+     * @returns void
+     */
+    const checkAndAutoSearch = () => {
+        if (departureCity && arrivalCity && departureDate) {
+            // Lancer la recherche automatiquement
+            handleSearch();
+        }
+    }
 
     /**
      * Gère la sélection d'une ville de départ
+     * @param city - La ville de départ
+     * @returns void
      */
     const handleSelectDepartureCity = (city: City) => {
         setDepartureCity(city);
@@ -98,6 +137,8 @@ const TripSearch = () => {
 
     /**
      * Gère la sélection d'une ville d'arrivée
+     * @param city - La ville d'arrivée
+     * @returns void
      */
     const handleSelectArrivalCity = (city: City) => {
         setArrivalCity(city);
@@ -106,6 +147,8 @@ const TripSearch = () => {
 
     /**
      * Gère la sélection du type de départ
+     * @param typeId - L'ID du type de départ
+     * @returns void
      */
     const handleSelectTypeDeparture = (typeId: string) => {
         setTypeDeparture(typeId);
@@ -118,6 +161,9 @@ const TripSearch = () => {
 
     /**
      * Gère la sélection de la date de départ
+     * @param event - L'événement
+     * @param selectedDate - La date sélectionnée
+     * @returns void
      */
     const handleDateChange = (event: any, selectedDate?: Date) => {
         // Sur Android, fermer immédiatement après sélection
@@ -139,6 +185,8 @@ const TripSearch = () => {
 
     /**
      * Gère la sélection du nombre de voyageurs
+     * @param value - Le nombre de voyageurs
+     * @returns void
      */
     const handleSelectPassenger = (value: number) => {
         setNumberOfPersons(value);
@@ -147,7 +195,7 @@ const TripSearch = () => {
 
     /**
      * Gère la recherche de trajet
-     * 
+     * @returns void
      */
     const handleSearch = async () => {
 
@@ -163,9 +211,7 @@ const TripSearch = () => {
             return;
         }
 
-        // page=1&pageSize=10&cityFromId=4fb8166f-6a31-464d-be16-e9d74198895b&cityToId=c0297edd-7d0f-4799-8cf3-edc9213ee64e&dateFrom=2025-11-01&dateTo=&companyId=&passengerCount=1
         const queryParams = `page=1&pageSize=10&cityFromId=${departureCity?.id}&cityToId=${arrivalCity?.id}&dateFrom=${departureDate?.toISOString()}&dateTo=${returnDate?.toISOString() || ''}&companyId=&passengerCount=${numberOfPersons}`;
-        console.log('queryParams => ', queryParams);
 
         setLoadingDepartures(true);
         const response = await getAvailableDepartures(queryParams).catch((error: any) => {
@@ -177,7 +223,6 @@ const TripSearch = () => {
         console.log('Les départs disponibles : ', response?.data);
         setLoadingDepartures(false);
         if (response?.data?.items?.length > 0) {
-            // TODO: Afficher la liste des départs disponibles sur une nouvelle page, en l'occurence TripListScreen
             navigation.navigate('trip/trip-list', { departures: response?.data, searchParams: { numberOfPersons } });
         } else {
             Alert.alert('Information !', 'Aucun départ disponible pour la recherche');
@@ -186,6 +231,7 @@ const TripSearch = () => {
 
     /**
      * Liste filtrée des villes pour le départ (exclut la ville d'arrivée)
+     * @returns Array<City>
      */
     const availableDepartureCities = useMemo(() => {
         if (!arrivalCity) return cities;
@@ -194,11 +240,46 @@ const TripSearch = () => {
 
     /**
      * Liste filtrée des villes pour l'arrivée (exclut la ville de départ)
+     * @returns Array<City>
      */
     const availableArrivalCities = useMemo(() => {
         if (!departureCity) return cities;
         return cities.filter(city => city.id !== departureCity.id);
     }, [cities, departureCity]);
+
+
+    /**
+     * Pour récupérer les villes disponibles
+     * @returns void
+     */
+    useEffect(() => {
+        getCitiesFunction();
+    }, []);
+
+    /**
+     * Pour pré-remplir le formulaire quand le trajet populaire et les villes sont disponibles
+     * @returns void
+     */
+    useEffect(() => {
+        if (popularTrip && cities.length > 0) {
+            prefillFormFromPopularTrip(popularTrip, cities);
+        }
+    }, [popularTrip, cities]);
+
+    /**
+     * Pour lancer automatiquement la recherche si tous les champs sont remplis
+     * @returns void
+     */
+    useEffect(() => {
+        if (departureCity && arrivalCity && departureDate && popularTrip) {
+            // Attendre un court délai pour s'assurer que tout est bien initialisé
+            const timer = setTimeout(() => {
+                checkAndAutoSearch();
+            }, 500);
+            return () => clearTimeout(timer);
+        }
+    }, [departureCity, arrivalCity, departureDate, popularTrip]);
+
 
     return (
         <View style={styles.container}>

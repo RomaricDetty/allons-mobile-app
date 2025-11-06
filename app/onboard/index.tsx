@@ -11,7 +11,6 @@ import {
 const Onboard = () => {
     /**
      * Dimensions of the window
-     * @type {Dimensions}
      * Get the width and height of the window
      * @returns void
      */
@@ -19,7 +18,6 @@ const Onboard = () => {
 
     /**
      * Images for the onboarding
-     * @type {Array<{id: number, bg: ImageSourcePropType, person: ImageSourcePropType, text_1: string, text_2: string, color_text: string}>}
      */
     const imagesOnboarding = [
         {
@@ -50,20 +48,16 @@ const Onboard = () => {
 
     /**
      * ScrollX value
-     * @type {Animated.Value}
      */
     const scrollX = React.useRef(new Animated.Value(0)).current;
     /**
      * Current index
-     * @type {number}
      */
     const [currentIndex, setCurrentIndex] = React.useState(0);
+    
     /**
      * On view change reference
-     * @type {React.RefObject<{viewableItems: {index: number}[]}>}
      */
-
-    // @ts-ignore
     const onViewChangeRef = React.useRef(({ viewableItems }) => {
         setCurrentIndex(viewableItems[0]?.index ?? 0);
     });
@@ -165,14 +159,6 @@ const Onboard = () => {
                     zIndex: 10
                 }}
             >
-                {/* <Image
-                    source={require('@/assets/images/icon.png')}
-                    resizeMode="contain"
-                    style={{
-                        width: 80,
-                        height: 80
-                    }}
-                /> */}
                 <Image source={require('@/assets/images/logo-allon-blanc.png')} resizeMode="cover" style={{ width: 75, height: 75 }} />
                 {/* <Text style={{ fontSize: 32, fontFamily: 'Ubuntu_Bold', color: '#ffffff' }}>AllOn</Text> */}
             </View>
@@ -272,8 +258,14 @@ const Onboard = () => {
                     );
                 }}
             />
-            {/* @ts-ignore */}
-            <View key={`dots-container`} style={{ alignItems: 'center', justifyContent: 'center' }}>
+
+            <View 
+                key={`dots-container`} 
+                style={{ 
+                    alignItems: 'center', 
+                    justifyContent: 'center' 
+                }}
+            >
                 <Dots />
             </View>
         </View>

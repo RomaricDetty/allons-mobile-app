@@ -86,3 +86,13 @@ export type Departures = {
 export type SearchParams = {
     numberOfPersons: number;
 };
+
+/**
+ * Type pour les props de la carte de départ
+ */
+export type DepartureCardProps = {
+    item: PopularTrip;
+    width: number;
+    height: number;
+    onPress?: (item: PopularTrip) => void;
+};
