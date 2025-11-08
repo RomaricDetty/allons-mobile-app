@@ -1,15 +1,19 @@
 // @ts-nocheck
-import { formatPrice } from '@/constants/functions';
+import { EmergencyContactBlock } from '@/components/passengers/EmergencyContactBlock';
+import { ErrorModal } from '@/components/passengers/ErrorModal';
+import { PassengersInfoBlock } from '@/components/passengers/PassengersInfoBlock';
+import { PaymentMethodBlock } from '@/components/passengers/PaymentMethodBlock';
+import { SelectionBottomSheet } from '@/components/passengers/SelectionBottomSheet';
+import { SummaryBlock } from '@/components/passengers/SummaryBlock';
 import { SearchParams, Trip } from '@/types';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import React, { useMemo, useState } from 'react';
 import {
-    Modal,
+    Alert,
     Pressable,
     ScrollView,
     StyleSheet,
     Text,
-    TextInput,
     View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -33,20 +37,19 @@ const PassengersInfo = () => {
         const initial = [];
         for (let i = 0; i < numberOfPersons; i++) {
             initial.push({
-                firstName: i === 0 ? 'Detty Romaric' : '',
-                lastName: i === 0 ? 'GUEU' : '',
-                phone: i === 0 ? '0757391917' : '',
-                seatNumber: null as number | null, // Ajouter le numéro de siège
+                firstName: i === 0 ? '' : '',
+                lastName: i === 0 ? '' : '',
+                phone: i === 0 ? '' : '',
+                seatNumber: null as number | null,
+                passengerType: 'adult' as string, // Type de passager par défaut
             });
         }
         return initial;
     });
 
-
     // États pour les informations de contact
-    const [contactPhone, setContactPhone] = useState('0757391917');
-    const [contactEmail, setContactEmail] = useState('dettyromaric@gmail.com');
-    const [passengerType, setPassengerType] = useState('Adulte');
+    const [contactPhone, setContactPhone] = useState('');
+    const [contactEmail, setContactEmail] = useState('');
 
     // États pour le contact d'urgence
     const [emergencyContact, setEmergencyContact] = useState({
@@ -64,9 +67,13 @@ const PassengersInfo = () => {
     const [showSelectionBottomSheet, setShowSelectionBottomSheet] = useState(false);
     const [selectionType, setSelectionType] = useState<'passengerType' | 'relation' | null>(null);
     const [selectionTitle, setSelectionTitle] = useState('');
-    const [selectionOptions, setSelectionOptions] = useState<string[]>([]);
+    const [selectionOptions, setSelectionOptions] = useState<Array<{value: string, label: string}>>([]);
     const [currentSelectionValue, setCurrentSelectionValue] = useState<string>('');
     const [onSelectionCallback, setOnSelectionCallback] = useState<((value: string) => void) | null>(null);
+
+    // État pour le modal d'erreur
+    const [showErrorModal, setShowErrorModal] = useState(false);
+    const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
     if (!trip) {
         return (
@@ -107,14 +114,123 @@ const PassengersInfo = () => {
     };
 
     /**
+     * Valide tous les champs requis du formulaire
+     * @returns {Object|null} Objet contenant les erreurs ou null si tout est valide
+     */
+    const validateForm = () => {
+        const errors: string[] = [];
+
+        // Validation des passagers
+        passengers.forEach((passenger, index) => {
+            const passengerNumber = passengers.length > 1 ? ` ${index + 1}` : '';
+            
+            if (!passenger.firstName || passenger.firstName.trim() === '') {
+                errors.push(`Le prénom du passager ${passengerNumber} est requis`);
+            }
+            
+            if (!passenger.lastName || passenger.lastName.trim() === '') {
+                errors.push(`Le nom du passager ${passengerNumber} est requis`);
+            }
+            
+            if (!passenger.phone || passenger.phone.trim() === '') {
+                errors.push(`Le téléphone du passager ${passengerNumber} est requis`);
+            }
+        });
+
+        // Validation du type de passager pour chaque passager
+        passengers.forEach((passenger, index) => {
+            const passengerNumber = passengers.length > 1 ? ` ${index + 1}` : '';
+            if (!passenger.passengerType || passenger.passengerType.trim() === '') {
+                errors.push(`Le type de passager${passengerNumber} est requis`);
+            }
+        });
+
+        // Validation du contact d'urgence
+        if (!emergencyContact.firstName || emergencyContact.firstName.trim() === '') {
+            errors.push('Le prénom du contact d\'urgence est requis');
+        }
+        
+        if (!emergencyContact.lastName || emergencyContact.lastName.trim() === '') {
+            errors.push('Le nom du contact d\'urgence est requis');
+        }
+        
+        if (!emergencyContact.phone || emergencyContact.phone.trim() === '') {
+            errors.push('Le téléphone du contact d\'urgence est requis');
+        }
+        
+        if (!emergencyContact.relation || emergencyContact.relation.trim() === '') {
+            errors.push('La relation avec le contact d\'urgence est requise');
+        }
+
+        // Validation de la méthode de paiement
+        if (!selectedPaymentMethod) {
+            errors.push('La méthode de paiement est requise');
+        }
+
+        return errors.length > 0 ? errors : null;
+    };
+
+    /**
      * Gère la soumission du formulaire
      */
     const handleConfirmAndPay = () => {
-        // TODO: Valider les champs et procéder au paiement
-        console.log('Passagers:', passengers);
-        console.log('Contact:', { contactPhone, contactEmail, passengerType });
-        console.log('Contact d\'urgence:', emergencyContact);
-        console.log('Méthode de paiement:', selectedPaymentMethod);
+        // Validation des champs requis
+        const validationErrors = validateForm();
+        
+        if (validationErrors) {
+            console.warn('Erreurs de validation:', validationErrors);
+            // setValidationErrors(validationErrors);
+            // setShowErrorModal(true);
+            Alert.alert('Attention !', "Veuillez remplir tous les champs requis");
+            return;
+        }
+
+        // Préparation des données pour chaque passager
+        const passengersData = passengers.map((passenger, index) => ({
+            number: index + 1,
+            isPrincipal: index === 0,
+            firstName: passenger.firstName.trim(),
+            lastName: passenger.lastName.trim(),
+            phone: passenger.phone.trim(),
+            passengerType: passenger.passengerType,
+            seatNumber: passenger.seatNumber
+        }));
+
+        // Préparation des données complètes
+        const formData = {
+            passengers: passengersData,
+            emergencyContact: {
+                firstName: emergencyContact.firstName.trim(),
+                lastName: emergencyContact.lastName.trim(),
+                phone: emergencyContact.phone.trim(),
+                email: emergencyContact.email.trim() || null,
+                relation: emergencyContact.relation.trim()
+            },
+            payment: {
+                method: selectedPaymentMethod
+            },
+            trip: {
+                id: trip.id,
+                departureCity: trip.departureCity,
+                arrivalCity: trip.arrivalCity,
+                price: trip.price,
+                company: trip.company,
+                companyId: trip.companyId,
+            },
+            summary: {
+                numberOfPersons: numberOfPersons,
+                totalPrice: totalPrice,
+                fees: fees,
+                taxes: taxes,
+                totalAmount: totalAmount
+            }
+        };
+
+        // Affichage des informations dans la console
+        console.log('=== DONNÉES COMPLÈTES ===');
+        console.log(JSON.stringify(formData, null, 2));
+
+        // TODO: Procéder au paiement
     };
 
     /**
@@ -123,7 +239,7 @@ const PassengersInfo = () => {
     const openSelectionBottomSheet = (
         type: 'passengerType' | 'relation',
         title: string,
-        options: string[],
+        options: Array<{value: string, label: string}>,
         currentValue: string,
         onSelect: (value: string) => void
     ) => {
@@ -157,222 +273,6 @@ const PassengersInfo = () => {
         closeSelectionBottomSheet();
     };
 
-    /**
-     * Composant pour un champ de formulaire
-     */
-    const FormField = ({
-        label,
-        value,
-        onChangeText,
-        placeholder,
-        required = false,
-        keyboardType = 'default',
-        editable = true
-    }: {
-        label: string;
-        value: string;
-        onChangeText: (text: string) => void;
-        placeholder?: string;
-        required?: boolean;
-        keyboardType?: 'default' | 'numeric' | 'email-address' | 'phone-pad';
-        editable?: boolean;
-    }) => {
-        return (
-            <View style={styles.formField}>
-                <Text style={styles.formLabel}>
-                    {label} {required && <Text style={styles.required}>*</Text>}
-                </Text>
-                <TextInput
-                    style={[styles.formInput, !editable && styles.formInputDisabled]}
-                    value={value}
-                    onChangeText={onChangeText}
-                    placeholder={placeholder}
-                    placeholderTextColor="#A6A6AA"
-                    keyboardType={keyboardType}
-                    editable={editable}
-                />
-            </View>
-        );
-    };
-
-    /**
-     * Composant pour un champ téléphone avec code pays
-     */
-    const PhoneField = ({
-        label,
-        value,
-        onChangeText,
-        required = false
-    }: {
-        label: string;
-        value: string;
-        onChangeText: (text: string) => void;
-        required?: boolean;
-    }) => {
-        return (
-            <View style={styles.formField}>
-                <Text style={styles.formLabel}>
-                    {label} {required && <Text style={styles.required}>*</Text>}
-                </Text>
-                <View style={styles.phoneContainer}>
-                    <View style={styles.countryCode}>
-                        <Text style={styles.countryCodeText}>+225</Text>
-                    </View>
-                    <TextInput
-                        style={styles.phoneInput}
-                        value={value}
-                        onChangeText={onChangeText}
-                        placeholder="XX XX XX XX"
-                        placeholderTextColor="#A6A6AA"
-                        keyboardType="numeric"
-                    />
-                </View>
-            </View>
-        );
-    };
-
-    /**
-     * Composant pour un sélecteur (dropdown)
-     */
-    const SelectField = ({
-        label,
-        value,
-        placeholder,
-        required = false,
-        selectionType,
-        options,
-        onSelect
-    }: {
-        label: string;
-        value: string;
-        placeholder: string;
-        required?: boolean;
-        selectionType: 'passengerType' | 'relation';
-        options: string[];
-        onSelect: (value: string) => void;
-    }) => {
-        const handlePress = () => {
-            openSelectionBottomSheet(selectionType, label, options, value, onSelect);
-        };
-
-        return (
-            <View style={styles.formField}>
-                <Text style={styles.formLabel}>
-                    {label} {required && <Text style={styles.required}>*</Text>}
-                </Text>
-                <Pressable style={styles.selectInput} onPress={handlePress}>
-                    <Text style={[styles.selectText, !value && styles.selectPlaceholder]}>
-                        {value || placeholder}
-                    </Text>
-                    <Icon name="chevron-down" size={20} color="#666" />
-                </Pressable>
-            </View>
-        );
-    };
-
-    /**
-     * Composant pour une section avec numéro
-     */
-    const SectionHeader = ({ number, title }: { number: number; title: string }) => {
-        return (
-            <View style={styles.sectionHeader}>
-                <View style={styles.sectionNumber}>
-                    <Text style={styles.sectionNumberText}>{number}</Text>
-                </View>
-                <Text style={styles.sectionTitle}>{title}</Text>
-            </View>
-        );
-    };
-
-    /**
-     * Composant pour un badge
-     */
-    const Badge = ({ text, color = '#1776BA' }: { text: string; color?: string }) => {
-        return (
-            <View style={[styles.badge, { backgroundColor: color }]}>
-                <Text style={styles.badgeText}>{text}</Text>
-            </View>
-        );
-    };
-
-    /**
-     * Composant pour une méthode de paiement
-     */
-    const PaymentMethodCard = ({
-        name,
-        icon,
-        isSelected,
-        onPress
-    }: {
-        name: string;
-        icon: string;
-        isSelected: boolean;
-        onPress: () => void;
-    }) => {
-        return (
-            <Pressable
-                style={[styles.paymentMethodCard, isSelected && styles.paymentMethodCardSelected]}
-                onPress={onPress}
-            >
-                <Icon name={icon} size={40} color={isSelected ? '#1776BA' : '#666'} />
-                <Text style={[styles.paymentMethodText, isSelected && styles.paymentMethodTextSelected]}>
-                    {name}
-                </Text>
-            </Pressable>
-        );
-    };
-
-
-    /**
-     * Composant pour le bottom sheet de sélection
-     */
-    const SelectionBottomSheet = () => {
-        return (
-            <Modal
-                visible={showSelectionBottomSheet}
-                transparent={true}
-                animationType="slide"
-                onRequestClose={closeSelectionBottomSheet}
-            >
-                <Pressable
-                    style={styles.selectionBottomSheetOverlay}
-                    onPress={closeSelectionBottomSheet}
-                >
-                    <View
-                        style={styles.selectionBottomSheetContent}
-                        onStartShouldSetResponder={() => true}
-                    >
-                        {/* Header */}
-                        <View style={styles.selectionBottomSheetHeader}>
-                            <Text style={styles.selectionBottomSheetTitle}>{selectionTitle}</Text>
-                            <Pressable
-                                onPress={closeSelectionBottomSheet}
-                                style={styles.selectionBottomSheetCloseButton}
-                            >
-                                <Icon name="close" size={24} color="#000" />
-                            </Pressable>
-                        </View>
-
-                        {/* Options */}
-                        <ScrollView style={styles.selectionOptionsList}>
-                            {selectionOptions.map((option, index) => (
-                                <Pressable
-                                    key={index}
-                                    style={styles.selectionOptionItem}
-                                    onPress={() => handleSelection(option)}
-                                >
-                                    <Text style={styles.selectionOptionText}>{option}</Text>
-                                    {currentSelectionValue === option && (
-                                        <Icon name="check" size={20} color="#1776BA" />
-                                    )}
-                                </Pressable>
-                            ))}
-                        </ScrollView>
-                    </View>
-                </Pressable>
-            </Modal>
-        );
-    };
 
     return (
         <View style={styles.container}>
@@ -430,207 +330,65 @@ const PassengersInfo = () => {
                 {/* Carte principale */}
                 <View style={styles.mainCard}>
                     {/* Section 1 : Informations du passager */}
-                    <SectionHeader number={1} title="Informations du passager" />
-
-                    {passengers.map((passenger, index) => (
-                        <View key={index} style={styles.passengerSection}>
-                            <View style={styles.passengerHeader}>
-                                <Text style={styles.passengerTitle}>Passager {passengers.length > 1 ? index + 1 : ''}</Text>
-                                <View style={styles.badgesContainer}>
-                                    {index === 0 ? (
-                                        <>
-                                            <Badge text="Principal" color="#1776BA" />
-                                            {/* <Pressable
-                                                style={styles.seatBadgeButton}
-                                                onPress={() => {
-                                                    setCurrentPassengerIndex(index);
-                                                    setShowSeatSelection(true);
-                                                }}
-                                            >
-                                                <Text style={styles.seatBadgeText}>
-                                                    {passenger.seatNumber 
-                                                        ? `Siège Aller ${passenger.seatNumber}` 
-                                                        : `Siège Aller ${index + 1}`}
-                                                </Text>
-                                            </Pressable> */}
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Badge text="Accompagnant" color="#1776BA" />
-                                            {/* <Pressable
-                                                style={styles.seatBadgeButton}
-                                                onPress={() => {
-                                                    setCurrentPassengerIndex(index);
-                                                    setShowSeatSelection(true);
-                                                }}
-                                            >
-                                                <Text style={styles.seatBadgeText}>
-                                                    {passenger.seatNumber 
-                                                        ? `Siège Aller ${passenger.seatNumber}` 
-                                                        : `Siège Aller ${index + 1}`}
-                                                </Text>
-                                            </Pressable> */}
-                                        </>
-                                    )}
-                                </View>
-                            </View>
-
-                            <FormField
-                                label="Prénom"
-                                value={passenger.firstName}
-                                onChangeText={(text) => updatePassenger(index, 'firstName', text)}
-                                placeholder="Entrez le prénom"
-                                required
-                            />
-
-                            <FormField
-                                label="Nom"
-                                value={passenger.lastName}
-                                onChangeText={(text) => updatePassenger(index, 'lastName', text)}
-                                placeholder="Entrez le nom"
-                                required
-                            />
-
-                            <PhoneField
-                                label="Téléphone"
-                                value={passenger.phone}
-                                onChangeText={(text) => updatePassenger(index, 'phone', text)}
-                                required
-                            />
-
-                            <FormField
-                                label="Email (optionnel)"
-                                value={contactEmail}
-                                onChangeText={setContactEmail}
-                                placeholder="exemple@email.com"
-                                keyboardType="email-address"
-                            />
-
-                            <SelectField
-                                label="Type de passager"
-                                value={passengerType}
-                                placeholder="Sélectionner un type"
-                                required
-                                selectionType="passengerType"
-                                options={['Adulte', 'Enfant', 'Senior']}
-                                onSelect={(value) => setPassengerType(value)}
-                            />
-                        </View>
-                    ))}
+                    <PassengersInfoBlock
+                        passengers={passengers}
+                        contactEmail={contactEmail}
+                        onUpdatePassenger={updatePassenger}
+                        onUpdateContactEmail={setContactEmail}
+                        onOpenBottomSheet={openSelectionBottomSheet}
+                    />
 
                     {/* Section 2 : Contact d'urgence */}
-                    <SectionHeader number={2} title="Contact d'urgence" />
-
-                    <FormField
-                        label="Prénom"
-                        value={emergencyContact.firstName}
-                        onChangeText={(text) => updateEmergencyContact('firstName', text)}
-                        placeholder="Entrez le prénom"
-                        required
-                    />
-
-                    <FormField
-                        label="Nom"
-                        value={emergencyContact.lastName}
-                        onChangeText={(text) => updateEmergencyContact('lastName', text)}
-                        placeholder="Entrez le nom"
-                        required
-                    />
-
-                    <PhoneField
-                        label="Téléphone"
-                        value={emergencyContact.phone}
-                        onChangeText={(text) => updateEmergencyContact('phone', text)}
-                        required
-                    />
-
-                    <FormField
-                        label="Email (optionnel)"
-                        value={emergencyContact.email}
-                        onChangeText={(text) => updateEmergencyContact('email', text)}
-                        placeholder="exemple@email.com"
-                        keyboardType="email-address"
-                    />
-
-                    <SelectField
-                        label="Relation"
-                        value={emergencyContact.relation}
-                        placeholder="Sélectionner une relation"
-                        required
-                        selectionType="relation"
-                        options={['Parent', 'Conjoint(e)', 'Enfant', 'Frère/Sœur', 'Ami(e)', 'Autre']}
-                        onSelect={(value) => updateEmergencyContact('relation', value)}
+                    <EmergencyContactBlock
+                        emergencyContact={emergencyContact}
+                        onUpdateEmergencyContact={updateEmergencyContact}
+                        onOpenBottomSheet={openSelectionBottomSheet}
                     />
 
                     {/* Section 3 : Méthode de paiement */}
-                    <SectionHeader number={3} title="Méthode de paiement" />
-
-                    <View style={styles.paymentMethodsContainer}>
-                        <PaymentMethodCard
-                            name="Carte de crédit"
-                            icon="credit-card-outline"
-                            isSelected={selectedPaymentMethod === 'credit-card'}
-                            onPress={() => setSelectedPaymentMethod('credit-card')}
-                        />
-                        <PaymentMethodCard
-                            name="Wave"
-                            icon="cash-multiple"
-                            isSelected={selectedPaymentMethod === 'wave'}
-                            onPress={() => setSelectedPaymentMethod('wave')}
-                        />
-                        <PaymentMethodCard
-                            name="Orange Money"
-                            icon="cash-multiple"
-                            isSelected={selectedPaymentMethod === 'orange-money'}
-                            onPress={() => setSelectedPaymentMethod('orange-money')}
-                        />
-                        <PaymentMethodCard
-                            name="MTN Money"
-                            icon="cash-multiple"
-                            isSelected={selectedPaymentMethod === 'mtn-money'}
-                            onPress={() => setSelectedPaymentMethod('mtn-money')}
-                        />
-                    </View>
+                    <PaymentMethodBlock
+                        selectedPaymentMethod={selectedPaymentMethod}
+                        onSelectPaymentMethod={setSelectedPaymentMethod}
+                    />
                 </View>
 
                 {/* Récapitulatif */}
-                <View style={styles.summaryCard}>
-                    <Text style={styles.summaryTitle}>Récapitulatif</Text>
-
-                    <View style={styles.summaryDetails}>
-                        <View style={styles.summaryRow}>
-                            <Text style={styles.summaryLabel}>Voyageurs</Text>
-                            <Text style={styles.summaryValue}>{formatPrice(totalPrice)}</Text>
-                        </View>
-                        <View style={styles.summaryRow}>
-                            <Text style={styles.summaryLabel}>Taxes</Text>
-                            <Text style={styles.summaryValue}>{formatPrice(taxes)}</Text>
-                        </View>
-                        <View style={styles.summaryRow}>
-                            <Text style={styles.summaryLabel}>Frais</Text>
-                            <Text style={styles.summaryValue}>{formatPrice(fees)}</Text>
-                        </View>
-                    </View>
-
-                    <View style={styles.summarySeparator} />
-
-                    <View style={styles.summaryTotalRow}>
-                        <Text style={styles.summaryTotalLabel}>Total</Text>
-                        <Text style={styles.summaryTotalValue}>{formatPrice(totalAmount)}</Text>
-                    </View>
-
-                    <Pressable
-                        style={styles.confirmButton}
-                        onPress={handleConfirmAndPay}
-                    >
-                        <Text style={styles.confirmButtonText}>Confirmer et payer</Text>
-                    </Pressable>
-                </View>
+                <SummaryBlock
+                    totalPrice={totalPrice}
+                    taxes={taxes}
+                    fees={fees}
+                    totalAmount={totalAmount}
+                />
             </ScrollView>
+
+            {/* Bouton fixe en bas de l'écran */}
+            <View style={[styles.fixedButtonContainer, { paddingBottom: insets.bottom + 8, paddingTop: 15 }]}>
+                <Pressable
+                    style={[styles.confirmButton, { width: '60%', alignSelf: 'center' }]}
+                    onPress={handleConfirmAndPay}
+                >
+                    <Text style={styles.confirmButtonText}>Confirmer et payer</Text>
+                </Pressable>
+            </View>
 
 
             {/* Bottom sheet de sélection */}
-            <SelectionBottomSheet />
+            <SelectionBottomSheet
+                visible={showSelectionBottomSheet}
+                title={selectionTitle}
+                options={selectionOptions}
+                currentValue={currentSelectionValue}
+                onSelect={handleSelection}
+                onClose={closeSelectionBottomSheet}
+            />
+
+            {/* Modal d'erreur de validation */}
+            <ErrorModal
+                visible={showErrorModal}
+                title="Attention !"
+                errors={validationErrors}
+                onClose={() => setShowErrorModal(false)}
+            />
         </View>
     );
 };
@@ -712,9 +470,10 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
-        paddingVertical: 8,
+        // paddingVertical: 12,
         backgroundColor: '#FFFFFF',
         gap: 8,
+        paddingBottom: 12,
     },
     progressDot: {
         width: 24,
@@ -735,6 +494,7 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         padding: 16,
+        paddingBottom: 100, // Espace pour le bouton fixe en bas
     },
     titleSection: {
         marginBottom: 20,
@@ -755,225 +515,27 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         padding: 16,
         marginBottom: 20,
-    },
-    sectionHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 16,
-        marginTop: 8,
-    },
-    sectionNumber: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: '#1776BA',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 12,
-    },
-    sectionNumberText: {
-        fontSize: 16,
-        fontFamily: 'Ubuntu_Bold',
-        color: '#FFFFFF',
-    },
-    sectionTitle: {
-        fontSize: 18,
-        fontFamily: 'Ubuntu_Bold',
-        color: '#000',
-    },
-    passengerSection: {
-        marginBottom: 24,
-        paddingBottom: 24,
-        borderBottomWidth: 1,
-        borderBottomColor: '#F3F3F7',
-    },
-    passengerHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: 16,
-        flexWrap: 'wrap',
-    },
-    passengerTitle: {
-        fontSize: 16,
-        fontFamily: 'Ubuntu_Bold',
-        color: '#000',
-        marginRight: 8,
-    },
-    badgesContainer: {
-        flexDirection: 'row',
-        gap: 8,
-        flexWrap: 'wrap',
-    },
-    badge: {
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 12,
-    },
-    badgeText: {
-        fontSize: 12,
-        fontFamily: 'Ubuntu_Medium',
-        color: '#FFFFFF',
-    },
-    formField: {
-        marginBottom: 16,
-    },
-    formLabel: {
-        fontSize: 14,
-        fontFamily: 'Ubuntu_Medium',
-        color: '#000',
-        marginBottom: 8,
-    },
-    required: {
-        color: '#FF0000',
-    },
-    formInput: {
-        backgroundColor: '#F3F3F7',
-        borderRadius: 8,
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        fontSize: 14,
-        fontFamily: 'Ubuntu_Regular',
-        color: '#000',
         borderWidth: 1,
         borderColor: '#E0E0E0',
     },
-    formInputDisabled: {
-        backgroundColor: '#F5F5F5',
-        color: '#666',
-    },
-    phoneContainer: {
-        flexDirection: 'row',
-        gap: 8,
-    },
-    countryCode: {
-        backgroundColor: '#F3F3F7',
-        borderRadius: 8,
-        paddingHorizontal: 12,
-        paddingVertical: 12,
-        justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: '#E0E0E0',
-    },
-    countryCodeText: {
-        fontSize: 14,
-        fontFamily: 'Ubuntu_Medium',
-        color: '#000',
-    },
-    phoneInput: {
-        flex: 1,
-        backgroundColor: '#F3F3F7',
-        borderRadius: 8,
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        fontSize: 14,
-        fontFamily: 'Ubuntu_Regular',
-        color: '#000',
-        borderWidth: 1,
-        borderColor: '#E0E0E0',
-    },
-    selectInput: {
-        backgroundColor: '#F3F3F7',
-        borderRadius: 8,
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#E0E0E0',
-    },
-    selectText: {
-        fontSize: 14,
-        fontFamily: 'Ubuntu_Regular',
-        color: '#000',
-    },
-    selectPlaceholder: {
-        color: '#A6A6AA',
-    },
-    paymentMethodsContainer: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 12,
-        marginTop: 8,
-    },
-    paymentMethodCard: {
-        width: '48%',
+    fixedButtonContainer: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
         backgroundColor: '#FFFFFF',
-        borderRadius: 12,
-        padding: 16,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: '#E0E0E0',
-        minHeight: 100,
-    },
-    paymentMethodCardSelected: {
-        borderColor: '#1776BA',
-        borderWidth: 2,
-        backgroundColor: '#F0F8FF',
-    },
-    paymentMethodText: {
-        fontSize: 14,
-        fontFamily: 'Ubuntu_Medium',
-        color: '#666',
-        marginTop: 8,
-        textAlign: 'center',
-    },
-    paymentMethodTextSelected: {
-        color: '#1776BA',
-    },
-    summaryCard: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 12,
-        padding: 16,
-        marginBottom: 20,
-    },
-    summaryTitle: {
-        fontSize: 24,
-        fontFamily: 'Ubuntu_Bold',
-        color: '#000',
-        marginBottom: 16,
-    },
-    summaryDetails: {
-        marginBottom: 12,
-    },
-    summaryRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 12,
-    },
-    summaryLabel: {
-        fontSize: 14,
-        fontFamily: 'Ubuntu_Regular',
-        color: '#000',
-    },
-    summaryValue: {
-        fontSize: 14,
-        fontFamily: 'Ubuntu_Regular',
-        color: '#000',
-    },
-    summarySeparator: {
-        height: 1,
-        backgroundColor: '#E0E0E0',
-        marginVertical: 12,
-    },
-    summaryTotalRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 20,
-    },
-    summaryTotalLabel: {
-        fontSize: 18,
-        fontFamily: 'Ubuntu_Bold',
-        color: '#000',
-    },
-    summaryTotalValue: {
-        fontSize: 18,
-        fontFamily: 'Ubuntu_Bold',
-        color: '#1776BA',
+        paddingHorizontal: 16,
+        paddingTop: 12,
+        borderTopWidth: 1,
+        borderTopColor: '#E0E0E0',
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: -2,
+        },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 5,
     },
     confirmButton: {
         backgroundColor: '#1776BA',
@@ -986,251 +548,6 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontFamily: 'Ubuntu_Bold',
         color: '#FFFFFF',
-    },
-
-    seatBadgeButton: {
-        backgroundColor: '#4CAF50',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 12,
-    },
-    seatBadgeText: {
-        fontSize: 12,
-        fontFamily: 'Ubuntu_Medium',
-        color: '#FFFFFF',
-    },
-    seatModalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        justifyContent: 'flex-end',
-    },
-    seatModalContent: {
-        backgroundColor: '#FFFFFF',
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        maxHeight: '90%',
-        paddingBottom: 20,
-    },
-    seatModalHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: '#E0E0E0',
-    },
-    seatModalTitle: {
-        fontSize: 18,
-        fontFamily: 'Ubuntu_Bold',
-        color: '#000',
-    },
-    seatModalCloseButton: {
-        padding: 4,
-    },
-    busInfoCard: {
-        backgroundColor: '#FFFFFF',
-        marginHorizontal: 16,
-        marginTop: 8,
-        marginBottom: 8,
-        padding: 16,
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: '#E0E0E0',
-    },
-    busInfoTitle: {
-        fontSize: 16,
-        fontFamily: 'Ubuntu_Bold',
-        color: '#1776BA',
-        marginBottom: 12,
-    },
-    busInfoRow: {
-        flexDirection: 'row',
-        gap: 16,
-        marginBottom: 4,
-    },
-    busInfoText: {
-        fontSize: 14,
-        fontFamily: 'Ubuntu_Regular',
-        color: '#000',
-    },
-    busInfoAvailable: {
-        fontSize: 14,
-        fontFamily: 'Ubuntu_Bold',
-        color: '#4CAF50',
-        marginTop: 4,
-    },
-    busVisualContainer: {
-        marginHorizontal: 16,
-        marginBottom: 16,
-        alignItems: 'center',
-    },
-    busShape: {
-        flexDirection: 'row',
-        width: '100%',
-        maxWidth: 400,
-    },
-    busFrontSection: {
-        width: 60,
-        height: 50,
-        backgroundColor: '#1776BA',
-        borderTopLeftRadius: 8,
-        borderBottomLeftRadius: 8,
-    },
-    busBodySection: {
-        flex: 1,
-        height: 50,
-        backgroundColor: '#1776BA',
-        borderTopRightRadius: 25,
-        borderBottomRightRadius: 25,
-        marginLeft: -2,
-    },
-    seatMapContainer: {
-        flex: 1,
-        paddingHorizontal: 16,
-        maxHeight: 400,
-    },
-    seatRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 16,
-        gap: 8,
-        justifyContent: 'center',
-        paddingHorizontal: 8,
-    },
-    rowNumber: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: '#1776BA',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    rowNumberText: {
-        fontSize: 14,
-        fontFamily: 'Ubuntu_Bold',
-        color: '#FFFFFF',
-    },
-    leftSeats: {
-        flexDirection: 'row',
-        gap: 10,
-        width: 100,
-        justifyContent: 'flex-end',
-    },
-    rightSeats: {
-        flexDirection: 'row',
-        gap: 10,
-        width: 150,
-        justifyContent: 'flex-start',
-    },
-    aisle: {
-        width: 70,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    aisleText: {
-        fontSize: 11,
-        fontFamily: 'Ubuntu_Medium',
-        color: '#666',
-        transform: [{ rotate: '-90deg' }],
-    },
-    seatButton: {
-        width: 44,
-        height: 44,
-        borderRadius: 8,
-        borderWidth: 2,
-        justifyContent: 'center',
-        alignItems: 'center',
-        position: 'relative',
-    },
-    seatButtonDisabled: {
-        opacity: 0.6,
-    },
-    seatNumber: {
-        fontSize: 13,
-        fontFamily: 'Ubuntu_Bold',
-        color: '#FFFFFF',
-    },
-    seatNumberSelected: {
-        color: '#FFFFFF',
-    },
-    seatDot: {
-        position: 'absolute',
-        bottom: 6,
-        left: '50%',
-        marginLeft: -3,
-        width: 6,
-        height: 6,
-        borderRadius: 3,
-    },
-    legend: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'center',
-        padding: 16,
-        gap: 16,
-        borderTopWidth: 1,
-        borderTopColor: '#E0E0E0',
-    },
-    legendItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-    },
-    legendColor: {
-        width: 16,
-        height: 16,
-        borderRadius: 4,
-    },
-    legendText: {
-        fontSize: 12,
-        fontFamily: 'Ubuntu_Regular',
-        color: '#000',
-    },
-    selectionBottomSheetOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        justifyContent: 'flex-end',
-    },
-    selectionBottomSheetContent: {
-        backgroundColor: '#FFFFFF',
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        maxHeight: '80%',
-        paddingBottom: 20,
-    },
-    selectionBottomSheetHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: '#E0E0E0',
-    },
-    selectionBottomSheetTitle: {
-        fontSize: 18,
-        fontFamily: 'Ubuntu_Bold',
-        color: '#000',
-    },
-    selectionBottomSheetCloseButton: {
-        padding: 4,
-    },
-    selectionOptionsList: {
-        maxHeight: 400,
-        // marginBottom: 20,
-    },
-    selectionOptionItem: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: '#F3F3F7',
-    },
-    selectionOptionText: {
-        fontSize: 16,
-        fontFamily: 'Ubuntu_Regular',
-        color: '#000',
     },
 });
 

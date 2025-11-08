@@ -6,7 +6,7 @@ import { City, PopularTrip } from "@/types";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation, useRoute } from "@react-navigation/native";
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -30,7 +30,10 @@ const TripSearch = () => {
     const insets = useSafeAreaInsets();
     const navigation = useNavigation();
     const route = useRoute();
-    const { popularTrip } = route.params as { popularTrip?: PopularTrip };
+    const { popularTrip } = (route.params as { popularTrip?: PopularTrip }) || {};
+
+    // Ref pour tracker si on a déjà lancé la recherche automatique
+    const hasAutoSearched = useRef(false);
 
     // États pour les champs du formulaire
     const [departureCity, setDepartureCity] = useState<City | null>(null);
@@ -261,24 +264,34 @@ const TripSearch = () => {
      * @returns void
      */
     useEffect(() => {
-        if (popularTrip && cities.length > 0) {
+        // Vérifier qu'on a un popularTrip (on vient de l'écran d'accueil)
+        if (popularTrip && cities.length > 0 && !hasAutoSearched.current) {
+            // Pré-remplir le formulaire
             prefillFormFromPopularTrip(popularTrip, cities);
         }
     }, [popularTrip, cities]);
 
     /**
      * Pour lancer automatiquement la recherche si tous les champs sont remplis
+     * uniquement quand on vient de l'écran d'accueil avec un popularTrip
      * @returns void
      */
     useEffect(() => {
-        if (departureCity && arrivalCity && departureDate && popularTrip) {
-            // Attendre un court délai pour s'assurer que tout est bien initialisé
+        // Vérifier qu'on a un popularTrip et que tous les champs sont remplis
+        // et qu'on n'a pas déjà lancé la recherche automatique
+        if (popularTrip && departureCity && arrivalCity && departureDate && !hasAutoSearched.current) {
+            // Marquer qu'on a lancé la recherche pour éviter les appels multiples
+            hasAutoSearched.current = true;
+            
+            // Lancer la recherche automatiquement après un court délai
+            // pour s'assurer que tous les états sont bien mis à jour
             const timer = setTimeout(() => {
-                checkAndAutoSearch();
+                handleSearch();
             }, 500);
+            
             return () => clearTimeout(timer);
         }
-    }, [departureCity, arrivalCity, departureDate, popularTrip]);
+    }, [popularTrip, departureCity, arrivalCity, departureDate]);
 
 
     return (

@@ -3,7 +3,7 @@ import { capitalizeBusType } from '@/constants/functions';
 import { Departures, SearchParams, Trip } from '@/types';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
     FlatList,
     Modal,
@@ -38,9 +38,49 @@ const TripList = () => {
     // États pour les filtres
     const [selectedSort, setSelectedSort] = useState('Prix croissant');
 
+    /**
+     * Convertit une heure au format HH:MM en minutes pour faciliter la comparaison
+     */
+    const timeToMinutes = (time: string): number => {
+        const [hours, minutes] = time.split(':').map(Number);
+        return hours * 60 + minutes;
+    };
+
+    /**
+     * Trie la liste des trajets selon le critère sélectionné
+     */
+    const sortedTrips = useMemo(() => {
+        const tripsCopy = [...trips];
+
+        switch (selectedSort) {
+            case 'Prix croissant':
+                return tripsCopy.sort((a, b) => a.price - b.price);
+            
+            case 'Prix décroissant':
+                return tripsCopy.sort((a, b) => b.price - a.price);
+            
+            case 'Départ tôt':
+                return tripsCopy.sort((a, b) => {
+                    const timeA = timeToMinutes(a.departureTime);
+                    const timeB = timeToMinutes(b.departureTime);
+                    return timeA - timeB;
+                });
+            
+            case 'Départ tard':
+                return tripsCopy.sort((a, b) => {
+                    const timeA = timeToMinutes(a.departureTime);
+                    const timeB = timeToMinutes(b.departureTime);
+                    return timeB - timeA;
+                });
+            
+            default:
+                return tripsCopy;
+        }
+    }, [trips, selectedSort]);
+
     // Récupération des villes depuis le premier trajet
-    const departureCity = trips[0]?.departureCity || '';
-    const arrivalCity = trips[0]?.arrivalCity || '';
+    const departureCity = sortedTrips[0]?.departureCity || trips[0]?.departureCity || '';
+    const arrivalCity = sortedTrips[0]?.arrivalCity || trips[0]?.arrivalCity || '';
 
 
     /**
@@ -199,9 +239,9 @@ const TripList = () => {
                 </View>
 
                 {/* Liste des trajets */}
-                {trips.length > 0 ? (
+                {sortedTrips.length > 0 ? (
                     <FlatList
-                        data={trips}
+                        data={sortedTrips}
                         renderItem={({ item }) => <TripCard item={item} />}
                         keyExtractor={(item) => item.id}
                         scrollEnabled={false}
@@ -216,7 +256,7 @@ const TripList = () => {
             </ScrollView>
 
             {/* Modal Filtres (à implémenter) */}
-            <Modal
+            {/* <Modal
                 visible={showFiltersModal}
                 transparent={true}
                 animationType="slide"
@@ -239,10 +279,10 @@ const TripList = () => {
                         </Pressable>
                     </View>
                 </Pressable>
-            </Modal>
+            </Modal> */}
 
             {/* Modal Afficher (à implémenter) */}
-            <Modal
+            {/* <Modal
                 visible={showDisplayModal}
                 transparent={true}
                 animationType="slide"
@@ -265,7 +305,7 @@ const TripList = () => {
                         </Pressable>
                     </View>
                 </Pressable>
-            </Modal>
+            </Modal> */}
 
             {/* Modal Tri */}
             <Modal
@@ -278,7 +318,18 @@ const TripList = () => {
                     style={styles.modalOverlay}
                     onPress={() => setShowSortModal(false)}
                 >
-                    <View style={[styles.modalContent, { paddingBottom: insets.bottom + 20 }]}>
+                    <View
+                        style={[
+                            styles.modalContent,
+                            {
+                                paddingTop: 20,
+                                paddingHorizontal: 20,
+                                // marginBottom: -500,
+                                paddingBottom: Math.max(insets.bottom, 0) + 20,
+                            }
+                        ]}
+                        onStartShouldSetResponder={() => true}
+                    >
                         <Text style={styles.modalTitle}>Trier par</Text>
                         {['Prix croissant', 'Prix décroissant', 'Départ tôt', 'Départ tard'].map((option) => (
                             <Pressable
@@ -389,18 +440,15 @@ const styles = StyleSheet.create({
         color: '#000',
     },
     tripsList: {
-        gap: 16,
+        gap: 15,
     },
     tripCard: {
         backgroundColor: '#FFFFFF',
         borderRadius: 12,
         padding: 16,
         marginBottom: 16,
-        // shadowColor: '#000',
-        // shadowOffset: { width: 0, height: 2 },
-        // shadowOpacity: 0.1,
-        // shadowRadius: 4,
-        // elevation: 3,
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
     },
     cardHeader: {
         flexDirection: 'row',
@@ -431,7 +479,7 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     companyName: {
-        fontSize: 16,
+        fontSize: 15,
         fontFamily: 'Ubuntu_Bold',
         color: '#000',
     },
@@ -580,13 +628,21 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
         justifyContent: 'flex-end',
+        // marginBottom: ,
     },
     modalContent: {
         backgroundColor: '#FFFFFF',
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
-        padding: 20,
-        paddingTop: 16,
+        width: '100%',
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: -2,
+        },
+        shadowOpacity: 0.25,
+        shadowRadius: 10,
+        elevation: 10,
     },
     modalTitle: {
         fontSize: 20,
@@ -615,7 +671,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 16,
+        paddingVertical: 20,
         borderBottomWidth: 1,
         borderBottomColor: '#F3F3F7',
     },
