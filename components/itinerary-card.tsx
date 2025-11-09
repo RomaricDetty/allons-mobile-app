@@ -90,13 +90,13 @@ const styles = StyleSheet.create({
     card: {
         borderRadius: 20,
         overflow: 'hidden',
-        marginBottom: 15,
+        marginBottom: 8,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.15,
         shadowRadius: 8,
         elevation: 5,
-        aspectRatio: 0.75,
+        aspectRatio: 0.85,
     },
     image: {
         width: '100%',

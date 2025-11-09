@@ -81,6 +81,7 @@ const TripSearch = () => {
         try {
             setLoadingCities(true);
             const response = await getCities();
+            console.log('Les villes disponibles : ', response?.data);
             setCities(response?.data || []);
         } catch (error: any) {
             console.error('Erreur dans la récupération des villes : ', error);

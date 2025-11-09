@@ -1,41 +1,38 @@
 import React from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
-interface FormFieldProps {
+interface AuthFormFieldProps {
     label: string;
     value: string;
     onChangeText: (text: string) => void;
     placeholder?: string;
     required?: boolean;
     keyboardType?: 'default' | 'numeric' | 'email-address' | 'phone-pad';
-    editable?: boolean;
 }
 
 /**
- * Composant pour un champ de formulaire standard
+ * Composant pour un champ de formulaire d'authentification avec fond blanc
  */
-export const FormField = ({
+export const AuthFormField = ({
     label,
     value,
     onChangeText,
     placeholder,
     required = false,
     keyboardType = 'default',
-    editable = true
-}: FormFieldProps) => {
+}: AuthFormFieldProps) => {
     return (
         <View style={styles.formField}>
             <Text style={styles.formLabel}>
                 {label} {required && <Text style={styles.required}>*</Text>}
             </Text>
             <TextInput
-                style={[styles.formInput, !editable && styles.formInputDisabled]}
+                style={styles.formInput}
                 value={value}
                 onChangeText={onChangeText}
                 placeholder={placeholder}
                 placeholderTextColor="#A6A6AA"
                 keyboardType={keyboardType}
-                editable={editable}
             />
         </View>
     );
@@ -55,7 +52,7 @@ const styles = StyleSheet.create({
         color: '#FF0000',
     },
     formInput: {
-        backgroundColor: '#F3F3F7',
+        backgroundColor: '#FFFFFF',
         borderRadius: 8,
         paddingHorizontal: 16,
         paddingVertical: 12,
@@ -65,10 +62,5 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#E0E0E0',
     },
-    formInputDisabled: {
-        backgroundColor: '#F5F5F5',
-        color: '#666',
-    },
 });
-
 

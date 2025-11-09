@@ -246,6 +246,7 @@ const styles = StyleSheet.create({
     titleContainer: {
         width: '100%',
         paddingHorizontal: 20,
+        paddingTop: 20,
     },
     title: {
         fontSize: 30,

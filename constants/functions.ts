@@ -40,3 +40,37 @@ export const formatFullDate = (dateString: string): string => {
 
     return `${dayName} ${day} ${month} ${year}`;
 };
+
+/**
+     * Formate la date pour l'affichage
+     */
+export const formatBookingDate = (dateString: string): string => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+};
+
+/**
+ * Formate le statut pour l'affichage
+ */
+export const formatStatus = (status: string): string => {
+    const statusMap: { [key: string]: string } = {
+        'PAID': 'Payé',
+        'PENDING': 'En attente',
+        'CANCELLED': 'Annulé',
+        'REFUNDED': 'Remboursé',
+    };
+    return statusMap[status] || status;
+};
+
+/**
+ * Retourne la couleur du badge de statut
+ */
+export const getStatusColor = (status: string): string => {
+    const colorMap: { [key: string]: string } = {
+        'PAID': '#4CAF50',
+        'PENDING': '#FFA726',
+        'CANCELLED': '#F44336',
+        'REFUNDED': '#2196F3',
+    };
+    return colorMap[status] || '#9E9E9E';
+};

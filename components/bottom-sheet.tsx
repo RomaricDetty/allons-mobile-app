@@ -19,6 +19,7 @@ import Animated, {
     withSpring,
     withTiming,
 } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -52,6 +53,7 @@ export function BottomSheet<T>({
     keyExtractor,
     emptyText = "Aucun élément disponible"
 }: BottomSheetProps<T>) {
+    const insets = useSafeAreaInsets();
     // Initialiser translateY à SCREEN_HEIGHT pour que le bottom sheet commence hors écran
     const translateY = useSharedValue(SCREEN_HEIGHT);
     const context = useSharedValue({ y: 0 });
@@ -76,6 +78,7 @@ export function BottomSheet<T>({
      * Gère les gestes de glissement avec la nouvelle API
      */
     const panGesture = Gesture.Pan()
+        .activeOffsetY(10)
         .onStart(() => {
             context.y = translateY.value;
         })
@@ -160,44 +163,51 @@ export function BottomSheet<T>({
                     />
                 </TouchableOpacity>
 
-                <GestureDetector gesture={panGesture}>
-                    <Animated.View style={[styles.bottomSheetContainer, bottomSheetStyle]}>
-                        {/* Handle bar */}
-                        <View style={styles.bottomSheetHandle} />
+                <Animated.View style={[styles.bottomSheetContainer, bottomSheetStyle]}>
+                    <GestureDetector gesture={panGesture}>
+                        <View>
+                            {/* Handle bar */}
+                            <View style={styles.bottomSheetHandle} />
 
-                        {/* Header */}
-                        <View style={styles.bottomSheetHeader}>
-                            <Text style={styles.bottomSheetTitle}>{title}</Text>
-                            <Pressable onPress={closeBottomSheet} style={styles.bottomSheetCloseButton}>
-                                <Icon name="close" size={24} color="#000" />
-                            </Pressable>
+                            {/* Header */}
+                            <View style={styles.bottomSheetHeader}>
+                                <Text style={styles.bottomSheetTitle}>{title}</Text>
+                                <Pressable onPress={closeBottomSheet} style={styles.bottomSheetCloseButton}>
+                                    <Icon name="close" size={24} color="#000" />
+                                </Pressable>
+                            </View>
                         </View>
+                    </GestureDetector>
 
-                        {/* Content */}
-                        {loading ? (
-                            <View style={styles.loadingContainer}>
-                                <ActivityIndicator size="large" color="#1776ba" />
-                            </View>
-                        ) : data.length === 0 ? (
-                            <View style={styles.emptyContainer}>
-                                <Text style={styles.emptyText}>{emptyText}</Text>
-                            </View>
-                        ) : (
-                            <ScrollView
-                                style={styles.bottomSheetList}
-                                contentContainerStyle={styles.bottomSheetListContent}
-                                showsVerticalScrollIndicator={true}
-                                nestedScrollEnabled={true}
-                            >
-                                {data.map((item) => (
-                                    <View key={keyExtractor(item)}>
-                                        {renderItem(item, closeBottomSheet)}
-                                    </View>
-                                ))}
-                            </ScrollView>
-                        )}
-                    </Animated.View>
-                </GestureDetector>
+                    {/* Content */}
+                    {loading ? (
+                        <View style={styles.loadingContainer}>
+                            <ActivityIndicator size="large" color="#1776ba" />
+                        </View>
+                    ) : data.length === 0 ? (
+                        <View style={styles.emptyContainer}>
+                            <Text style={styles.emptyText}>{emptyText}</Text>
+                        </View>
+                    ) : (
+                        <ScrollView
+                            style={styles.bottomSheetList}
+                            contentContainerStyle={[
+                                styles.bottomSheetListContent,
+                                { paddingBottom: Math.max(insets.bottom, 20) }
+                            ]}
+                            showsVerticalScrollIndicator={true}
+                            nestedScrollEnabled={true}
+                            bounces={true}
+                            scrollEventThrottle={16}
+                        >
+                            {data.map((item) => (
+                                <View key={keyExtractor(item)}>
+                                    {renderItem(item, closeBottomSheet)}
+                                </View>
+                            ))}
+                        </ScrollView>
+                    )}
+                </Animated.View>
             </GestureHandlerRootView>
         </Modal>
     );
@@ -223,7 +233,8 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         bottom: 0,
-        height: SCREEN_HEIGHT,
+        maxHeight: SCREEN_HEIGHT * 0.9,
+        height: SCREEN_HEIGHT * 0.8,
         backgroundColor: '#FFFFFF',
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
@@ -235,6 +246,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.25,
         shadowRadius: 10,
         elevation: 10,
+        flexDirection: 'column',
     },
     bottomSheetHandle: {
         width: 40,
@@ -266,7 +278,8 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     bottomSheetListContent: {
-        paddingBottom: 20,
+        paddingHorizontal: 20,
+        paddingTop: 10,
     },
     loadingContainer: {
         padding: 40,
