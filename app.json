@@ -1,16 +1,16 @@
 {
   "expo": {
-    "name": "allons-app-mobile",
-    "slug": "allons-app-mobile",
+    "name": "AllOn",
+    "slug": "allon-app-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "allonsappmobile",
+    "scheme": "allonappmobile",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.allons.app.mobile"
+      "bundleIdentifier": "com.allon.app.mobile"
     },
     "android": {
       "adaptiveIcon": {
@@ -21,7 +21,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.allons.app.mobile"
+      "package": "com.allon.app.mobile"
     },
     "web": {
       "output": "static",
