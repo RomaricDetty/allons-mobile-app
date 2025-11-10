@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.romdja.allonsappmobile"
+      "bundleIdentifier": "com.allons.app.mobile"
     },
     "android": {
       "adaptiveIcon": {
@@ -21,7 +21,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.romdja.allonsappmobile"
+      "package": "com.allons.app.mobile"
     },
     "web": {
       "output": "static",
