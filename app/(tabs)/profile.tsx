@@ -1,112 +1,182 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { refreshTokenApi } from '@/api/auth_register';
+import { ProfileScreen } from '@/components/auth/ProfileScreen';
+import { SignInScreen } from '@/components/auth/SignInScreen';
+import { SignUpScreen } from '@/components/auth/SignUpScreen';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useEffect, useState } from 'react';
+import { StyleSheet } from 'react-native';
 
-import { ExternalLink } from '@/components/external-link';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Collapsible } from '@/components/ui/collapsible';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Fonts } from '@/constants/theme';
+type AuthScreen = 'signup' | 'signin';
 
+interface ContactUrgent {
+    fullName: string;
+    phone: string;
+}
+
+type User = {
+    id: string;
+    firstName: string;
+    lastName: string;
+    middleName?: string | null;
+    email: string;
+    username: string;
+    civility: string;
+    dateOfBirth: string;
+    picture?: string | null;
+    role?: string | null;
+    company?: string | null;
+    address?: string | null;
+    contactUrgent: ContactUrgent;
+    phones?: any[];
+    active: boolean;
+    isEmailVerified: boolean;
+    createdAt: string;
+    updatedAt: string;
+};
+
+/**
+ * Écran de profil principal qui gère l'affichage des écrans d'authentification et de profil
+ */
 export default function TabTwoScreen() {
+    const [isSignedIn, setIsSignedIn] = useState(false);
+    const [currentScreen, setCurrentScreen] = useState<AuthScreen>('signin');
+    // const [user, setUser] = useState<User | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+
+    /**
+     * Vérifie si l'utilisateur est déjà connecté en récupérant les données depuis AsyncStorage
+     */
+    useEffect(() => {
+        checkUserSession();
+    }, []);
+
+    /**
+     * Vérifie la session utilisateur au chargement de l'écran
+     */
+    const checkUserSession = async () => {
+        setIsLoading(true);
+        try {
+            const token = await AsyncStorage.getItem('token');
+            // const userData = await AsyncStorage.getItem('user');
+            const expiresAt = await AsyncStorage.getItem('expires_in');
+            const refreshToken = await AsyncStorage.getItem('refresh_token');
+            console.log('expiresAt : ', expiresAt);
+            const expiresAtDate = new Date(Number(expiresAt) * 1000);
+            const currentDate = new Date();
+            console.log('expiresAtDate : ', expiresAtDate);
+            console.log('currentDate : ', currentDate);
+            console.log('refreshToken : ', refreshToken);
+
+            if (refreshToken) {
+                const response = await refreshTokenApi(refreshToken as string);
+                console.log('response refresh token: ', response);
+                console.log('response.data : ', response.data);
+                console.log('response.status : ', response.status);
+                if (response.status === 200) {
+                    await AsyncStorage.setItem('token', response.data.access_token);
+                    // await AsyncStorage.setItem('refresh_token', response.data.refresh_token);
+                    await AsyncStorage.setItem('expires_at', String(response.data.expires_in));
+                    await AsyncStorage.setItem('token_type', response.data.token_type);
+                    setIsSignedIn(true);
+                    return;
+                }
+            } else {
+                await AsyncStorage.multiRemove([
+                    'token',
+                    'refresh_token',
+                    'expires_at',
+                    'token_type',
+                    // 'user',
+                ]);
+            }
+
+            if (expiresAtDate < currentDate) {
+                // Alert.alert('Attention !', 'Votre session a expiré, veuillez vous reconnecter');
+                await AsyncStorage.multiRemove([
+                    'token',
+                    'refresh_token',
+                    'expires_at',
+                    'token_type',
+                    // 'user',
+                ]);
+                // setUser(null);
+                setIsSignedIn(false);
+                setCurrentScreen('signin');
+                return;
+            }
+            if (token) {
+                setIsSignedIn(true);
+            }
+        } catch (error) {
+            console.error('Erreur lors de la vérification de la session:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    /**
+     * Gère l'inscription d'un nouvel utilisateur
+     */
+    const handleSignUp = (data: { name: string; email: string; password: string }) => {
+        // TODO: Implémenter la logique d'inscription avec l'API
+        console.log('Sign up:', data);
+    };
+
+    /**
+     * Gère la connexion d'un utilisateur
+     * Les données utilisateur sont déjà stockées dans AsyncStorage par SignInScreen
+     */
+    const handleSignIn = () => {
+        setIsSignedIn(true);
+    };
+
+    /**
+     * Gère la déconnexion de l'utilisateur
+     * La suppression d'AsyncStorage est gérée dans ProfileScreen
+     */
+    const handleLogout = () => {
+        // setUser(null);
+        setIsSignedIn(false);
+        setCurrentScreen('signin');
+    };
+
+    /**
+     * Gère l'oubli de mot de passe
+     */
+    const handleForgotPassword = () => {
+        // TODO: Implémenter la logique de réinitialisation de mot de passe
+        console.log('Forgot password');
+    };
+
+    // Afficher un écran de chargement pendant la vérification de la session
+    if (isLoading) {
+        return null; // Ou un composant de chargement
+    }
+
+    if (isSignedIn) {
+        return <ProfileScreen onLogout={handleLogout} />;
+    }
+
+    if (currentScreen === 'signin') {
+        return (
+            <SignInScreen
+                onSignIn={() => handleSignIn()}
+                onSwitchToSignUp={() => setCurrentScreen('signup')}
+                onForgotPassword={handleForgotPassword}
+            />
+        );
+    }
+
     return (
-        <ParallaxScrollView
-            headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
-            headerImage={
-                <IconSymbol
-                    size={310}
-                    color="#808080"
-                    name="chevron.left.forwardslash.chevron.right"
-                    style={styles.headerImage}
-                />
-            }>
-            <ThemedView style={styles.titleContainer}>
-                <ThemedText
-                    type="title"
-                    style={{
-                        fontFamily: Fonts.rounded,
-                    }}>
-                    Explore
-                </ThemedText>
-            </ThemedView>
-            <ThemedText>This app includes example code to help you get started.</ThemedText>
-            <Collapsible title="File-based routing">
-                <ThemedText>
-                    This app has two screens:{' '}
-                    <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-                    <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
-                </ThemedText>
-                <ThemedText>
-                    The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-                    sets up the tab navigator.
-                </ThemedText>
-                <ExternalLink href="https://docs.expo.dev/router/introduction">
-                    <ThemedText type="link">Learn more</ThemedText>
-                </ExternalLink>
-            </Collapsible>
-            <Collapsible title="Android, iOS, and web support">
-                <ThemedText>
-                    You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-                    <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
-                </ThemedText>
-            </Collapsible>
-            <Collapsible title="Images">
-                <ThemedText>
-                    For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-                    <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-                    different screen densities
-                </ThemedText>
-                <Image
-                    source={require('@/assets/images/react-logo.png')}
-                    style={{ width: 100, height: 100, alignSelf: 'center' }}
-                />
-                <ExternalLink href="https://reactnative.dev/docs/images">
-                    <ThemedText type="link">Learn more</ThemedText>
-                </ExternalLink>
-            </Collapsible>
-            <Collapsible title="Light and dark mode components">
-                <ThemedText>
-                    This template has light and dark mode support. The{' '}
-                    <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-                    what the user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-                </ThemedText>
-                <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-                    <ThemedText type="link">Learn more</ThemedText>
-                </ExternalLink>
-            </Collapsible>
-            <Collapsible title="Animations">
-                <ThemedText>
-                    This template includes an example of an animated component. The{' '}
-                    <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-                    the powerful{' '}
-                    <ThemedText type="defaultSemiBold" style={{ fontFamily: Fonts.mono }}>
-                        react-native-reanimated
-                    </ThemedText>{' '}
-                    library to create a waving hand animation.
-                </ThemedText>
-                {Platform.select({
-                    ios: (
-                        <ThemedText>
-                            The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-                            component provides a parallax effect for the header image.
-                        </ThemedText>
-                    ),
-                })}
-            </Collapsible>
-        </ParallaxScrollView>
+        <SignUpScreen
+            onSignUp={handleSignUp}
+            onSwitchToSignIn={() => setCurrentScreen('signin')}
+        />
     );
 }
 
 const styles = StyleSheet.create({
-    headerImage: {
-        color: '#808080',
-        bottom: -90,
-        left: -35,
-        position: 'absolute',
-    },
-    titleContainer: {
-        flexDirection: 'row',
-        gap: 8,
+    container: {
+        flex: 1,
     },
 });
