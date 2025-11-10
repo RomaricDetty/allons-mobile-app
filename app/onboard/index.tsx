@@ -24,24 +24,24 @@ const Onboard = () => {
     const imagesOnboarding = [
         {
             id: 1,
-            bg: require('@/assets/images/onboarding/bg_voyage.png'),
-            person: require('@/assets/images/onboarding/person_travel_1.png'),
+            bg: require('../../assets/images/onboarding/bg_voyage.png'),
+            person: require('../../assets/images/onboarding/person_travel_1.png'),
             text_1: 'Voyagez malin,',
             text_2: 'Payez moins !',
             color_text: ''
         },
         {
             id: 2,
-            bg: require('@/assets/images/onboarding/bg_voyage.png'),
-            person: require('@/assets/images/onboarding/person_travel_2.png'),
+            bg: require('../../assets/images/onboarding/bg_voyage.png'),
+            person: require('../../assets/images/onboarding/person_travel_2.png'),
             text_1: 'Voyagez en toute ',
             text_2: 'Sécurité !',
             color_text: ''
         },
         {
             id: 3,
-            bg: require('@/assets/images/onboarding/bg_voyage.png'),
-            person: require('@/assets/images/onboarding/person_travel_3.png'),
+            bg: require('../../assets/images/onboarding/bg_voyage.png'),
+            person: require('../../assets/images/onboarding/person_travel_3.png'),
             text_1: 'Partez loin sans',
             text_2: 'Casser votre tirelire !',
             color_text: ''
@@ -173,7 +173,7 @@ const Onboard = () => {
                         height: 80
                     }}
                 /> */}
-                <Image source={require('@/assets/images/logo-allon-blanc.png')} resizeMode="cover" style={{ width: 75, height: 75 }} />
+                <Image source={require('../../assets/images/onboarding/logo-allon-blanc.png')} resizeMode="cover" style={{ width: 75, height: 75 }} />
                 {/* <Text style={{ fontSize: 32, fontFamily: 'Ubuntu_Bold', color: '#ffffff' }}>AllOn</Text> */}
             </View>
 
