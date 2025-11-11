@@ -3,11 +3,14 @@ import React from 'react';
 import {
     ActivityIndicator,
     Dimensions,
+    KeyboardAvoidingView,
     Modal,
+    Platform,
     Pressable,
     ScrollView,
     StyleSheet,
     Text,
+    TextInput,
     TouchableOpacity,
     View
 } from "react-native";
@@ -23,7 +26,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const MAX_TRANSLATE_Y = SCREEN_HEIGHT * 0.20;
+const MAX_TRANSLATE_Y = SCREEN_HEIGHT * 0.15;
 const MIN_TRANSLATE_Y = 0;
 
 interface BottomSheetProps<T> {
@@ -35,6 +38,9 @@ interface BottomSheetProps<T> {
     renderItem: (item: T, onSelect: () => void) => React.ReactNode;
     keyExtractor: (item: T) => string;
     emptyText?: string;
+    searchable?: boolean;
+    searchPlaceholder?: string;
+    filterFunction?: (item: T, searchTerm: string) => boolean;
 }
 
 /**
@@ -51,13 +57,17 @@ export function BottomSheet<T>({
     loading = false,
     renderItem,
     keyExtractor,
-    emptyText = "Aucun élément disponible"
+    emptyText = "Aucun élément disponible",
+    searchable = false,
+    searchPlaceholder = "Rechercher...",
+    filterFunction
 }: BottomSheetProps<T>) {
     const insets = useSafeAreaInsets();
     // Initialiser translateY à SCREEN_HEIGHT pour que le bottom sheet commence hors écran
     const translateY = useSharedValue(SCREEN_HEIGHT);
     const context = useSharedValue({ y: 0 });
     const opacity = useSharedValue(0);
+    const [searchTerm, setSearchTerm] = React.useState('');
 
     /**
      * Ferme le BottomSheet avec animation
@@ -71,8 +81,35 @@ export function BottomSheet<T>({
         opacity.value = withTiming(0, { duration: 200 }); 
         setTimeout(() => {
             runOnJS(onClose)();
+            // Réinitialiser le terme de recherche à la fermeture
+            setSearchTerm('');
         }, 250); 
     };
+
+    /**
+     * Filtre les données en fonction du terme de recherche
+     * @returns Array<T> - Liste filtrée
+     */
+    const filteredData = React.useMemo(() => {
+        if (!searchable || !searchTerm.trim()) {
+            return data;
+        }
+
+        if (filterFunction) {
+            return data.filter(item => filterFunction(item, searchTerm));
+        }
+
+        // Filtrage par défaut : recherche dans les propriétés string de l'objet
+        const lowerSearchTerm = searchTerm.toLowerCase();
+        return data.filter(item => {
+            return Object.values(item as any).some(value => {
+                if (typeof value === 'string') {
+                    return value.toLowerCase().includes(lowerSearchTerm);
+                }
+                return false;
+            });
+        });
+    }, [data, searchTerm, searchable, filterFunction]);
 
     /**
      * Gère les gestes de glissement avec la nouvelle API
@@ -116,6 +153,8 @@ export function BottomSheet<T>({
                 stiffness: 120,           
                 mass: 0.3                  
             });
+            // Réinitialiser le terme de recherche à l'ouverture
+            setSearchTerm('');
         } else {
             translateY.value = withSpring(SCREEN_HEIGHT, {
                 damping: 15,              
@@ -179,14 +218,45 @@ export function BottomSheet<T>({
                         </View>
                     </GestureDetector>
 
+                    {/* Champ de recherche */}
+                    {searchable && (
+                        <KeyboardAvoidingView
+                            behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+                            keyboardVerticalOffset={0}
+                        >
+                            <View style={styles.searchContainer}>
+                                <Icon name="magnify" size={20} color="#A6A6AA" style={styles.searchIcon} />
+                                <TextInput
+                                    style={styles.searchInput}
+                                    placeholder={searchPlaceholder}
+                                    placeholderTextColor="#A6A6AA"
+                                    value={searchTerm}
+                                    onChangeText={setSearchTerm}
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
+                                />
+                                {searchTerm.length > 0 && (
+                                    <Pressable
+                                        onPress={() => setSearchTerm('')}
+                                        style={styles.searchClearButton}
+                                    >
+                                        <Icon name="close-circle" size={20} color="#A6A6AA" />
+                                    </Pressable>
+                                )}
+                            </View>
+                        </KeyboardAvoidingView>
+                    )}
+
                     {/* Content */}
                     {loading ? (
                         <View style={styles.loadingContainer}>
                             <ActivityIndicator size="large" color="#1776ba" />
                         </View>
-                    ) : data.length === 0 ? (
+                    ) : filteredData.length === 0 ? (
                         <View style={styles.emptyContainer}>
-                            <Text style={styles.emptyText}>{emptyText}</Text>
+                            <Text style={styles.emptyText}>
+                                {searchTerm.trim() ? "Aucun résultat trouvé" : emptyText}
+                            </Text>
                         </View>
                     ) : (
                         <ScrollView
@@ -195,12 +265,12 @@ export function BottomSheet<T>({
                                 styles.bottomSheetListContent,
                                 { paddingBottom: Math.max(insets.bottom, 20) }
                             ]}
-                            showsVerticalScrollIndicator={true}
+                            showsVerticalScrollIndicator={false}
                             nestedScrollEnabled={true}
                             bounces={true}
                             scrollEventThrottle={16}
                         >
-                            {data.map((item) => (
+                            {filteredData.map((item) => (
                                 <View key={keyExtractor(item)}>
                                     {renderItem(item, closeBottomSheet)}
                                 </View>
@@ -266,6 +336,31 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1,
         borderBottomColor: '#F3F3F7',
     },
+    searchContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F3F3F7',
+        borderRadius: 12,
+        marginHorizontal: 20,
+        marginTop: 10,
+        marginBottom: 10,
+        paddingHorizontal: 12,
+        height: 48,
+    },
+    searchIcon: {
+        marginRight: 8,
+    },
+    searchInput: {
+        flex: 1,
+        fontSize: 15,
+        fontFamily: 'Ubuntu_Regular',
+        color: '#000',
+        paddingVertical: 0,
+    },
+    searchClearButton: {
+        marginLeft: 8,
+        padding: 4,
+    },
     bottomSheetTitle: {
         fontSize: 18,
         fontFamily: 'Ubuntu_Bold',
@@ -276,6 +371,7 @@ const styles = StyleSheet.create({
     },
     bottomSheetList: {
         flex: 1,
+        marginBottom: 100,
     },
     bottomSheetListContent: {
         paddingHorizontal: 20,

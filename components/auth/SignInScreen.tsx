@@ -56,7 +56,7 @@ export const SignInScreen = ({ onSignIn, onSwitchToSignUp, onForgotPassword }: S
         }
 
         try {
-            const response = await authLogin({ emailOrUsername: email.trim(), password: password.trim() });
+            const response = await authLogin({ emailOrUsername: email.trim().toLowerCase(), password: password.trim() });
             console.log('Réponse de la connexion : ', response);
             if (response.status === 200) {
                 AsyncStorage.setItem('token', response.data.access_token);
@@ -73,14 +73,14 @@ export const SignInScreen = ({ onSignIn, onSwitchToSignUp, onForgotPassword }: S
             }
         } catch (error) {
             console.error('Erreur lors de la connexion : ', error);
-            Alert.alert('Attention !', 'Une erreur est survenue lors de la connexion');
+            Alert.alert('Attention !', 'Une erreur est survenue lors de la connexion, veuillez vérifier vos informations et réessayer.');
             return;
         } finally {
             setIsLoading(false);
         }
     };
 
-    
+
 
     return (
         <ScrollView
@@ -107,14 +107,17 @@ export const SignInScreen = ({ onSignIn, onSwitchToSignUp, onForgotPassword }: S
                     onChangeText={setPassword}
                     placeholder="Entrez votre mot de passe"
                 />
-                
+
             </View>
 
-            <Pressable style={styles.primaryButton} onPress={handleSignIn}>
+            <Pressable
+                style={styles.primaryButton}
+                onPress={handleSignIn}
+                disabled={isLoading}
+            >
                 {isLoading ? <ActivityIndicator size="small" color="#FFFFFF" /> : (
                     <Text style={styles.primaryButtonText}>Se connecter</Text>
                 )}
-                {/* <Text style={styles.primaryButtonText}>Se connecter</Text> */}
             </Pressable>
 
             <View style={styles.separator}>

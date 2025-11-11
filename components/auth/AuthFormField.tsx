@@ -33,6 +33,7 @@ export const AuthFormField = ({
                 placeholder={placeholder}
                 placeholderTextColor="#A6A6AA"
                 keyboardType={keyboardType}
+                autoCapitalize="none"
             />
         </View>
     );

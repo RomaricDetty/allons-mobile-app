@@ -173,7 +173,7 @@ const Onboard = () => {
                         height: 80
                     }}
                 /> */}
-                <Image source={require('../../assets/images/onboarding/logo-allon-blanc.png')} resizeMode="cover" style={{ width: 75, height: 75 }} />
+                <Image source={require('@/assets/images/onboarding/logo-allon-blanc.png')} resizeMode="cover" style={{ width: 75, height: 75 }} />
                 {/* <Text style={{ fontSize: 32, fontFamily: 'Ubuntu_Bold', color: '#ffffff' }}>AllOn</Text> */}
             </View>
 

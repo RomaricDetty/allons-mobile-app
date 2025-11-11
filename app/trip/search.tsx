@@ -470,6 +470,11 @@ const TripSearch = () => {
                     );
                 }}
                 emptyText="Aucune ville disponible"
+                searchable={true}
+                searchPlaceholder="Rechercher une ville..."
+                filterFunction={(item, searchTerm) => {
+                    return item.name.toLowerCase().includes(searchTerm.toLowerCase());
+                }}
             />
 
             {/* BottomSheet de sélection ville d'arrivée */}
@@ -495,6 +500,11 @@ const TripSearch = () => {
                     );
                 }}
                 emptyText="Aucune ville disponible"
+                searchable={true}
+                searchPlaceholder="Rechercher une ville..."
+                filterFunction={(item, searchTerm) => {
+                    return item.name.toLowerCase().includes(searchTerm.toLowerCase());
+                }}
             />
 
             {/* BottomSheet de sélection type de départ */}
