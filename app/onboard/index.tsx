@@ -26,7 +26,7 @@ const Onboard = () => {
             id: 1,
             bg: require('../../assets/images/onboarding/bg_voyage.png'),
             person: require('../../assets/images/onboarding/person_travel_1.png'),
-            text_1: 'Voyagez malin,',
+            text_1: 'Voyagez malin',
             text_2: 'Payez moins !',
             color_text: ''
         },
