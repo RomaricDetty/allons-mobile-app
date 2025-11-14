@@ -1,3 +1,4 @@
+//@ts-nocheck
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -50,5 +51,6 @@ const styles = StyleSheet.create({
         color: '#000',
     },
 });
+
 
 

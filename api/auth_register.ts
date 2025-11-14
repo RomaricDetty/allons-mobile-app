@@ -10,7 +10,7 @@ import { baseUrl } from "./config"
  * @returns AxiosResponse<any>
  */
 export const authRegister = async (data: any): Promise<AxiosResponse<any>> => {
-    return await axios.post(`${baseUrl}/auth/register`, data)
+    return await axios.post(`${baseUrl}/auth/register/customer`, data)
 }
 
 /**
@@ -60,4 +60,19 @@ export const bookingListInfo = async (userId: string, token: string): Promise<Ax
  */
 export const refreshTokenApi = async (token: string): Promise<AxiosResponse<any>> => {
     return await axios.post(`${baseUrl}/auth/refresh-token`, { refreshToken: token });
+}
+
+/**
+ * Update user info
+ * @param userId - The user's ID
+ * @param data - The user data
+ * @param token - The user's token
+ * @returns AxiosResponse<any>
+ */
+export const updateUserInfo = async (userId: string, data: any, token: string): Promise<AxiosResponse<any>> => {
+    return await axios.patch(`${baseUrl}/customers/${userId}`, data, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
 }

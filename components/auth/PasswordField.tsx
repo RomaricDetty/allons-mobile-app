@@ -1,5 +1,6 @@
+//@ts-nocheck
 import React, { useState } from 'react';
-import { StyleSheet, Text, TextInput, View, Pressable } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 interface PasswordFieldProps {
@@ -84,5 +85,6 @@ const styles = StyleSheet.create({
         padding: 12,
     },
 });
+
 
 

@@ -3,7 +3,9 @@ import { authGetUserInfo, bookingListInfo } from '@/api/auth_register';
 import { formatBookingDate, formatStatus, getStatusColor } from '@/constants/functions';
 import { Booking, ProfileScreenProps, User } from '@/interfaces';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { useEffect, useMemo, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import { router } from 'expo-router';
+import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -134,27 +136,35 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
 
     /**
      * Récupère les informations de l'utilisateur au montage de l'écran
+     * et chaque fois que l'écran redevient actif (par exemple après modification du profil)
      */
-    useEffect(() => {
-        const fetchData = async () => {
-            setIsLoading(true);
-            try {
-                const userInfo = await getUserInfo();
-                setUser(userInfo);
-                getFullName();
-                formatDateOfBirth();
-                formatCivility();
-                await getBookingList();
-            } catch (error) {
-                console.error('Erreur lors du chargement des données:', error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        fetchData();
-    }, []);
+    useFocusEffect(
+        useCallback(() => {
+            const fetchData = async () => {
+                setIsLoading(true);
+                try {
+                    const userInfo = await getUserInfo();
+                    setUser(userInfo);
+                    getFullName();
+                    formatDateOfBirth();
+                    formatCivility();
+                    await getBookingList();
+                } catch (error) {
+                    console.error('Erreur lors du chargement des données:', error);
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+            fetchData();
+        }, [])
+    );
 
-    
+    /**
+     * Navigue vers l'écran de modification du profil
+     */
+    const handleUpdateUserInfo = () => {
+        router.push('/profile/edit');
+    };
 
     /**
      * Options de statut pour le filtre
@@ -241,6 +251,11 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                             <Text style={styles.detailLabel}>Nom d'utilisateur:</Text>
                             <Text style={styles.detailValue}>@{user?.username}</Text>
                         </View>
+                        <View style={styles.detailRow}>
+                            <MaterialCommunityIcons name="phone-outline" size={18} color="#666" />
+                            <Text style={styles.detailLabel}>Téléphone:</Text>
+                            <Text style={styles.detailValue}>+225 {user?.phones?.[0]?.digits}</Text>
+                        </View>
                         {user?.dateOfBirth && (
                             <View style={styles.detailRow}>
                                 <MaterialCommunityIcons name="calendar-outline" size={18} color="#666" />
@@ -302,7 +317,7 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                 </View>
 
                 {/* Modify Button */}
-                <Pressable style={styles.upgradeButton}>
+                <Pressable style={styles.upgradeButton} onPress={handleUpdateUserInfo}>
                     <MaterialCommunityIcons name="pencil" size={20} color="#FFFFFF" />
                     <Text style={styles.upgradeButtonText}>Modifier mes informations</Text>
                 </Pressable>
@@ -725,6 +740,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         gap: 8,
         marginBottom: 16,
+        marginTop: 16,
     },
     upgradeButtonText: {
         fontSize: 16,

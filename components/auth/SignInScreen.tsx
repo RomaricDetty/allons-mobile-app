@@ -128,8 +128,7 @@ export const SignInScreen = ({ onSignIn, onSwitchToSignUp, onForgotPassword }: S
 
             <View style={styles.footer}>
                 <Text style={styles.footerText}>Vous n'avez pas de compte ? </Text>
-                <Pressable>
-                    {/* onPress={onSwitchToSignUp} */}
+                <Pressable onPress={onSwitchToSignUp}>
                     <Text style={styles.footerLink}>Inscrivez-vous</Text>
                 </Pressable>
             </View>

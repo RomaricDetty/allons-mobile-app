@@ -116,10 +116,12 @@ export default function TabTwoScreen() {
 
     /**
      * Gère l'inscription d'un nouvel utilisateur
+     * Les données utilisateur sont déjà stockées dans AsyncStorage par SignUpScreen
      */
     const handleSignUp = (data: { name: string; email: string; password: string }) => {
-        // TODO: Implémenter la logique d'inscription avec l'API
-        console.log('Sign up:', data);
+        // L'inscription est déjà gérée dans SignUpScreen avec l'API
+        // On met simplement l'utilisateur comme connecté pour afficher le profil
+        setIsSignedIn(true);
     };
 
     /**

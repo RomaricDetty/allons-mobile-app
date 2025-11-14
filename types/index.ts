@@ -96,3 +96,18 @@ export type DepartureCardProps = {
     height: number;
     onPress?: (item: PopularTrip) => void;
 };
+
+/**
+ * Type pour le type de téléphone
+ */
+export enum PhoneType {
+    NONE = 'none',
+    MOBILE = 'mobile',
+    HOME = 'home',
+    WORK = 'work',
+}
+
+/**
+ * Type pour la civilité
+ */
+export type Civility = 'MR' | 'Mrs' | 'Miss';

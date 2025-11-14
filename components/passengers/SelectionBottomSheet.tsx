@@ -115,6 +115,7 @@ const styles = StyleSheet.create({
         paddingVertical: 16,
         borderBottomWidth: 1,
         borderBottomColor: '#F3F3F7',
+        marginBottom: 20,
     },
     selectionOptionText: {
         fontSize: 16,

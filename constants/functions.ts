@@ -74,3 +74,19 @@ export const getStatusColor = (status: string): string => {
     };
     return colorMap[status] || '#9E9E9E';
 };
+
+/**
+     * Valide le format de l'email
+     */
+export const isValidEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+};
+
+/**
+ * Valide le format du numéro de téléphone (format français)
+ */
+export const isValidPhone = (phone: string): boolean => {
+    const phoneRegex = /^0[1-9][0-9]{8}$/;
+    return phoneRegex.test(phone.replace(/\s/g, ''));
+};
