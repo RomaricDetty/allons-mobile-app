@@ -41,7 +41,7 @@ export const Checkbox = ({ label, checked, onToggle }: CheckboxProps) => {
                     <MaterialCommunityIcons name="check" size={16} color="#FFFFFF" />
                 )}
             </View>
-            <Text style={[styles.label, { color: textColor }]}>{label}</Text>
+            <Text style={[styles.label, { color: textColor, width: '80%' }]}>{label}</Text>
         </Pressable>
     );
 };
