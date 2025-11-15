@@ -738,7 +738,7 @@ const TicketDetails = () => {
                         <Text style={[styles.sectionTitle, { color: textColor }]}>Code QR de vérification</Text>
                     </View>
                     <View style={{ alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 }}>
-                        <QRCode value={`https://allon-frontoffice-ng.onrender.com/verify-ticket/${ticket.id}?ref=${ticket.code}`} size={200} color={primaryBlue} backgroundColor="transparent" />
+                        <QRCode value={`https://allon-frontoffice-ng.onrender.com/verify-ticket/${ticket.id}?ref=${ticket.code}`} size={150} color={primaryBlue} backgroundColor="transparent" />
                     </View>
                 </View>
 

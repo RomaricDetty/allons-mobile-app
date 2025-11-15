@@ -16,13 +16,13 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
     const insets = useSafeAreaInsets();
     const colorScheme = useColorScheme() ?? 'light';
-    
+
     // Couleurs dynamiques basées sur le thème
     const backgroundColor = useThemeColor({}, 'background');
     const textColor = useThemeColor({}, 'text');
     const iconColor = useThemeColor({}, 'icon');
     const tintColor = useThemeColor({}, 'tint');
-    
+
     // Couleurs spécifiques pour l'écran
     const cardBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
     const borderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
@@ -51,7 +51,7 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
     const [selectedStatus, setSelectedStatus] = useState<string | any>('');
     const [showStatusModal, setShowStatusModal] = useState<boolean>(false);
     const [isLoading, setIsLoading] = useState<boolean>(true);
-    
+
     // Ajouter un état pour le modal de confirmation
     const [showLogoutModal, setShowLogoutModal] = useState(false);
 
@@ -215,16 +215,16 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
     const filteredBookings = useMemo(() => {
         return bookingList.filter((booking) => {
             // Filtre par recherche
-            const matchesSearch = 
+            const matchesSearch =
                 !searchQuery ||
                 booking.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 booking.trip.stationFrom.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 booking.trip.stationTo.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 booking.companyName.toLowerCase().includes(searchQuery.toLowerCase());
-            
+
             // Filtre par statut
             const matchesStatus = !selectedStatus || booking.status === selectedStatus;
-            
+
             return matchesSearch && matchesStatus;
         });
     }, [bookingList, searchQuery, selectedStatus]);
@@ -238,121 +238,121 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
         >
-                {/* Main Profile Card */}
-                <View style={[styles.profileCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
-                    <View style={styles.profileCardHeader}>
-                        <Text style={[styles.businessLabel, { color: secondaryTextColor }]}>Profil Utilisateur</Text>
-                        <View style={[styles.statusBadge, { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'space-between', alignItems: 'center' }]}>
-                            <View style={[styles.statusDot, { backgroundColor: user?.active ? '#4CAF50' : '#9E9E9E' }]} />
-                            <Text style={[styles.statusLabel, { color: secondaryTextColor }]}>{user?.active ? 'Actif' : 'Inactif'}</Text>
-                        </View>
+            {/* Main Profile Card */}
+            <View style={[styles.profileCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
+                <View style={styles.profileCardHeader}>
+                    <Text style={[styles.businessLabel, { color: secondaryTextColor }]}>Profil Utilisateur</Text>
+                    <View style={[styles.statusBadge, { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'space-between', alignItems: 'center' }]}>
+                        <View style={[styles.statusDot, { backgroundColor: user?.active ? '#4CAF50' : '#9E9E9E' }]} />
+                        <Text style={[styles.statusLabel, { color: secondaryTextColor }]}>{user?.active ? 'Actif' : 'Inactif'}</Text>
                     </View>
+                </View>
 
-                    <View style={styles.profileInfo}>
-                        <View style={[styles.profileImageContainer, { backgroundColor: profileImagePlaceholderBackgroundColor }]}>
-                            {user?.picture ? (
-                                <Image
-                                    source={{ uri: user?.picture }}
-                                    style={styles.profileImage}
-                                />
-                            ) : (
-                                <View style={[styles.profileImagePlaceholder, { backgroundColor: profileImagePlaceholderBackgroundColor }]}>
-                                    <MaterialCommunityIcons name="account" size={40} color={secondaryTextColor} />
-                                </View>
-                            )}
-                        </View>
-                        <Text style={[styles.userName, { color: textColor }]}>{getFullName() || 'Non renseigné'}</Text>
-                        <Text style={[styles.userRole, { color: secondaryTextColor }]}>{formatCivility()}</Text>
-                        {user?.company && (
-                            <Text style={[styles.userCompany, { color: activeTabColor }]}>{user?.company}</Text>
-                        )}
-                    </View>
-
-                    {/* Informations détaillées */}
-                    <View style={[styles.detailsSection, { borderTopColor: borderColor }]}>
-                        <View style={styles.detailRow}>
-                            <MaterialCommunityIcons name="email-outline" size={18} color={secondaryTextColor} />
-                            <Text style={[styles.detailLabel, { color: textColor }]}>Email:</Text>
-                            <Text style={[styles.detailValue, { color: secondaryTextColor }]}>{user?.email}</Text>
-                            {user?.isEmailVerified && (
-                                <MaterialCommunityIcons name="check-circle" size={16} color="#4CAF50" />
-                            )}
-                        </View>
-                        <View style={styles.detailRow}>
-                            <MaterialCommunityIcons name="account-outline" size={18} color={secondaryTextColor} />
-                            <Text style={[styles.detailLabel, { color: textColor }]}>Nom d'utilisateur:</Text>
-                            <Text style={[styles.detailValue, { color: secondaryTextColor }]}>@{user?.username}</Text>
-                        </View>
-                        <View style={styles.detailRow}>
-                            <MaterialCommunityIcons name="phone-outline" size={18} color={secondaryTextColor} />
-                            <Text style={[styles.detailLabel, { color: textColor }]}>Téléphone:</Text>
-                            <Text style={[styles.detailValue, { color: secondaryTextColor }]}>+225 {user?.phones?.[0]?.digits}</Text>
-                        </View>
-                        {user?.dateOfBirth && (
-                            <View style={styles.detailRow}>
-                                <MaterialCommunityIcons name="calendar-outline" size={18} color={secondaryTextColor} />
-                                <Text style={[styles.detailLabel, { color: textColor }]}>Date de naissance:</Text>
-                                <Text style={[styles.detailValue, { color: secondaryTextColor }]}>{formatDateOfBirth()}</Text>
-                            </View>
-                        )}
-                        {user?.address && (
-                            <View style={styles.detailRow}>
-                                <MaterialCommunityIcons name="map-marker-outline" size={18} color={secondaryTextColor} />
-                                <Text style={[styles.detailLabel, { color: textColor }]}>Adresse:</Text>
-                                <Text style={[styles.detailValue, { color: secondaryTextColor }]}>{user?.address}</Text>
+                <View style={styles.profileInfo}>
+                    <View style={[styles.profileImageContainer, { backgroundColor: profileImagePlaceholderBackgroundColor }]}>
+                        {user?.picture ? (
+                            <Image
+                                source={{ uri: user?.picture }}
+                                style={styles.profileImage}
+                            />
+                        ) : (
+                            <View style={[styles.profileImagePlaceholder, { backgroundColor: profileImagePlaceholderBackgroundColor }]}>
+                                <MaterialCommunityIcons name="account" size={40} color={secondaryTextColor} />
                             </View>
                         )}
                     </View>
+                    <Text style={[styles.userName, { color: textColor }]}>{getFullName() || 'Non renseigné'}</Text>
+                    <Text style={[styles.userRole, { color: secondaryTextColor }]}>{formatCivility()}</Text>
+                    {user?.company && (
+                        <Text style={[styles.userCompany, { color: activeTabColor }]}>{user?.company}</Text>
+                    )}
+                </View>
 
-                    {/* Contact d'urgence */}
-                    {user?.contactUrgent && (
-                        <View style={[styles.emergencySection, { borderTopColor: borderColor }]}>
-                            <Text style={[styles.sectionTitle, { color: textColor }]}>Contact d'urgence</Text>
-                            <View style={[styles.emergencyInfo, { backgroundColor: emergencyInfoBackgroundColor }]}>
-                                <Text style={[styles.emergencyName, { color: textColor }]}>{user?.contactUrgent.fullName}</Text>
-                                <Text style={[styles.emergencyPhone, { color: secondaryTextColor }]}>{user?.contactUrgent.phone}</Text>
-                            </View>
+                {/* Informations détaillées */}
+                <View style={[styles.detailsSection, { borderTopColor: borderColor }]}>
+                    <View style={styles.detailRow}>
+                        <MaterialCommunityIcons name="email-outline" size={18} color={secondaryTextColor} />
+                        <Text style={[styles.detailLabel, { color: textColor }]}>Email:</Text>
+                        <Text style={[styles.detailValue, { color: secondaryTextColor }]}>{user?.email}</Text>
+                        {user?.isEmailVerified && (
+                            <MaterialCommunityIcons name="check-circle" size={16} color="#4CAF50" />
+                        )}
+                    </View>
+                    <View style={styles.detailRow}>
+                        <MaterialCommunityIcons name="account-outline" size={18} color={secondaryTextColor} />
+                        <Text style={[styles.detailLabel, { color: textColor }]}>Nom d'utilisateur:</Text>
+                        <Text style={[styles.detailValue, { color: secondaryTextColor }]}>@{user?.username}</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                        <MaterialCommunityIcons name="phone-outline" size={18} color={secondaryTextColor} />
+                        <Text style={[styles.detailLabel, { color: textColor }]}>Téléphone:</Text>
+                        <Text style={[styles.detailValue, { color: secondaryTextColor }]}>+225 {user?.phones?.[0]?.digits}</Text>
+                    </View>
+                    {user?.dateOfBirth && (
+                        <View style={styles.detailRow}>
+                            <MaterialCommunityIcons name="calendar-outline" size={18} color={secondaryTextColor} />
+                            <Text style={[styles.detailLabel, { color: textColor }]}>Date de naissance:</Text>
+                            <Text style={[styles.detailValue, { color: secondaryTextColor }]}>{formatDateOfBirth()}</Text>
+                        </View>
+                    )}
+                    {user?.address && (
+                        <View style={styles.detailRow}>
+                            <MaterialCommunityIcons name="map-marker-outline" size={18} color={secondaryTextColor} />
+                            <Text style={[styles.detailLabel, { color: textColor }]}>Adresse:</Text>
+                            <Text style={[styles.detailValue, { color: secondaryTextColor }]}>{user?.address}</Text>
                         </View>
                     )}
                 </View>
 
-                {/* Statistiques utilisateur */}
-                <View style={styles.statsSection}>
-                    {/* Voyages effectués */}
-                    <View style={[styles.tripsCompletedCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
-                        <View style={[styles.tripsIconContainer, { backgroundColor: tripsIconContainerBackgroundColor }]}>
-                            <MaterialCommunityIcons name="check-circle" size={24} color={activeTabColor} />
-                        </View>
-                        <View style={styles.statsContent}>
-                            <Text style={[styles.statsLabel, { color: secondaryTextColor }]}>Voyages effectués</Text>
-                            <Text style={[styles.tripsCount, { color: activeTabColor }]}>{user?.customerProfile?.totalTripsPaid ?? 0}</Text>
+                {/* Contact d'urgence */}
+                {user?.contactUrgent && (
+                    <View style={[styles.emergencySection, { borderTopColor: borderColor }]}>
+                        <Text style={[styles.sectionTitle, { color: textColor }]}>Contact d'urgence</Text>
+                        <View style={[styles.emergencyInfo, { backgroundColor: emergencyInfoBackgroundColor }]}>
+                            <Text style={[styles.emergencyName, { color: textColor }]}>{user?.contactUrgent.fullName}</Text>
+                            <Text style={[styles.emergencyPhone, { color: secondaryTextColor }]}>{user?.contactUrgent.phone}</Text>
                         </View>
                     </View>
+                )}
+            </View>
 
-                    {/* Type de clients */}
-                    <View style={[styles.clientTypeCard, { backgroundColor: clientTypeCardBackgroundColor, borderColor }]}>
-                        <MaterialCommunityIcons name="wallet" size={24} color="#4CAF50" />
-                        <View style={styles.statsContent}>
-                            <Text style={[styles.statsLabel, { color: secondaryTextColor }]}>Type de client</Text>
-                            <Text style={[styles.clientTypeValue, { color: '#4CAF50' }]}>{user?.customerProfile?.loyaltyTier ?? 'bronze'}</Text>
-                        </View>
+            {/* Statistiques utilisateur */}
+            <View style={styles.statsSection}>
+                {/* Voyages effectués */}
+                <View style={[styles.tripsCompletedCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
+                    <View style={[styles.tripsIconContainer, { backgroundColor: tripsIconContainerBackgroundColor }]}>
+                        <MaterialCommunityIcons name="check-circle" size={24} color={activeTabColor} />
                     </View>
-
-                    {/* AllOn Coin gagnés */}
-                    <View style={[styles.coinsCard, { backgroundColor: coinsCardBackgroundColor, borderColor }]}>
-                        <MaterialCommunityIcons name="star" size={24} color="#FFA726" />
-                        <View style={styles.statsContent}>
-                            <Text style={[styles.statsLabel, { color: secondaryTextColor }]}>AllOn Coin gagnés</Text>
-                            <Text style={[styles.coinsValue, { color: '#FFA726' }]}>{user?.customerProfile?.totalCoinsEarned ?? '0.00'}</Text>
-                        </View>
+                    <View style={styles.statsContent}>
+                        <Text style={[styles.statsLabel, { color: secondaryTextColor }]}>Voyages effectués</Text>
+                        <Text style={[styles.tripsCount, { color: activeTabColor }]}>{user?.customerProfile?.totalTripsPaid ?? 0}</Text>
                     </View>
                 </View>
 
-                {/* Modify Button */}
-                <Pressable style={styles.upgradeButton} onPress={handleUpdateUserInfo}>
-                    <MaterialCommunityIcons name="pencil" size={20} color="#FFFFFF" />
-                    <Text style={styles.upgradeButtonText}>Modifier mes informations</Text>
-                </Pressable>
+                {/* Type de clients */}
+                <View style={[styles.clientTypeCard, { backgroundColor: clientTypeCardBackgroundColor, borderColor }]}>
+                    <MaterialCommunityIcons name="wallet" size={24} color="#4CAF50" />
+                    <View style={styles.statsContent}>
+                        <Text style={[styles.statsLabel, { color: secondaryTextColor }]}>Type de client</Text>
+                        <Text style={[styles.clientTypeValue, { color: '#4CAF50' }]}>{user?.customerProfile?.loyaltyTier ?? 'bronze'}</Text>
+                    </View>
+                </View>
+
+                {/* AllOn Coin gagnés */}
+                <View style={[styles.coinsCard, { backgroundColor: coinsCardBackgroundColor, borderColor }]}>
+                    <MaterialCommunityIcons name="star" size={24} color="#FFA726" />
+                    <View style={styles.statsContent}>
+                        <Text style={[styles.statsLabel, { color: secondaryTextColor }]}>AllOn Coin gagnés</Text>
+                        <Text style={[styles.coinsValue, { color: '#FFA726' }]}>{user?.customerProfile?.totalCoinsEarned ?? '0.00'}</Text>
+                    </View>
+                </View>
+            </View>
+
+            {/* Modify Button */}
+            <Pressable style={styles.upgradeButton} onPress={handleUpdateUserInfo}>
+                <MaterialCommunityIcons name="pencil" size={20} color="#FFFFFF" />
+                <Text style={styles.upgradeButtonText}>Modifier mes informations</Text>
+            </Pressable>
         </ScrollView>
     );
 
@@ -450,15 +450,16 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
 
                             {/* Boutons d'action */}
                             <View style={styles.actionButtons}>
-                                <Pressable 
-                                style={[styles.actionButton, { backgroundColor: activeTabColor, borderColor: activeTabColor }]}
-                                onPress={() => handleViewBooking(booking.id)}
+                                <Pressable
+                                    style={[styles.actionButton, { backgroundColor: activeTabColor, borderColor: activeTabColor }]}
+                                    onPress={() => handleViewBooking(booking.id)}
                                 >
                                     <MaterialCommunityIcons name="eye-outline" size={20} color="#ffffff" />
+                                    <Text style={styles.actionButtonText}>Voir le ticket</Text>
                                 </Pressable>
-                                <Pressable style={[styles.actionButton, { backgroundColor: actionButtonBackgroundColor, borderColor }]}>
+                                {/* <Pressable style={[styles.actionButton, { backgroundColor: actionButtonBackgroundColor, borderColor }]}>
                                     <MaterialCommunityIcons name="download" size={20} color={secondaryTextColor} />
-                                </Pressable>
+                                </Pressable> */}
                             </View>
                         </View>
                     ))}
@@ -1087,14 +1088,24 @@ const styles = StyleSheet.create({
     actionButtons: {
         flexDirection: 'row',
         gap: 12,
+        marginTop: 12,
     },
     actionButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 100,
-        borderWidth: 1,
-        justifyContent: 'center',
+        flex: 1,
+        flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderRadius: 8,
+        borderWidth: 1,
+        gap: 8,
+        minHeight: 44,
+    },
+    actionButtonText: {
+        fontSize: 14,
+        fontFamily: 'Ubuntu_Medium',
+        color: '#FFFFFF',
     },
     modalOverlay: {
         flex: 1,
