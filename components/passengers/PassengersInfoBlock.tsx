@@ -1,3 +1,5 @@
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useThemeColor } from '@/hooks/use-theme-color';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Badge } from './Badge';
@@ -38,21 +40,32 @@ export const PassengersInfoBlock = ({
     onUpdateContactEmail,
     onOpenBottomSheet
 }: PassengersInfoBlockProps) => {
+    const colorScheme = useColorScheme() ?? 'light';
+    
+    // Couleurs dynamiques basées sur le thème
+    const textColor = useThemeColor({}, 'text');
+    
+    // Couleur pour les badges : utilise la couleur principale de l'app qui fonctionne dans les deux modes
+    const badgeColor = '#1776BA';
+    
+    // Couleurs spécifiques
+    const borderColor = colorScheme === 'dark' ? '#3A3A3C' : '#F3F3F7';
+
     return (
         <View>
             <SectionHeader number={1} title="Informations du passager" />
 
             {passengers.map((passenger, index) => (
-                <View key={index} style={styles.passengerSection}>
+                <View key={index} style={[styles.passengerSection, { borderBottomColor: borderColor }]}>
                     <View style={styles.passengerHeader}>
-                        <Text style={styles.passengerTitle}>
+                        <Text style={[styles.passengerTitle, { color: textColor }]}>
                             Passager {passengers.length > 1 ? index + 1 : ''}
                         </Text>
                         <View style={styles.badgesContainer}>
                             {index === 0 ? (
-                                <Badge text="Principal" color="#1776BA" />
+                                <Badge text="Principal" color={badgeColor} />
                             ) : (
-                                <Badge text="Accompagnant" color="#1776BA" />
+                                <Badge text="Accompagnant" color={badgeColor} />
                             )}
                         </View>
                     </View>
@@ -110,7 +123,6 @@ const styles = StyleSheet.create({
         marginBottom: 24,
         paddingBottom: 24,
         borderBottomWidth: 1,
-        borderBottomColor: '#F3F3F7',
     },
     passengerHeader: {
         flexDirection: 'row',
@@ -122,7 +134,6 @@ const styles = StyleSheet.create({
     passengerTitle: {
         fontSize: 16,
         fontFamily: 'Ubuntu_Bold',
-        color: '#000',
         marginRight: 8,
     },
     badgesContainer: {

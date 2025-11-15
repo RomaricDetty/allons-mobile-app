@@ -2,6 +2,8 @@
 import { getCities } from "@/api/city";
 import { getAvailableDepartures } from "@/api/departure";
 import { BottomSheet } from "@/components/bottom-sheet";
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useThemeColor } from '@/hooks/use-theme-color';
 import { City, PopularTrip } from "@/types";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -31,6 +33,23 @@ const TripSearch = () => {
     const navigation = useNavigation();
     const route = useRoute();
     const { popularTrip } = (route.params as { popularTrip?: PopularTrip }) || {};
+    const colorScheme = useColorScheme() ?? 'light';
+    
+    // Couleurs dynamiques basées sur le thème
+    const backgroundColor = useThemeColor({}, 'background');
+    const textColor = useThemeColor({}, 'text');
+    const iconColor = useThemeColor({}, 'icon');
+    const tintColor = useThemeColor({}, 'tint');
+    
+    // Couleurs spécifiques pour les champs et modals
+    const fieldBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#F3F3F7';
+    const fieldTextColor = colorScheme === 'dark' ? '#ECEDEE' : '#1776ba';
+    const fieldPlaceholderColor = colorScheme === 'dark' ? '#9BA1A6' : '#A6A6AA';
+    const borderColor = colorScheme === 'dark' ? '#3A3A3C' : '#F3F3F7';
+    const modalBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
+    const datePickerBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
+    const cancelTextColor = colorScheme === 'dark' ? '#FF453A' : '#ff0000';
+    const confirmTextColor = colorScheme === 'dark' ? '#0A84FF' : '#1776ba';
 
     // Ref pour tracker si on a déjà lancé la recherche automatique
     const hasAutoSearched = useRef(false);
@@ -296,14 +315,14 @@ const TripSearch = () => {
 
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor }]}>
             {/* Header avec bouton retour */}
             <View style={[styles.header, { paddingTop: insets.top }]}>
                 <Pressable
                     onPress={() => navigation.goBack()}
                     style={styles.backButton}
                 >
-                    <Icon name="arrow-left" size={25} color="#000" />
+                    <Icon name="arrow-left" size={25} color={iconColor} />
                     {/* <Text style={styles.backButtonText}>Retour</Text> */}
                 </Pressable>
             </View>
@@ -311,65 +330,68 @@ const TripSearch = () => {
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
-                <Text style={styles.sectionTitle}>Rechercher un trajet</Text>
+                <Text style={[styles.sectionTitle, { color: textColor }]}>Rechercher un trajet</Text>
                 {/* Formulaire de recherche */}
-                <View style={styles.formContainer}>
+                <View style={[styles.formContainer]}>
                     {/* Ville de départ */}
                     <Pressable
-                        style={styles.field}
+                        style={[styles.field, { backgroundColor: fieldBackgroundColor }]}
                         onPress={() => setShowDepartureModal(true)}
                     >
-                        <Icon name="map-marker" size={20} color="#1776ba" />
+                        <Icon name="map-marker" size={20} color={tintColor} />
                         <Text style={[
                             styles.fieldText,
-                            !departureCity && styles.fieldPlaceholder
+                            { color: departureCity ? fieldTextColor : fieldPlaceholderColor }
                         ]}>
                             {departureCity ? departureCity.name : 'Ville de départ'}
                         </Text>
-                        <Icon name="chevron-down" size={20} color="#000" />
+                        <Icon name="chevron-down" size={20} color={iconColor} />
                     </Pressable>
 
                     {/* Ville d'arrivée */}
                     <Pressable
-                        style={styles.field}
+                        style={[styles.field, { backgroundColor: fieldBackgroundColor }]}
                         onPress={() => setShowArrivalModal(true)}
                     >
-                        <Icon name="map-marker" size={20} color="#1776ba" />
+                        <Icon name="map-marker" size={20} color={tintColor} />
                         <Text style={[
                             styles.fieldText,
-                            !arrivalCity && styles.fieldPlaceholder
+                            { color: arrivalCity ? fieldTextColor : fieldPlaceholderColor }
                         ]}>
                             {arrivalCity ? arrivalCity.name : 'Ville d\'arrivée'}
                         </Text>
-                        <Icon name="chevron-down" size={20} color="#000" />
+                        <Icon name="chevron-down" size={20} color={iconColor} />
                     </Pressable>
 
                     {/* Type de départ */}
-                    <Pressable style={styles.field} onPress={() => setShowTypeDepartureModal(true)}>
-                        <Icon name="bus" size={20} color="#1776ba" />
+                    <Pressable 
+                        style={[styles.field, { backgroundColor: fieldBackgroundColor }]} 
+                        onPress={() => setShowTypeDepartureModal(true)}
+                    >
+                        <Icon name="bus" size={20} color={tintColor} />
                         <Text style={[
                             styles.fieldText,
-                            !typeDeparture && styles.fieldPlaceholder
+                            { color: typeDeparture ? fieldTextColor : fieldPlaceholderColor }
                         ]}>
                             {typeDeparture
                                 ? typeDepartureOptions.find(opt => opt.id === typeDeparture)?.label
                                 : 'Type de départ'}
                         </Text>
-                        <Icon name="chevron-down" size={20} color="#000" />
+                        <Icon name="chevron-down" size={20} color={iconColor} />
                     </Pressable>
 
                     {/* Départ (date) */}
                     <Pressable
-                        style={styles.field}
+                        style={[styles.field, { backgroundColor: fieldBackgroundColor }]}
                         onPress={() => {
                             setDepartureDate(tempDepartureDate);
                             setShowDatePicker(true);
                         }}
                     >
-                        <Icon name="calendar" size={20} color="#1776ba" />
+                        <Icon name="calendar" size={20} color={tintColor} />
                         <Text style={[
                             styles.fieldText,
-                            !departureDate && styles.fieldPlaceholder
+                            { color: departureDate ? fieldTextColor : fieldPlaceholderColor }
                         ]}>
                             {departureDate
                                 ? departureDate.toLocaleDateString('fr-FR', {
@@ -379,22 +401,22 @@ const TripSearch = () => {
                                 })
                                 : 'Date de départ'}
                         </Text>
-                        <Icon name="chevron-down" size={20} color="#000" />
+                        <Icon name="chevron-down" size={20} color={iconColor} />
                     </Pressable>
 
                     {/* Date de retour - Affiché uniquement si Aller-retour */}
                     {typeDeparture === 'ROUND_TRIP' && (
                         <Pressable
-                            style={styles.field}
+                            style={[styles.field, { backgroundColor: fieldBackgroundColor }]}
                             onPress={() => {
                                 setReturnDate(tempReturnDate);
                                 setShowReturnDatePicker(true);
                             }}
                         >
-                            <Icon name="calendar" size={20} color="#1776ba" />
+                            <Icon name="calendar" size={20} color={tintColor} />
                             <Text style={[
                                 styles.fieldText,
-                                !returnDate && styles.fieldPlaceholder
+                                { color: returnDate ? fieldTextColor : fieldPlaceholderColor }
                             ]}>
                                 {returnDate
                                     ? returnDate.toLocaleDateString('fr-FR', {
@@ -404,22 +426,25 @@ const TripSearch = () => {
                                     })
                                     : 'Date de retour'}
                             </Text>
-                            <Icon name="chevron-down" size={20} color="#000" />
+                            <Icon name="chevron-down" size={20} color={iconColor} />
                         </Pressable>
                     )}
 
                     {/* Nombre de personnes */}
-                    <Pressable style={styles.field} onPress={() => setShowPassengerModal(true)}>
-                        <Icon name="account-group" size={20} color="#1776ba" />
+                    <Pressable 
+                        style={[styles.field, { backgroundColor: fieldBackgroundColor }]} 
+                        onPress={() => setShowPassengerModal(true)}
+                    >
+                        <Icon name="account-group" size={20} color={tintColor} />
                         <Text style={[
                             styles.fieldText,
-                            !numberOfPersons && styles.fieldPlaceholder
+                            { color: numberOfPersons ? fieldTextColor : fieldPlaceholderColor }
                         ]}>
                             {numberOfPersons
                                 ? passengerOptions.find(opt => opt.value === numberOfPersons)?.label
                                 : 'Nombre de voyageurs'}
                         </Text>
-                        <Icon name="chevron-down" size={20} color="#000" />
+                        <Icon name="chevron-down" size={20} color={iconColor} />
                     </Pressable>
 
                     {/* Bouton Rechercher */}
@@ -436,8 +461,6 @@ const TripSearch = () => {
                                 style={styles.searchButton}
                                 onPress={() => handleSearch()}
                             >
-                                {/* {loadingDepartures && <ActivityIndicator size="small" color="#FFFFFF" />} */}
-                                {/* <Text style={[styles.searchButtonText, { opacity: loadingDepartures ? 0.5 : 1 }]}>Rechercher</Text> */}
                                 <MaterialIcons name="search" size={30} color="#FFFFFF" />
                             </Pressable>
                         }
@@ -458,14 +481,14 @@ const TripSearch = () => {
                 renderItem={(item, onClose) => {
                     return (
                         <Pressable
-                            style={styles.cityItem}
+                            style={[styles.cityItem, { borderBottomColor: borderColor }]}
                             onPress={() => {
                                 handleSelectDepartureCity(item);
                                 onClose();
                             }}
                         >
-                            <Icon name="map-marker" size={20} color="#1776ba" />
-                            <Text style={styles.cityItemText}>{item.name}</Text>
+                            <Icon name="map-marker" size={20} color={tintColor} />
+                            <Text style={[styles.cityItemText, { color: textColor }]}>{item.name}</Text>
                         </Pressable>
                     );
                 }}
@@ -488,14 +511,14 @@ const TripSearch = () => {
                 renderItem={(item, onClose) => {
                     return (
                         <Pressable
-                            style={styles.cityItem}
+                            style={[styles.cityItem, { borderBottomColor: borderColor }]}
                             onPress={() => {
                                 handleSelectArrivalCity(item);
                                 onClose();
                             }}
                         >
-                            <Icon name="map-marker" size={20} color="#1776ba" />
-                            <Text style={styles.cityItemText}>{item.name}</Text>
+                            <Icon name="map-marker" size={20} color={tintColor} />
+                            <Text style={[styles.cityItemText, { color: textColor }]}>{item.name}</Text>
                         </Pressable>
                     );
                 }}
@@ -519,7 +542,7 @@ const TripSearch = () => {
                     const isSelected = typeDeparture === item.id;
                     return (
                         <Pressable
-                            style={styles.typeItem}
+                            style={[styles.typeItem, { borderBottomColor: borderColor }]}
                             onPress={() => {
                                 handleSelectTypeDeparture(item.id);
                                 onClose();
@@ -528,11 +551,11 @@ const TripSearch = () => {
                             <Icon
                                 name={isSelected ? "check-circle" : "circle-outline"}
                                 size={24}
-                                color={isSelected ? "#1776ba" : "#CCCCCC"}
+                                color={isSelected ? tintColor : iconColor}
                             />
                             <Text style={[
                                 styles.typeItemText,
-                                isSelected && styles.typeItemTextSelected
+                                { color: isSelected ? tintColor : textColor }
                             ]}>
                                 {item.label}
                             </Text>
@@ -554,7 +577,7 @@ const TripSearch = () => {
                     const isSelected = numberOfPersons === item.value;
                     return (
                         <Pressable
-                            style={styles.typeItem}
+                            style={[styles.typeItem, { borderBottomColor: borderColor }]}
                             onPress={() => {
                                 handleSelectPassenger(item.value);
                                 onClose();
@@ -563,11 +586,11 @@ const TripSearch = () => {
                             <Icon
                                 name={isSelected ? "check-circle" : "circle-outline"}
                                 size={24}
-                                color={isSelected ? "#1776ba" : "#CCCCCC"}
+                                color={isSelected ? tintColor : iconColor}
                             />
                             <Text style={[
                                 styles.typeItemText,
-                                isSelected && styles.typeItemTextSelected
+                                { color: isSelected ? tintColor : textColor }
                             ]}>
                                 {item.label}
                             </Text>
@@ -590,21 +613,27 @@ const TripSearch = () => {
                         onPress={() => setShowDatePicker(false)}
                     >
                         <Pressable
-                            style={[styles.datePickerContainer, { paddingBottom: insets.bottom + 20 }]}
+                            style={[
+                                styles.datePickerContainer, 
+                                { 
+                                    paddingBottom: insets.bottom + 20,
+                                    backgroundColor: datePickerBackgroundColor
+                                }
+                            ]}
                             onPress={(e) => e.stopPropagation()}
                         >
-                            <View style={styles.datePickerHeader}>
+                            <View style={[styles.datePickerHeader, { borderBottomColor: borderColor, backgroundColor: datePickerBackgroundColor }]}>
                                 <Pressable onPress={() => setShowDatePicker(false)}>
-                                    <Text style={styles.datePickerCancel}>Annuler</Text>
+                                    <Text style={[styles.datePickerCancel, { color: cancelTextColor }]}>Annuler</Text>
                                 </Pressable>
-                                <Text style={styles.datePickerTitle} numberOfLines={1}>
+                                <Text style={[styles.datePickerTitle, { color: textColor }]} numberOfLines={1}>
                                     Date de départ
                                 </Text>
                                 <Pressable onPress={() => {
                                     setDepartureDate(tempDepartureDate);
                                     setShowDatePicker(false);
                                 }}>
-                                    <Text style={styles.datePickerConfirm}>Confirmer</Text>
+                                    <Text style={[styles.datePickerConfirm, { color: confirmTextColor }]}>Confirmer</Text>
                                 </Pressable>
                             </View>
                             <View style={styles.datePickerContent}>
@@ -619,7 +648,7 @@ const TripSearch = () => {
                                     }}
                                     minimumDate={new Date()}
                                     locale="fr-FR"
-                                    themeVariant="light"
+                                    themeVariant={colorScheme === 'dark' ? 'dark' : 'light'}
                                 />
                             </View>
                         </Pressable>
@@ -639,6 +668,7 @@ const TripSearch = () => {
                         setShowDatePicker(false);
                     }}
                     minimumDate={new Date()}
+                    themeVariant={colorScheme === 'dark' ? 'dark' : 'light'}
                 />
             )}
 
@@ -657,21 +687,27 @@ const TripSearch = () => {
                                 onPress={() => setShowReturnDatePicker(false)}
                             >
                                 <Pressable
-                                    style={[styles.datePickerContainer, { paddingBottom: insets.bottom + 20 }]}
+                                    style={[
+                                        styles.datePickerContainer, 
+                                        { 
+                                            paddingBottom: insets.bottom + 20,
+                                            backgroundColor: datePickerBackgroundColor
+                                        }
+                                    ]}
                                     onPress={(e) => e.stopPropagation()}
                                 >
-                                    <View style={styles.datePickerHeader}>
+                                    <View style={[styles.datePickerHeader, { borderBottomColor: borderColor, backgroundColor: datePickerBackgroundColor }]}>
                                         <Pressable onPress={() => setShowReturnDatePicker(false)}>
-                                            <Text style={styles.datePickerCancel}>Annuler</Text>
+                                            <Text style={[styles.datePickerCancel, { color: cancelTextColor }]}>Annuler</Text>
                                         </Pressable>
-                                        <Text style={styles.datePickerTitle} numberOfLines={1}>
+                                        <Text style={[styles.datePickerTitle, { color: textColor }]} numberOfLines={1}>
                                             Date de retour
                                         </Text>
                                         <Pressable onPress={() => {
                                             setReturnDate(tempReturnDate);
                                             setShowReturnDatePicker(false);
                                         }}>
-                                            <Text style={styles.datePickerConfirm}>Confirmer</Text>
+                                            <Text style={[styles.datePickerConfirm, { color: confirmTextColor }]}>Confirmer</Text>
                                         </Pressable>
                                     </View>
                                     <View style={styles.datePickerContent}>
@@ -686,7 +722,7 @@ const TripSearch = () => {
                                             }}
                                             minimumDate={departureDate || new Date()}
                                             locale="fr-FR"
-                                            textColor="#000000"
+                                            themeVariant={colorScheme === 'dark' ? 'dark' : 'light'}
                                         />
                                     </View>
                                 </Pressable>
@@ -706,6 +742,7 @@ const TripSearch = () => {
                                 setShowReturnDatePicker(false);
                             }}
                             minimumDate={departureDate || new Date()}
+                            themeVariant={colorScheme === 'dark' ? 'dark' : 'light'}
                         />
                     )}
                 </>
@@ -717,7 +754,6 @@ const TripSearch = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FFFFFF',
     },
     header: {
         position: 'absolute',
@@ -736,22 +772,17 @@ const styles = StyleSheet.create({
         padding: 15,
         paddingLeft: 20,
     },
-
     backButtonText: {
         fontSize: 16,
         color: '#000',
         fontFamily: 'Ubuntu_Medium',
         marginLeft: 10,
     },
-
     scrollContent: {
         flexGrow: 1,
         justifyContent: 'center',
-        paddingHorizontal: 20,
-        // paddingTop: 80,
     },
     formContainer: {
-        backgroundColor: '#FFFFFF',
         borderRadius: 20,
         padding: 20,
         gap: 15,
@@ -759,7 +790,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     field: {
-        backgroundColor: '#F3F3F7',
         borderRadius: 15,
         height: 60,
         flexDirection: 'row',
@@ -771,13 +801,11 @@ const styles = StyleSheet.create({
     fieldText: {
         flex: 1,
         fontSize: 15,
-        color: '#1776ba',
         fontFamily: 'Ubuntu_Medium',
     },
     dateLabel: {
         flex: 1,
         fontSize: 15,
-        color: '#666666',
     },
     datePickerModal: {
         flex: 1,
@@ -789,7 +817,6 @@ const styles = StyleSheet.create({
         borderTopRightRadius: 20,
         paddingBottom: 20,
         minHeight: 320,
-        backgroundColor: '#FFFFFF',
     },
     datePickerHeader: {
         flexDirection: 'row',
@@ -798,28 +825,23 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#F3F3F7',
         minHeight: 56,
-        backgroundColor: '#FFFFFF',
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
     },
     datePickerCancel: {
         fontSize: 16,
-        color: '#ff0000',
         fontFamily: 'Ubuntu_Regular',
     },
     datePickerTitle: {
         fontSize: 16,
         fontFamily: 'Ubuntu_Bold',
-        color: '#000',
         flex: 1,
         textAlign: 'center',
         paddingHorizontal: 8,
     },
     datePickerConfirm: {
         fontSize: 16,
-        color: '#1776ba',
         fontFamily: 'Ubuntu_Medium',
     },
     searchButton: {
@@ -841,32 +863,27 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         padding: 15,
         borderBottomWidth: 1,
-        borderBottomColor: '#F3F3F7',
         gap: 12,
     },
     cityItemText: {
         fontSize: 16,
-        color: '#000',
         fontFamily: 'Ubuntu_Medium',
     },
     fieldPlaceholder: {
-        color: '#A6A6AA',
+        // Couleur gérée dynamiquement
     },
     typeItem: {
         flexDirection: 'row',
         alignItems: 'center',
         padding: 15,
         borderBottomWidth: 1,
-        borderBottomColor: '#F3F3F7',
         gap: 12,
     },
     typeItemText: {
         fontSize: 16,
-        color: '#000',
         fontFamily: 'Ubuntu_Regular',
     },
     typeItemTextSelected: {
-        color: '#1776ba',
         fontFamily: 'Ubuntu_Medium',
     },
     datePickerContent: {
@@ -874,7 +891,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         paddingVertical: 8,
-        // backgroundColor: '#000000',
     },
 });
 

@@ -1,3 +1,5 @@
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useThemeColor } from '@/hooks/use-theme-color';
 import React from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -23,17 +25,41 @@ export const FormField = ({
     keyboardType = 'default',
     editable = true
 }: FormFieldProps) => {
+    const colorScheme = useColorScheme() ?? 'light';
+    
+    // Couleurs dynamiques basées sur le thème
+    const textColor = useThemeColor({}, 'text');
+    const secondaryTextColor = colorScheme === 'dark' ? '#9BA1A6' : '#666';
+    
+    // Couleurs spécifiques pour le champ
+    const inputBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#F3F3F7';
+    const inputBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
+    const placeholderColor = colorScheme === 'dark' ? '#9BA1A6' : '#A6A6AA';
+    const inputDisabledBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#F5F5F5';
+    const inputDisabledTextColor = colorScheme === 'dark' ? '#9BA1A6' : '#666';
+
     return (
         <View style={styles.formField}>
-            <Text style={styles.formLabel}>
+            <Text style={[styles.formLabel, { color: textColor }]}>
                 {label} {required && <Text style={styles.required}>*</Text>}
             </Text>
             <TextInput
-                style={[styles.formInput, !editable && styles.formInputDisabled]}
+                style={[
+                    styles.formInput,
+                    {
+                        backgroundColor: inputBackgroundColor,
+                        borderColor: inputBorderColor,
+                        color: textColor
+                    },
+                    !editable && {
+                        backgroundColor: inputDisabledBackgroundColor,
+                        color: inputDisabledTextColor
+                    }
+                ]}
                 value={value}
                 onChangeText={onChangeText}
                 placeholder={placeholder}
-                placeholderTextColor="#A6A6AA"
+                placeholderTextColor={placeholderColor}
                 keyboardType={keyboardType}
                 editable={editable}
             />
@@ -48,26 +74,21 @@ const styles = StyleSheet.create({
     formLabel: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Medium',
-        color: '#000',
         marginBottom: 8,
     },
     required: {
         color: '#FF0000',
     },
     formInput: {
-        backgroundColor: '#F3F3F7',
         borderRadius: 8,
         paddingHorizontal: 16,
         paddingVertical: 12,
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        color: '#000',
         borderWidth: 1,
-        borderColor: '#E0E0E0',
     },
     formInputDisabled: {
-        backgroundColor: '#F5F5F5',
-        color: '#666',
+        // Styles gérés dynamiquement
     },
 });
 

@@ -1,12 +1,14 @@
 // @ts-nocheck
+import { BottomSheet } from '@/components/bottom-sheet';
 import { capitalizeBusType } from '@/constants/functions';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useThemeColor } from '@/hooks/use-theme-color';
 import { Departures, SearchParams, Trip } from '@/types';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import React, { useMemo, useState } from 'react';
 import {
     FlatList,
-    Modal,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -24,6 +26,23 @@ const TripList = () => {
     const route = useRoute();
     const navigation = useNavigation();
     const insets = useSafeAreaInsets();
+    const colorScheme = useColorScheme() ?? 'light';
+
+    // Couleurs dynamiques basées sur le thème
+    const backgroundColor = useThemeColor({}, 'background');
+    const textColor = useThemeColor({}, 'text');
+    const iconColor = useThemeColor({}, 'icon');
+    const tintColor = useThemeColor({}, 'tint');
+
+    // Couleurs spécifiques pour l'écran
+    const cardBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
+    const borderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
+    const secondaryTextColor = colorScheme === 'dark' ? '#9BA1A6' : '#666';
+    const headerBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
+    const headerBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
+    const modalBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
+    const modalBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#F3F3F7';
+    const scrollBackgroundColor = colorScheme === 'dark' ? '#000000' : '#F5F5F5';
 
     // Récupération des données passées en paramètre
     const { departures, searchParams } = (route.params as { departures?: Departures, searchParams?: SearchParams }) || {};
@@ -37,6 +56,14 @@ const TripList = () => {
 
     // États pour les filtres
     const [selectedSort, setSelectedSort] = useState('Prix croissant');
+
+    // Options de tri
+    const sortOptions = [
+        { id: 'Prix croissant', label: 'Prix croissant' },
+        { id: 'Prix décroissant', label: 'Prix décroissant' },
+        { id: 'Départ tôt', label: 'Départ tôt' },
+        { id: 'Départ tard', label: 'Départ tard' },
+    ];
 
     /**
      * Convertit une heure au format HH:MM en minutes pour faciliter la comparaison
@@ -55,24 +82,24 @@ const TripList = () => {
         switch (selectedSort) {
             case 'Prix croissant':
                 return tripsCopy.sort((a, b) => a.price - b.price);
-            
+
             case 'Prix décroissant':
                 return tripsCopy.sort((a, b) => b.price - a.price);
-            
+
             case 'Départ tôt':
                 return tripsCopy.sort((a, b) => {
                     const timeA = timeToMinutes(a.departureTime);
                     const timeB = timeToMinutes(b.departureTime);
                     return timeA - timeB;
                 });
-            
+
             case 'Départ tard':
                 return tripsCopy.sort((a, b) => {
                     const timeA = timeToMinutes(a.departureTime);
                     const timeB = timeToMinutes(b.departureTime);
                     return timeB - timeA;
                 });
-            
+
             default:
                 return tripsCopy;
         }
@@ -96,7 +123,7 @@ const TripList = () => {
      */
     const TripCard = ({ item }: { item: Trip }) => {
         return (
-            <View style={styles.tripCard}>
+            <View style={[styles.tripCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
                 {/* En-tête de la carte : Logo compagnie et Prix */}
                 <View style={styles.cardHeader}>
                     <View style={styles.companyInfo}>
@@ -106,39 +133,39 @@ const TripList = () => {
                             </Text>
                         </View>
                         <View style={styles.companyDetails}>
-                            <Text style={styles.companyName}>{item.company}</Text>
-                            <Text style={styles.licencePlate}>{item.licencePlate}</Text>
+                            <Text style={[styles.companyName, { color: textColor }]}>{item.company}</Text>
+                            <Text style={[styles.licencePlate, { color: secondaryTextColor }]}>{item.licencePlate}</Text>
                         </View>
                     </View>
                     <View style={styles.priceContainer}>
-                        <Text style={styles.price}>{item.price}</Text>
-                        <Text style={styles.currency}>{item.currency}</Text>
+                        <Text style={[styles.price, { color: tintColor }]}>{item.price}</Text>
+                        <Text style={[styles.currency, { color: secondaryTextColor }]}>{item.currency}</Text>
                     </View>
                 </View>
 
                 {/* Section Départ */}
                 <View style={styles.timeSection}>
                     <View style={styles.departureSection}>
-                        <Text style={styles.sectionLabel}>DÉPART</Text>
-                        <Text style={styles.time}>{item.departureTime}</Text>
-                        <Text style={styles.city}>{item.departureCity}</Text>
-                        <Text style={styles.station}>{item.departureStation}</Text>
+                        <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>DÉPART</Text>
+                        <Text style={[styles.time, { color: textColor }]}>{item.departureTime}</Text>
+                        <Text style={[styles.city, { color: textColor }]}>{item.departureCity}</Text>
+                        <Text style={[styles.station, { color: secondaryTextColor }]}>{item.departureStation}</Text>
                     </View>
 
                     {/* Timeline */}
                     <View style={styles.timelineContainer}>
-                        <View style={styles.timelineDot} />
-                        <View style={styles.timelineLine} />
-                        <View style={styles.timelineDot} />
-                        <Text style={styles.duration}>{item.duration}</Text>
+                        <View style={[styles.timelineDot, { backgroundColor: tintColor }]} />
+                        <View style={[styles.timelineLine, { backgroundColor: tintColor }]} />
+                        <View style={[styles.timelineDot, { backgroundColor: tintColor }]} />
+                        <Text style={[styles.duration, { color: secondaryTextColor }]}>{item.duration}</Text>
                     </View>
 
                     {/* Section Arrivée */}
                     <View style={styles.arrivalSection}>
-                        <Text style={styles.sectionLabel}>ARRIVÉE</Text>
-                        <Text style={styles.time}>{item.arrivalTime}</Text>
-                        <Text style={styles.city}>{item.arrivalCity}</Text>
-                        <Text style={styles.station}>{item.arrivalStation}</Text>
+                        <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>ARRIVÉE</Text>
+                        <Text style={[styles.time, { color: textColor }]}>{item.arrivalTime}</Text>
+                        <Text style={[styles.city, { color: textColor }]}>{item.arrivalCity}</Text>
+                        <Text style={[styles.station, { color: secondaryTextColor }]}>{item.arrivalStation}</Text>
                     </View>
                 </View>
 
@@ -148,7 +175,7 @@ const TripList = () => {
                         {item.options.map((option, index) => (
                             <View key={index} style={styles.optionItem}>
                                 <Icon name="check-circle" size={16} color="#4CAF50" />
-                                <Text style={styles.optionText}>{option}</Text>
+                                <Text style={[styles.optionText, { color: textColor }]}>{option}</Text>
                             </View>
                         ))}
                     </View>
@@ -167,7 +194,7 @@ const TripList = () => {
                                 {item.availableSeats} places disponibles
                             </Text>
                         </View>
-                        <Text style={styles.busType}>{capitalizeBusType(item.busType)}</Text>
+                        <Text style={[styles.busType, { color: tintColor }]}>{capitalizeBusType(item.busType)}</Text>
                     </View>
                 </View>
 
@@ -183,18 +210,26 @@ const TripList = () => {
     };
 
     return (
-        <View style={styles.container}>
-            {/* Header avec bouton retour */}
-            <View style={[styles.header, { paddingTop: insets.top }]}>
-                <Pressable
-                    onPress={() => navigation.goBack()}
-                    style={styles.backButton}
-                >
-                    <Icon name="arrow-left" size={25} color="#000" />
-                </Pressable>
+        <>
+            <View style={[styles.container, { backgroundColor: scrollBackgroundColor }]}>
+                {/* Header avec bouton retour */}
+                <View style={[
+                    styles.header,
+                    {
+                        paddingTop: insets.top,
+                        backgroundColor: headerBackgroundColor,
+                        borderBottomColor: headerBorderColor
+                    }
+                ]}>
+                    <Pressable
+                        onPress={() => navigation.goBack()}
+                        style={styles.backButton}
+                    >
+                        <Icon name="arrow-left" size={25} color={iconColor} />
+                    </Pressable>
 
-                {/* Bouton Filtres */}
-                {/* <Pressable
+                    {/* Bouton Filtres */}
+                    {/* <Pressable
                     style={styles.filterButton}
                     onPress={() => setShowFiltersModal(true)}
                 >
@@ -202,61 +237,61 @@ const TripList = () => {
                     <Text style={styles.filterButtonText}>Filtres</Text>
                 </Pressable> */}
 
-                {/* Dropdown Afficher */}
-                {/* <Pressable
+                    {/* Dropdown Afficher */}
+                    {/* <Pressable
                     style={styles.displayButton}
                     onPress={() => setShowDisplayModal(true)}
                 >
                     <Text style={styles.displayButtonText}>Afficher</Text>
                     <Icon name="chevron-down" size={20} color="#000" />
                 </Pressable> */}
-            </View>
-
-            <ScrollView
-                style={styles.scrollView}
-                contentContainerStyle={styles.scrollContent}
-                showsVerticalScrollIndicator={false}
-            >
-                {/* Route */}
-                <View style={styles.routeContainer}>
-                    <Text style={styles.routeCity}>{departureCity}</Text>
-                    <Icon name="arrow-right" size={24} color="#1776BA" />
-                    <Text style={styles.routeCity}>{arrivalCity}</Text>
                 </View>
 
-                {/* Résumé et Tri */}
-                <View style={styles.summaryContainer}>
-                    <Text style={styles.summaryText}>
-                        {totalTrips} {totalTrips > 1 ? 'trajets disponibles' : 'trajet disponible'}
-                    </Text>
-                    <Pressable
-                        style={styles.sortButton}
-                        onPress={() => setShowSortModal(true)}
-                    >
-                        <Text style={styles.sortButtonText}>{selectedSort}</Text>
-                        <Icon name="chevron-down" size={16} color="#000" />
-                    </Pressable>
-                </View>
-
-                {/* Liste des trajets */}
-                {sortedTrips.length > 0 ? (
-                    <FlatList
-                        data={sortedTrips}
-                        renderItem={({ item }) => <TripCard item={item} />}
-                        keyExtractor={(item) => item.id}
-                        scrollEnabled={false}
-                        contentContainerStyle={styles.tripsList}
-                    />
-                ) : (
-                    <View style={styles.emptyContainer}>
-                        <MaterialIcons name="directions-bus" size={40} color="#1776BA" />
-                        <Text style={styles.emptyText}>Aucun trajet disponible</Text>
+                <ScrollView
+                    style={styles.scrollView}
+                    contentContainerStyle={styles.scrollContent}
+                    showsVerticalScrollIndicator={false}
+                >
+                    {/* Route */}
+                    <View style={styles.routeContainer}>
+                        <Text style={[styles.routeCity, { color: textColor }]}>{departureCity}</Text>
+                        <Icon name="arrow-right" size={24} color={tintColor} />
+                        <Text style={[styles.routeCity, { color: textColor }]}>{arrivalCity}</Text>
                     </View>
-                )}
-            </ScrollView>
 
-            {/* Modal Filtres (à implémenter) */}
-            {/* <Modal
+                    {/* Résumé et Tri */}
+                    <View style={styles.summaryContainer}>
+                        <Text style={[styles.summaryText, { color: secondaryTextColor }]}>
+                            {totalTrips} {totalTrips > 1 ? 'trajets disponibles' : 'trajet disponible'}
+                        </Text>
+                        <Pressable
+                            style={styles.sortButton}
+                            onPress={() => setShowSortModal(true)}
+                        >
+                            <Text style={[styles.sortButtonText, { color: textColor }]}>{selectedSort}</Text>
+                            <Icon name="chevron-down" size={16} color={iconColor} />
+                        </Pressable>
+                    </View>
+
+                    {/* Liste des trajets */}
+                    {sortedTrips.length > 0 ? (
+                        <FlatList
+                            data={sortedTrips}
+                            renderItem={({ item }) => <TripCard item={item} />}
+                            keyExtractor={(item) => item.id}
+                            scrollEnabled={false}
+                            contentContainerStyle={styles.tripsList}
+                        />
+                    ) : (
+                        <View style={styles.emptyContainer}>
+                            <MaterialIcons name="directions-bus" size={40} color={tintColor} />
+                            <Text style={[styles.emptyText, { color: secondaryTextColor }]}>Aucun trajet disponible</Text>
+                        </View>
+                    )}
+                </ScrollView>
+
+                {/* Modal Filtres (à implémenter) */}
+                {/* <Modal
                 visible={showFiltersModal}
                 transparent={true}
                 animationType="slide"
@@ -279,89 +314,78 @@ const TripList = () => {
                         </Pressable>
                     </View>
                 </Pressable>
-            </Modal> */}
+                </Modal> */}
 
-            {/* Modal Afficher (à implémenter) */}
-            {/* <Modal
-                visible={showDisplayModal}
-                transparent={true}
-                animationType="slide"
-                onRequestClose={() => setShowDisplayModal(false)}
-            >
-                <Pressable
-                    style={styles.modalOverlay}
-                    onPress={() => setShowDisplayModal(false)}
+                {/* Modal Afficher (à implémenter) */}
+                {/* <Modal
+                    visible={showDisplayModal}
+                    transparent={true}
+                    animationType="slide"
+                    onRequestClose={() => setShowDisplayModal(false)}
                 >
-                    <View style={[styles.modalContent, { paddingBottom: insets.bottom + 20 }]}>
-                        <Text style={styles.modalTitle}>Afficher</Text>
-                        <Text style={styles.modalPlaceholder}>
-                            Options d'affichage à implémenter
-                        </Text>
-                        <Pressable
-                            style={styles.modalCloseButton}
-                            onPress={() => setShowDisplayModal(false)}
-                        >
-                            <Text style={styles.modalCloseButtonText}>Fermer</Text>
-                        </Pressable>
-                    </View>
-                </Pressable>
-            </Modal> */}
-
-            {/* Modal Tri */}
-            <Modal
-                visible={showSortModal}
-                transparent={true}
-                animationType="slide"
-                onRequestClose={() => setShowSortModal(false)}
-            >
-                <Pressable
-                    style={styles.modalOverlay}
-                    onPress={() => setShowSortModal(false)}
-                >
-                    <View
-                        style={[
-                            styles.modalContent,
-                            {
-                                paddingTop: 20,
-                                paddingHorizontal: 20,
-                                // marginBottom: -500,
-                                paddingBottom: Math.max(insets.bottom, 0) + 20,
-                            }
-                        ]}
-                        onStartShouldSetResponder={() => true}
+                    <Pressable
+                        style={styles.modalOverlay}
+                        onPress={() => setShowDisplayModal(false)}
                     >
-                        <Text style={styles.modalTitle}>Trier par</Text>
-                        {['Prix croissant', 'Prix décroissant', 'Départ tôt', 'Départ tard'].map((option) => (
+                        <View style={[styles.modalContent, { paddingBottom: insets.bottom + 20 }]}>
+                            <Text style={styles.modalTitle}>Afficher</Text>
+                            <Text style={styles.modalPlaceholder}>
+                                Options d'affichage à implémenter
+                            </Text>
                             <Pressable
-                                key={option}
-                                style={styles.sortOption}
-                                onPress={() => {
-                                    setSelectedSort(option);
-                                    setShowSortModal(false);
-                                }}
+                                style={styles.modalCloseButton}
+                                onPress={() => setShowDisplayModal(false)}
                             >
-                                <Text style={[
-                                    styles.sortOptionText,
-                                    selectedSort === option && styles.sortOptionTextSelected
-                                ]}>
-                                    {option}
-                                </Text>
-                                {selectedSort === option && (
-                                    <Icon name="check" size={20} color="#1776BA" />
-                                )}
+                                <Text style={styles.modalCloseButtonText}>Fermer</Text>
                             </Pressable>
-                        ))}
-                    </View>
-                </Pressable>
-            </Modal>
-        </View>
+                        </View>
+                    </Pressable>
+                </Modal> */}
+
+            </View>
+            {/* BottomSheet de tri */}
+            <BottomSheet
+                visible={showSortModal}
+                onClose={() => setShowSortModal(false)}
+                title="Trier par"
+                data={sortOptions}
+                loading={false}
+                keyExtractor={(item) => item.id}
+                renderItem={(item, onClose) => {
+                    const isSelected = selectedSort === item.id;
+                    return (
+                        <Pressable
+                            style={[
+                                styles.sortOption,
+                                { borderBottomColor: colorScheme === 'dark' ? '#3A3A3C' : '#F3F3F7' }
+                            ]}
+                            onPress={() => {
+                                setSelectedSort(item.id);
+                                onClose();
+                            }}
+                        >
+                            <Text style={[
+                                styles.sortOptionText,
+                                { color: isSelected ? tintColor : textColor },
+                                isSelected && styles.sortOptionTextSelected
+                            ]}>
+                                {item.label}
+                            </Text>
+                            {isSelected && (
+                                <Icon name="check" size={20} color={tintColor} />
+                            )}
+                        </Pressable>
+                    );
+                }}
+                emptyText="Aucune option disponible"
+            />
+        </>
     );
 };
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F5F5F5',
     },
     header: {
         flexDirection: 'row',
@@ -369,9 +393,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingHorizontal: 16,
         paddingBottom: 12,
-        backgroundColor: '#FFFFFF',
         borderBottomWidth: 1,
-        borderBottomColor: '#E0E0E0',
     },
     backButton: {
         padding: 8,
@@ -385,7 +407,6 @@ const styles = StyleSheet.create({
     filterButtonText: {
         fontSize: 16,
         fontFamily: 'Ubuntu_Medium',
-        color: '#000',
     },
     displayButton: {
         flexDirection: 'row',
@@ -396,7 +417,6 @@ const styles = StyleSheet.create({
     displayButtonText: {
         fontSize: 16,
         fontFamily: 'Ubuntu_Regular',
-        color: '#000',
     },
     scrollView: {
         flex: 1,
@@ -415,7 +435,6 @@ const styles = StyleSheet.create({
     routeCity: {
         fontSize: 24,
         fontFamily: 'Ubuntu_Bold',
-        color: '#000',
     },
     summaryContainer: {
         flexDirection: 'row',
@@ -427,7 +446,6 @@ const styles = StyleSheet.create({
     summaryText: {
         fontSize: 16,
         fontFamily: 'Ubuntu_Regular',
-        color: '#666',
     },
     sortButton: {
         flexDirection: 'row',
@@ -437,18 +455,15 @@ const styles = StyleSheet.create({
     sortButtonText: {
         fontSize: 16,
         fontFamily: 'Ubuntu_Regular',
-        color: '#000',
     },
     tripsList: {
         gap: 15,
     },
     tripCard: {
-        backgroundColor: '#FFFFFF',
         borderRadius: 12,
         padding: 16,
         marginBottom: 16,
         borderWidth: 1,
-        borderColor: '#E0E0E0',
     },
     cardHeader: {
         flexDirection: 'row',
@@ -481,12 +496,10 @@ const styles = StyleSheet.create({
     companyName: {
         fontSize: 15,
         fontFamily: 'Ubuntu_Bold',
-        color: '#000',
     },
     licencePlate: {
         fontSize: 12,
         fontFamily: 'Ubuntu_Regular',
-        color: '#666',
         marginTop: 2,
     },
     priceContainer: {
@@ -495,12 +508,10 @@ const styles = StyleSheet.create({
     price: {
         fontSize: 24,
         fontFamily: 'Ubuntu_Bold',
-        color: '#1776BA',
     },
     currency: {
         fontSize: 12,
         fontFamily: 'Ubuntu_Regular',
-        color: '#666',
     },
     timeSection: {
         flexDirection: 'row',
@@ -519,26 +530,22 @@ const styles = StyleSheet.create({
     sectionLabel: {
         fontSize: 11,
         fontFamily: 'Ubuntu_Bold',
-        color: '#666',
         textTransform: 'uppercase',
         marginBottom: 4,
     },
     time: {
         fontSize: 20,
         fontFamily: 'Ubuntu_Bold',
-        color: '#000',
         marginBottom: 4,
     },
     city: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Medium',
-        color: '#000',
         marginBottom: 2,
     },
     station: {
         fontSize: 12,
         fontFamily: 'Ubuntu_Regular',
-        color: '#666',
     },
     timelineContainer: {
         alignItems: 'center',
@@ -549,19 +556,16 @@ const styles = StyleSheet.create({
         width: 8,
         height: 8,
         borderRadius: 4,
-        backgroundColor: '#1776BA',
         marginBottom: 4,
     },
     timelineLine: {
         width: 2,
         height: 30,
-        backgroundColor: '#1776BA',
         marginBottom: 4,
     },
     duration: {
         fontSize: 12,
         fontFamily: 'Ubuntu_Regular',
-        color: '#666',
         marginTop: 4,
     },
     optionsSection: {
@@ -581,7 +585,6 @@ const styles = StyleSheet.create({
     optionText: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        color: '#000',
     },
     availabilityBadge: {
         alignSelf: 'flex-start',
@@ -599,7 +602,6 @@ const styles = StyleSheet.create({
     busType: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        color: '#1776BA',
     },
     selectButton: {
         backgroundColor: '#1776BA',
@@ -621,17 +623,14 @@ const styles = StyleSheet.create({
     emptyText: {
         fontSize: 18,
         fontFamily: 'Ubuntu_Regular',
-        color: '#666',
         marginTop: 10,
     },
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
         justifyContent: 'flex-end',
-        // marginBottom: ,
     },
     modalContent: {
-        backgroundColor: '#FFFFFF',
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
         width: '100%',
@@ -647,13 +646,11 @@ const styles = StyleSheet.create({
     modalTitle: {
         fontSize: 20,
         fontFamily: 'Ubuntu_Bold',
-        color: '#000',
         marginBottom: 20,
     },
     modalPlaceholder: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        color: '#666',
         marginBottom: 20,
     },
     modalCloseButton: {
@@ -673,16 +670,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingVertical: 20,
         borderBottomWidth: 1,
-        borderBottomColor: '#F3F3F7',
     },
     sortOptionText: {
         fontSize: 16,
         fontFamily: 'Ubuntu_Regular',
-        color: '#000',
     },
     sortOptionTextSelected: {
         fontFamily: 'Ubuntu_Bold',
-        color: '#1776BA',
     },
 });
 

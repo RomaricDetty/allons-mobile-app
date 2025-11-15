@@ -1,6 +1,9 @@
 // @ts-nocheck
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useThemeColor } from '@/hooks/use-theme-color';
 import React from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 interface SelectionBottomSheetProps {
@@ -23,6 +26,21 @@ export const SelectionBottomSheet = ({
     onSelect,
     onClose
 }: SelectionBottomSheetProps) => {
+    const colorScheme = useColorScheme() ?? 'light';
+    const insets = useSafeAreaInsets();
+    
+    // Couleurs dynamiques basées sur le thème
+    const textColor = useThemeColor({}, 'text');
+    const iconColor = useThemeColor({}, 'icon');
+    const tintColor = useThemeColor({}, 'tint');
+    
+    // Couleurs spécifiques pour le bottom sheet
+    const contentBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
+    const borderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
+    const optionBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#F3F3F7';
+    // Utilise #1776BA si tintColor est blanc en dark mode
+    const checkIconColor = tintColor === '#fff' ? '#1776BA' : tintColor;
+
     const handleSelection = (value: string) => {
         onSelect(value);
         onClose();
@@ -40,17 +58,26 @@ export const SelectionBottomSheet = ({
                 onPress={onClose}
             >
                 <View
-                    style={styles.selectionBottomSheetContent}
+                    style={[
+                        styles.selectionBottomSheetContent,
+                        {
+                            backgroundColor: contentBackgroundColor,
+                            paddingBottom: Math.max(insets.bottom, 20)
+                        }
+                    ]}
                     onStartShouldSetResponder={() => true}
                 >
                     {/* Header */}
-                    <View style={styles.selectionBottomSheetHeader}>
-                        <Text style={styles.selectionBottomSheetTitle}>{title}</Text>
+                    <View style={[
+                        styles.selectionBottomSheetHeader,
+                        { borderBottomColor: borderColor }
+                    ]}>
+                        <Text style={[styles.selectionBottomSheetTitle, { color: textColor }]}>{title}</Text>
                         <Pressable
                             onPress={onClose}
                             style={styles.selectionBottomSheetCloseButton}
                         >
-                            <Icon name="close" size={24} color="#000" />
+                            <Icon name="close" size={24} color={iconColor} />
                         </Pressable>
                     </View>
 
@@ -59,12 +86,15 @@ export const SelectionBottomSheet = ({
                         {options.map((option, index) => (
                             <Pressable
                                 key={index}
-                                style={styles.selectionOptionItem}
+                                style={[
+                                    styles.selectionOptionItem,
+                                    { borderBottomColor: optionBorderColor }
+                                ]}
                                 onPress={() => handleSelection(option.value)}
                             >
-                                <Text style={styles.selectionOptionText}>{option.label}</Text>
+                                <Text style={[styles.selectionOptionText, { color: textColor }]}>{option.label}</Text>
                                 {currentValue === option.value && (
-                                    <Icon name="check" size={20} color="#1776BA" />
+                                    <Icon name="check" size={20} color={checkIconColor} />
                                 )}
                             </Pressable>
                         ))}
@@ -82,11 +112,9 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-end',
     },
     selectionBottomSheetContent: {
-        backgroundColor: '#FFFFFF',
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
         maxHeight: '80%',
-        // paddingBottom: 20,
     },
     selectionBottomSheetHeader: {
         flexDirection: 'row',
@@ -94,12 +122,10 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         padding: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#E0E0E0',
     },
     selectionBottomSheetTitle: {
         fontSize: 18,
         fontFamily: 'Ubuntu_Bold',
-        color: '#000',
     },
     selectionBottomSheetCloseButton: {
         padding: 4,
@@ -114,13 +140,11 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#F3F3F7',
         marginBottom: 20,
     },
     selectionOptionText: {
         fontSize: 16,
         fontFamily: 'Ubuntu_Regular',
-        color: '#000',
     },
 });
 

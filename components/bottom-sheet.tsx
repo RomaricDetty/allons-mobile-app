@@ -1,4 +1,6 @@
 // @ts-nocheck
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useThemeColor } from '@/hooks/use-theme-color';
 import React from 'react';
 import {
     ActivityIndicator,
@@ -63,6 +65,22 @@ export function BottomSheet<T>({
     filterFunction
 }: BottomSheetProps<T>) {
     const insets = useSafeAreaInsets();
+    const colorScheme = useColorScheme() ?? 'light';
+    
+    // Couleurs dynamiques basées sur le thème
+    const backgroundColor = useThemeColor({}, 'background');
+    const textColor = useThemeColor({}, 'text');
+    const iconColor = useThemeColor({}, 'icon');
+    const tintColor = useThemeColor({}, 'tint');
+    
+    // Couleurs spécifiques pour le BottomSheet
+    const containerBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
+    const borderColor = colorScheme === 'dark' ? '#3A3A3C' : '#F3F3F7';
+    const searchBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#F3F3F7';
+    const placeholderColor = colorScheme === 'dark' ? '#9BA1A6' : '#A6A6AA';
+    const handleColor = colorScheme === 'dark' ? '#48484A' : '#CCCCCC';
+    const emptyTextColor = colorScheme === 'dark' ? '#9BA1A6' : '#666666';
+    
     // Initialiser translateY à SCREEN_HEIGHT pour que le bottom sheet commence hors écran
     const translateY = useSharedValue(SCREEN_HEIGHT);
     const context = useSharedValue({ y: 0 });
@@ -202,17 +220,21 @@ export function BottomSheet<T>({
                     />
                 </TouchableOpacity>
 
-                <Animated.View style={[styles.bottomSheetContainer, bottomSheetStyle]}>
+                <Animated.View style={[
+                    styles.bottomSheetContainer, 
+                    bottomSheetStyle,
+                    { backgroundColor: containerBackgroundColor }
+                ]}>
                     <GestureDetector gesture={panGesture}>
                         <View>
                             {/* Handle bar */}
-                            <View style={styles.bottomSheetHandle} />
+                            <View style={[styles.bottomSheetHandle, { backgroundColor: handleColor }]} />
 
                             {/* Header */}
-                            <View style={styles.bottomSheetHeader}>
-                                <Text style={styles.bottomSheetTitle}>{title}</Text>
+                            <View style={[styles.bottomSheetHeader, { borderBottomColor: borderColor }]}>
+                                <Text style={[styles.bottomSheetTitle, { color: textColor }]}>{title}</Text>
                                 <Pressable onPress={closeBottomSheet} style={styles.bottomSheetCloseButton}>
-                                    <Icon name="close" size={24} color="#000" />
+                                    <Icon name="close" size={24} color={iconColor} />
                                 </Pressable>
                             </View>
                         </View>
@@ -224,12 +246,12 @@ export function BottomSheet<T>({
                             behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
                             keyboardVerticalOffset={0}
                         >
-                            <View style={styles.searchContainer}>
-                                <Icon name="magnify" size={20} color="#A6A6AA" style={styles.searchIcon} />
+                            <View style={[styles.searchContainer, { backgroundColor: searchBackgroundColor }]}>
+                                <Icon name="magnify" size={20} color={placeholderColor} style={styles.searchIcon} />
                                 <TextInput
-                                    style={styles.searchInput}
+                                    style={[styles.searchInput, { color: textColor }]}
                                     placeholder={searchPlaceholder}
-                                    placeholderTextColor="#A6A6AA"
+                                    placeholderTextColor={placeholderColor}
                                     value={searchTerm}
                                     onChangeText={setSearchTerm}
                                     autoCapitalize="none"
@@ -240,7 +262,7 @@ export function BottomSheet<T>({
                                         onPress={() => setSearchTerm('')}
                                         style={styles.searchClearButton}
                                     >
-                                        <Icon name="close-circle" size={20} color="#A6A6AA" />
+                                        <Icon name="close-circle" size={20} color={placeholderColor} />
                                     </Pressable>
                                 )}
                             </View>
@@ -250,11 +272,11 @@ export function BottomSheet<T>({
                     {/* Content */}
                     {loading ? (
                         <View style={styles.loadingContainer}>
-                            <ActivityIndicator size="large" color="#1776ba" />
+                            <ActivityIndicator size="large" color={tintColor} />
                         </View>
                     ) : filteredData.length === 0 ? (
                         <View style={styles.emptyContainer}>
-                            <Text style={styles.emptyText}>
+                            <Text style={[styles.emptyText, { color: emptyTextColor }]}>
                                 {searchTerm.trim() ? "Aucun résultat trouvé" : emptyText}
                             </Text>
                         </View>
@@ -305,7 +327,6 @@ const styles = StyleSheet.create({
         bottom: 0,
         maxHeight: SCREEN_HEIGHT * 0.9,
         height: SCREEN_HEIGHT * 0.8,
-        backgroundColor: '#FFFFFF',
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
         shadowColor: '#000',
@@ -321,7 +342,6 @@ const styles = StyleSheet.create({
     bottomSheetHandle: {
         width: 40,
         height: 4,
-        backgroundColor: '#CCCCCC',
         borderRadius: 2,
         alignSelf: 'center',
         marginTop: 10,
@@ -334,12 +354,10 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         paddingBottom: 15,
         borderBottomWidth: 1,
-        borderBottomColor: '#F3F3F7',
     },
     searchContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#F3F3F7',
         borderRadius: 12,
         marginHorizontal: 20,
         marginTop: 10,
@@ -354,7 +372,6 @@ const styles = StyleSheet.create({
         flex: 1,
         fontSize: 15,
         fontFamily: 'Ubuntu_Regular',
-        color: '#000',
         paddingVertical: 0,
     },
     searchClearButton: {
@@ -364,7 +381,6 @@ const styles = StyleSheet.create({
     bottomSheetTitle: {
         fontSize: 18,
         fontFamily: 'Ubuntu_Bold',
-        color: '#000',
     },
     bottomSheetCloseButton: {
         padding: 5,
@@ -388,7 +404,6 @@ const styles = StyleSheet.create({
     },
     emptyText: {
         fontSize: 14,
-        color: '#666666',
         fontFamily: 'Ubuntu_Regular',
     },
 });

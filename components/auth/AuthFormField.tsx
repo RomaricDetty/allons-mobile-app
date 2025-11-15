@@ -1,3 +1,5 @@
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useThemeColor } from '@/hooks/use-theme-color';
 import React from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -5,6 +7,7 @@ interface AuthFormFieldProps {
     label: string;
     value: string;
     onChangeText: (text: string) => void;
+    onBlur?: () => void;
     placeholder?: string;
     required?: boolean;
     keyboardType?: 'default' | 'numeric' | 'email-address' | 'phone-pad';
@@ -17,21 +20,40 @@ export const AuthFormField = ({
     label,
     value,
     onChangeText,
+    onBlur,
     placeholder,
     required = false,
     keyboardType = 'default',
 }: AuthFormFieldProps) => {
+    const colorScheme = useColorScheme() ?? 'light';
+    
+    // Couleurs dynamiques basées sur le thème
+    const textColor = useThemeColor({}, 'text');
+    
+    // Couleurs spécifiques pour le champ
+    const inputBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#FFFFFF';
+    const inputBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
+    const placeholderColor = colorScheme === 'dark' ? '#9BA1A6' : '#A6A6AA';
+
     return (
         <View style={styles.formField}>
-            <Text style={styles.formLabel}>
+            <Text style={[styles.formLabel, { color: textColor }]}>
                 {label} {required && <Text style={styles.required}>*</Text>}
             </Text>
             <TextInput
-                style={styles.formInput}
+                style={[
+                    styles.formInput,
+                    {
+                        backgroundColor: inputBackgroundColor,
+                        borderColor: inputBorderColor,
+                        color: textColor
+                    }
+                ]}
                 value={value}
                 onChangeText={onChangeText}
+                onBlur={onBlur}
                 placeholder={placeholder}
-                placeholderTextColor="#A6A6AA"
+                placeholderTextColor={placeholderColor}
                 keyboardType={keyboardType}
                 autoCapitalize="none"
             />
@@ -46,24 +68,19 @@ const styles = StyleSheet.create({
     formLabel: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Medium',
-        color: '#000',
         marginBottom: 8,
     },
     required: {
         color: '#FF0000',
     },
     formInput: {
-        backgroundColor: '#FFFFFF',
         borderRadius: 8,
         paddingHorizontal: 16,
         paddingVertical: 12,
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        color: '#000',
         borderWidth: 1,
-        borderColor: '#E0E0E0',
     },
-    
 });
 
 

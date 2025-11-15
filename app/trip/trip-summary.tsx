@@ -1,5 +1,7 @@
 // @ts-nocheck
 import { capitalizeBusType, formatFullDate, formatPrice } from '@/constants/functions';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useThemeColor } from '@/hooks/use-theme-color';
 import { SearchParams, Trip } from '@/types';
 import { CommonActions, useNavigation, useRoute } from '@react-navigation/native';
 import React, { useMemo } from 'react';
@@ -21,6 +23,25 @@ const TripSummary = () => {
     const route = useRoute();
     const navigation = useNavigation();
     const insets = useSafeAreaInsets();
+    const colorScheme = useColorScheme() ?? 'light';
+    
+    // Couleurs dynamiques basées sur le thème
+    const backgroundColor = useThemeColor({}, 'background');
+    const textColor = useThemeColor({}, 'text');
+    const iconColor = useThemeColor({}, 'icon');
+    const tintColor = useThemeColor({}, 'tint');
+    
+    // Couleurs spécifiques pour l'écran
+    const cardBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
+    const borderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
+    const secondaryTextColor = colorScheme === 'dark' ? '#9BA1A6' : '#666';
+    const headerBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
+    const headerBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
+    const scrollBackgroundColor = colorScheme === 'dark' ? '#000000' : '#F5F5F5';
+    const progressBarBackgroundColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
+    const progressDotBackgroundColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
+    const separatorColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
+    const secondaryButtonBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
 
     // Récupération des données passées en paramètre
     const { trip, searchParams } = (route.params as { trip?: Trip, searchParams?: SearchParams }) || {};
@@ -28,8 +49,8 @@ const TripSummary = () => {
 
     if (!trip) {
         return (
-            <View style={styles.container}>
-                <Text>Erreur : Aucun trajet sélectionné</Text>
+            <View style={[styles.container, { backgroundColor: scrollBackgroundColor }]}>
+                <Text style={{ color: textColor }}>Erreur : Aucun trajet sélectionné</Text>
             </View>
         );
     }
@@ -55,9 +76,9 @@ const TripSummary = () => {
         const cards = [];
         for (let i = 1; i <= numberOfPersons; i++) {
             cards.push(
-                <View key={i} style={styles.passengerCard}>
-                    <Text style={styles.passengerCardTitle}>Passager {i}</Text>
-                    <Text style={styles.passengerCardText}>
+                <View key={i} style={[styles.passengerCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
+                    <Text style={[styles.passengerCardTitle, { color: textColor }]}>Passager {i}</Text>
+                    <Text style={[styles.passengerCardText, { color: secondaryTextColor }]}>
                         Les informations seront complétées à l'étape suivante
                     </Text>
                 </View>
@@ -85,38 +106,45 @@ const TripSummary = () => {
     }
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: scrollBackgroundColor }]}>
             {/* Header */}
-            <View style={[styles.header, { paddingTop: insets.top }]}>
+            <View style={[
+                styles.header, 
+                { 
+                    paddingTop: insets.top,
+                    backgroundColor: headerBackgroundColor,
+                    borderBottomColor: headerBorderColor
+                }
+            ]}>
                 <Pressable
                     onPress={() => navigation.goBack()}
                     style={styles.backButton}
                 >
-                    <Icon name="arrow-left" size={25} color="#000" />
+                    <Icon name="arrow-left" size={25} color={iconColor} />
                 </Pressable>
 
                 <View style={styles.routeBadge}>
-                    <Text style={styles.routeBadgeText}>
-                        {trip.departureCity} <Icon name="chevron-right" size={15} color="#1776BA" /> {trip.arrivalCity}
+                    <Text style={[styles.routeBadgeText, { color: tintColor }]}>
+                        {trip.departureCity} <Icon name="chevron-right" size={15} color={tintColor} /> {trip.arrivalCity}
                     </Text>
                 </View>
 
-                <Text style={styles.stepIndicator}>Étape 1 sur 3</Text>
+                <Text style={[styles.stepIndicator, { color: secondaryTextColor }]}>Étape 1 sur 3</Text>
             </View>
 
             {/* Barre de progression */}
-            <View style={styles.progressContainer}>
-                <View style={styles.progressBar}>
-                    <View style={[styles.progressFill, { width: '17%' }]} />
+            <View style={[styles.progressContainer, { backgroundColor: headerBackgroundColor }]}>
+                <View style={[styles.progressBar, { backgroundColor: progressBarBackgroundColor }]}>
+                    <View style={[styles.progressFill, { width: '17%', backgroundColor: tintColor }]} />
                 </View>
-                <Text style={styles.progressText}>17%</Text>
+                <Text style={[styles.progressText, { color: secondaryTextColor }]}>17%</Text>
             </View>
 
             {/* Indicateurs de progression */}
-            <View style={styles.progressIndicators}>
-                <View style={[styles.progressDot, styles.progressDotActive]} />
-                <View style={styles.progressDot} />
-                <View style={styles.progressDot} />
+            <View style={[styles.progressIndicators, { backgroundColor: headerBackgroundColor }]}>
+                <View style={[styles.progressDot, { backgroundColor: tintColor }]} />
+                <View style={[styles.progressDot, { backgroundColor: progressDotBackgroundColor }]} />
+                <View style={[styles.progressDot, { backgroundColor: progressDotBackgroundColor }]} />
             </View>
 
             <ScrollView
@@ -126,58 +154,57 @@ const TripSummary = () => {
             >
                 {/* Titre principal */}
                 <View style={styles.titleSection}>
-                    <Text style={styles.mainTitle}>Résumé du voyage</Text>
-                    <Text style={styles.subtitle}>
+                    <Text style={[styles.mainTitle, { color: textColor }]}>Résumé du voyage</Text>
+                    <Text style={[styles.subtitle, { color: secondaryTextColor }]}>
                         Vérifiez les détails de votre voyage avant de continuer
                     </Text>
                 </View>
 
                 {/* Carte principale du voyage */}
-                <View style={styles.tripCard}>
+                <View style={[styles.tripCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
                     <View style={styles.tripCardHeader}>
-                        <Text style={styles.tripCardLabel}>Voyage</Text>
-                        <Text style={styles.tripCardCompany}>{trip.company}</Text>
+                        <Text style={[styles.tripCardLabel, { color: textColor }]}>Voyage</Text>
+                        <Text style={[styles.tripCardCompany, { color: textColor }]}>{trip.company}</Text>
                     </View>
 
                     {/* Section Départ/Arrivée */}
                     <View style={styles.tripDetails}>
                         <View style={styles.departureSection}>
-                            <Text style={styles.time}>{trip.departureTime}</Text>
-                            <Text style={styles.city}>{trip.departureCity}</Text>
-                            <Text style={styles.station}>{trip.departureStation}</Text>
+                            <Text style={[styles.time, { textAlign: 'left', color: textColor }]}>{trip.departureTime}</Text>
+                            <Text style={[styles.city, { textAlign: 'left', color: textColor }]}>{trip.departureCity}</Text>
+                            <Text style={[styles.station, { textAlign: 'left', color: secondaryTextColor }]}>{trip.departureStation}</Text>
                         </View>
 
-                        <View style={styles.timelineContainer}>
-                            <Text style={styles.duration}>{trip.duration}</Text>
-                            <View style={styles.timelineLine} />
-                            <View style={styles.timelineDot} />
-                            <Text style={styles.date}>
+                        <View style={[styles.timelineContainer, { marginTop: 10 }]}>
+                            <Text style={[styles.duration, { color: secondaryTextColor }]}>{trip.duration}</Text>
+                            <View style={[styles.timelineLine, { backgroundColor: separatorColor }]} />
+                            <View style={[styles.timelineDot, { backgroundColor: tintColor }]} />
+                            <Text style={[styles.date, { color: secondaryTextColor }]}>
                                 {formatFullDate(trip.departureDateTime)}
                             </Text>
                         </View>
 
-                        <View style={styles.arrivalSection}>
-                            <Text style={styles.time}>{trip.arrivalTime}</Text>
-                            <Text style={styles.city}>{trip.arrivalCity}</Text>
-                            <Text style={styles.station}>{trip.arrivalStation}</Text>
+                        <View style={[styles.arrivalSection]}>
+                            <Text style={[styles.time, { textAlign: 'right', color: textColor }]}>{trip.arrivalTime}</Text>
+                            <Text style={[styles.city, { textAlign: 'right', color: textColor }]}>{trip.arrivalCity}</Text>
+                            <Text style={[styles.station, { textAlign: 'right', color: secondaryTextColor }]}>{trip.arrivalStation}</Text>
                         </View>
                     </View>
 
                     {/* Véhicule et Équipements */}
-                    <View style={styles.vehicleSection}>
+                    <View style={[styles.vehicleSection, { borderTopColor: borderColor }]}>
                         <View style={styles.vehicleInfo}>
-                            <Text style={styles.vehicleLabel}>Véhicule : </Text>
-                            <Text style={styles.vehicleNumber}>{trip.licencePlate}</Text>
+                            <Text style={[styles.vehicleLabel, { color: secondaryTextColor }]}>Véhicule : </Text>
+                            <Text style={[styles.vehicleNumber, { color: textColor }]}>{trip.licencePlate}</Text>
                             <View style={styles.businessBadge}>
                                 <Text style={styles.businessBadgeText}>{capitalizeBusType(trip.busType)}</Text>
                             </View>
                         </View>
                         <View style={styles.amenitiesContainer}>
                             {trip.options.map((option, index) => (
-                                <View key={index} style={styles.amenityItem}>
+                                <View key={index} style={[styles.amenityItem]}>
                                     <Icon name="check-circle" size={16} color="#4CAF50" />
-                                    <Text style={styles.amenityText}>{option}</Text>
-
+                                    <Text style={[styles.amenityText, { color: textColor }]}>{option}</Text>
                                 </View>
                             ))}
                         </View>
@@ -186,42 +213,42 @@ const TripSummary = () => {
 
                 {/* Section Informations voyageurs */}
                 <View style={styles.passengersSection}>
-                    <Text style={styles.sectionTitle}>Informations voyageurs</Text>
+                    <Text style={[styles.sectionTitle, { color: textColor }]}>Informations voyageurs</Text>
                     {renderPassengerCards()}
                 </View>
 
                 {/* Section Répartition des prix */}
-                <View style={styles.priceSection}>
-                    <Text style={styles.priceSectionTitle}>Répartition des prix</Text>
+                <View style={[styles.priceSection, { backgroundColor: cardBackgroundColor, borderColor }]}>
+                    <Text style={[styles.priceSectionTitle, { color: textColor }]}>Répartition des prix</Text>
 
                     <View style={styles.priceDetails}>
                         <View style={styles.priceRow}>
-                            <Text style={styles.priceLabel}>
+                            <Text style={[styles.priceLabel, { color: textColor }]}>
                                 {numberOfPersons} {numberOfPersons > 1 ? 'voyageurs' : 'voyageur'}
                             </Text>
-                            <Text style={styles.priceValue}>
+                            <Text style={[styles.priceValue, { color: textColor }]}>
                                 {formatPrice(totalPrice)}
                             </Text>
                         </View>
                         <View style={styles.priceRow}>
-                            <Text style={styles.priceLabel}>Taxes</Text>
-                            <Text style={styles.priceValue}>
+                            <Text style={[styles.priceLabel, { color: textColor }]}>Taxes</Text>
+                            <Text style={[styles.priceValue, { color: textColor }]}>
                                 {formatPrice(taxes)}
                             </Text>
                         </View>
                         <View style={styles.priceRow}>
-                            <Text style={styles.priceLabel}>Frais</Text>
-                            <Text style={styles.priceValue}>
+                            <Text style={[styles.priceLabel, { color: textColor }]}>Frais</Text>
+                            <Text style={[styles.priceValue, { color: textColor }]}>
                                 {formatPrice(fees)}
                             </Text>
                         </View>
                     </View>
 
-                    <View style={styles.priceSeparator} />
+                    <View style={[styles.priceSeparator, { backgroundColor: separatorColor }]} />
 
                     <View style={styles.totalRow}>
-                        <Text style={styles.totalLabel}>Montant dû</Text>
-                        <Text style={styles.totalValue}>
+                        <Text style={[styles.totalLabel, { color: textColor }]}>Montant dû</Text>
+                        <Text style={[styles.totalValue, { color: tintColor }]}>
                             {formatPrice(amountDue)}
                         </Text>
                     </View>
@@ -233,16 +260,24 @@ const TripSummary = () => {
                         </Text>
                     </Pressable>
 
-                    <Pressable style={styles.secondaryButton}
-                        onPress={handleNavigateToHome}>
-                        <Text style={styles.secondaryButtonText}>
+                    <Pressable 
+                        style={[
+                            styles.secondaryButton,
+                            { 
+                                backgroundColor: secondaryButtonBackgroundColor,
+                                borderColor 
+                            }
+                        ]}
+                        onPress={handleNavigateToHome}
+                    >
+                        <Text style={[styles.secondaryButtonText, { color: textColor }]}>
                             Annuler la réservation
                         </Text>
                     </Pressable>
 
                     {/* Information box */}
                     {/* <View style={styles.infoBox}>
-                        <Icon name="lock" size={20} color="#1776BA" />
+                        <Icon name="lock" size={20} color={tintColor} />
                         <Text style={styles.infoBoxText}>
                             24H SANS RISQUE{'\n'}ANNULATIONS
                         </Text>
@@ -256,7 +291,6 @@ const TripSummary = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F5F5F5',
     },
     header: {
         flexDirection: 'row',
@@ -264,9 +298,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingHorizontal: 16,
         paddingBottom: 12,
-        backgroundColor: '#FFFFFF',
         borderBottomWidth: 1,
-        borderBottomColor: '#E0E0E0',
     },
     backButton: {
         padding: 8,
@@ -282,12 +314,10 @@ const styles = StyleSheet.create({
     routeBadgeText: {
         fontSize: 15,
         fontFamily: 'Ubuntu_Medium',
-        color: '#1776BA'
     },
     stepIndicator: {
         fontSize: 12,
         fontFamily: 'Ubuntu_Regular',
-        color: '#666',
     },
     progressContainer: {
         flexDirection: 'row',
@@ -295,41 +325,32 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingTop: 12,
         paddingBottom: 8,
-        backgroundColor: '#FFFFFF',
         gap: 12,
     },
     progressBar: {
         flex: 1,
         height: 4,
-        backgroundColor: '#E0E0E0',
         borderRadius: 2,
         overflow: 'hidden',
     },
     progressFill: {
         height: '100%',
-        backgroundColor: '#1776BA',
     },
     progressText: {
         fontSize: 12,
         fontFamily: 'Ubuntu_Regular',
-        color: '#666',
     },
     progressIndicators: {
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
         paddingVertical: 8,
-        backgroundColor: '#FFFFFF',
         gap: 8,
     },
     progressDot: {
         width: 8,
         height: 8,
         borderRadius: 4,
-        backgroundColor: '#E0E0E0',
-    },
-    progressDotActive: {
-        backgroundColor: '#1776BA',
     },
     scrollView: {
         flex: 1,
@@ -343,21 +364,17 @@ const styles = StyleSheet.create({
     mainTitle: {
         fontSize: 28,
         fontFamily: 'Ubuntu_Bold',
-        color: '#000',
         marginBottom: 8,
     },
     subtitle: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        color: '#666',
     },
     tripCard: {
-        backgroundColor: '#FFFFFF',
         borderRadius: 12,
         padding: 16,
         marginBottom: 20,
         borderWidth: 1,
-        borderColor: '#E0E0E0',
     },
     tripCardHeader: {
         flexDirection: 'row',
@@ -368,12 +385,10 @@ const styles = StyleSheet.create({
     tripCardLabel: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Bold',
-        color: '#000',
     },
     tripCardCompany: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Bold',
-        color: '#000',
     },
     tripDetails: {
         flexDirection: 'row',
@@ -389,21 +404,20 @@ const styles = StyleSheet.create({
         alignItems: 'flex-end',
     },
     time: {
-        fontSize: 24,
+        fontSize: 23,
         fontFamily: 'Ubuntu_Bold',
-        color: '#000',
         marginBottom: 4,
+        width: 100,
     },
     city: {
         fontSize: 16,
         fontFamily: 'Ubuntu_Medium',
-        color: '#000',
         marginBottom: 2,
     },
     station: {
         fontSize: 12,
+        width: 100,
         fontFamily: 'Ubuntu_Regular',
-        color: '#666',
     },
     timelineContainer: {
         alignItems: 'center',
@@ -412,35 +426,29 @@ const styles = StyleSheet.create({
     duration: {
         fontSize: 12,
         fontFamily: 'Ubuntu_Regular',
-        color: '#666',
         marginBottom: 4,
     },
     timelineLine: {
         width: 2,
         height: 40,
-        backgroundColor: '#E0E0E0',
         marginBottom: 4,
     },
     timelineDot: {
         width: 8,
         height: 8,
         borderRadius: 4,
-        backgroundColor: '#1776BA',
         marginBottom: 4,
     },
     date: {
         fontSize: 12,
         fontFamily: 'Ubuntu_Regular',
-        color: '#666',
     },
     vehicleSection: {
         flexDirection: 'column',
-        // justifyContent: 'space-between',
         alignItems: 'center',
         marginTop: 16,
         paddingTop: 16,
         borderTopWidth: 1,
-        borderTopColor: '#F3F3F7',
     },
     vehicleInfo: {
         flexDirection: 'row',
@@ -450,12 +458,10 @@ const styles = StyleSheet.create({
     vehicleLabel: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        color: '#666',
     },
     vehicleNumber: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Bold',
-        color: '#000',
     },
     amenitiesContainer: {
         marginTop: 22,
@@ -472,15 +478,13 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-start',
         gap: 6,
         marginBottom: 6,
-        // position: 'relative',
     },
     amenityText: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        color: '#000',
     },
     businessBadge: {
-        backgroundColor: 'rgba(156, 39, 176, 0.2)',
+        backgroundColor: 'rgba(23, 118, 186, 0.2)',
         paddingHorizontal: 6,
         paddingVertical: 2,
         borderRadius: 4,
@@ -489,7 +493,7 @@ const styles = StyleSheet.create({
     businessBadgeText: {
         fontSize: 10,
         fontFamily: 'Ubuntu_Medium',
-        color: '#9C27B0',
+        color: '#1776BA',
     },
     passengersSection: {
         marginBottom: 20,
@@ -497,7 +501,6 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 18,
         fontFamily: 'Ubuntu_Bold',
-        color: '#000',
         marginBottom: 12,
     },
     passengerCard: {
@@ -511,26 +514,21 @@ const styles = StyleSheet.create({
     passengerCardTitle: {
         fontSize: 16,
         fontFamily: 'Ubuntu_Bold',
-        color: '#000',
         marginBottom: 8,
     },
     passengerCardText: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        color: '#000',
     },
     priceSection: {
-        backgroundColor: '#FFFFFF',
         borderRadius: 12,
         padding: 16,
         marginBottom: 20,
         borderWidth: 1,
-        borderColor: '#E0E0E0',
     },
     priceSectionTitle: {
         fontSize: 24,
         fontFamily: 'Ubuntu_Bold',
-        color: '#000',
         marginBottom: 16,
     },
     priceDetails: {
@@ -545,16 +543,13 @@ const styles = StyleSheet.create({
     priceLabel: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        color: '#000',
     },
     priceValue: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        color: '#000',
     },
     priceSeparator: {
         height: 1,
-        backgroundColor: '#E0E0E0',
         marginVertical: 12,
     },
     totalRow: {
@@ -566,12 +561,10 @@ const styles = StyleSheet.create({
     totalLabel: {
         fontSize: 18,
         fontFamily: 'Ubuntu_Bold',
-        color: '#000',
     },
     totalValue: {
         fontSize: 18,
         fontFamily: 'Ubuntu_Bold',
-        color: '#1776BA',
     },
     primaryButton: {
         backgroundColor: '#1776BA',
@@ -587,19 +580,16 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
     },
     secondaryButton: {
-        backgroundColor: '#FFFFFF',
         borderRadius: 8,
         paddingVertical: 14,
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
-        borderColor: '#E0E0E0',
         marginBottom: 16,
     },
     secondaryButtonText: {
         fontSize: 16,
         fontFamily: 'Ubuntu_Regular',
-        color: '#000',
     },
     infoBox: {
         flexDirection: 'row',

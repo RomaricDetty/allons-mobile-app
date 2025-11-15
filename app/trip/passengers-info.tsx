@@ -5,6 +5,8 @@ import { PassengersInfoBlock } from '@/components/passengers/PassengersInfoBlock
 import { PaymentMethodBlock } from '@/components/passengers/PaymentMethodBlock';
 import { SelectionBottomSheet } from '@/components/passengers/SelectionBottomSheet';
 import { SummaryBlock } from '@/components/passengers/SummaryBlock';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useThemeColor } from '@/hooks/use-theme-color';
 import { SearchParams, Trip } from '@/types';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import React, { useMemo, useState } from 'react';
@@ -27,6 +29,23 @@ const PassengersInfo = () => {
     const route = useRoute();
     const navigation = useNavigation();
     const insets = useSafeAreaInsets();
+    const colorScheme = useColorScheme() ?? 'light';
+    
+    // Couleurs dynamiques basées sur le thème
+    const backgroundColor = useThemeColor({}, 'background');
+    const textColor = useThemeColor({}, 'text');
+    const iconColor = useThemeColor({}, 'icon');
+    const tintColor = useThemeColor({}, 'tint');
+    
+    // Couleurs spécifiques pour l'écran
+    const cardBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
+    const borderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
+    const secondaryTextColor = colorScheme === 'dark' ? '#9BA1A6' : '#666';
+    const headerBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
+    const headerBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
+    const scrollBackgroundColor = colorScheme === 'dark' ? '#000000' : '#F5F5F5';
+    const progressBarBackgroundColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
+    const progressDotBackgroundColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
 
     // Récupération des données passées en paramètre
     const { trip, searchParams } = (route.params as { trip?: Trip, searchParams?: SearchParams }) || {};
@@ -77,8 +96,8 @@ const PassengersInfo = () => {
 
     if (!trip) {
         return (
-            <View style={styles.container}>
-                <Text>Erreur : Aucun trajet sélectionné</Text>
+            <View style={[styles.container, { backgroundColor: scrollBackgroundColor }]}>
+                <Text style={{ color: textColor }}>Erreur : Aucun trajet sélectionné</Text>
             </View>
         );
     }
@@ -275,43 +294,50 @@ const PassengersInfo = () => {
 
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: scrollBackgroundColor }]}>
             {/* Header */}
-            <View style={[styles.header, { paddingTop: insets.top }]}>
+            <View style={[
+                styles.header, 
+                { 
+                    paddingTop: insets.top,
+                    backgroundColor: headerBackgroundColor,
+                    borderBottomColor: headerBorderColor
+                }
+            ]}>
                 <Pressable
                     onPress={() => navigation.goBack()}
                     style={styles.backButton}
                 >
-                    <Icon name="arrow-left" size={25} color="#000" />
+                    <Icon name="arrow-left" size={25} color={iconColor} />
                 </Pressable>
 
                 <View style={styles.routeBadge}>
-                    <Text style={styles.routeBadgeText}>
-                        {trip.departureCity} <Icon name="chevron-right" size={15} color="#1776BA" /> {trip.arrivalCity}
+                    <Text style={[styles.routeBadgeText, { color: tintColor }]}>
+                        {trip.departureCity} <Icon name="chevron-right" size={15} color={tintColor} /> {trip.arrivalCity}
                     </Text>
                 </View>
 
-                <Text style={styles.stepIndicator}>Étape 2 sur 3</Text>
+                <Text style={[styles.stepIndicator, { color: secondaryTextColor }]}>Étape 2 sur 3</Text>
             </View>
 
             {/* Barre de progression */}
-            <View style={styles.progressContainer}>
-                <Text style={styles.progressTitle}>Vérifier et payer</Text>
+            <View style={[styles.progressContainer, { backgroundColor: headerBackgroundColor }]}>
+                <Text style={[styles.progressTitle, { color: textColor }]}>Vérifier et payer</Text>
                 <View style={styles.progressBarContainer}>
-                    <View style={styles.progressBar}>
-                        <View style={[styles.progressFill, { width: '67%' }]} />
+                    <View style={[styles.progressBar, { backgroundColor: progressBarBackgroundColor }]}>
+                        <View style={[styles.progressFill, { width: '67%', backgroundColor: tintColor }]} />
                     </View>
-                    <Text style={styles.progressText}>67%</Text>
+                    <Text style={[styles.progressText, { color: secondaryTextColor }]}>67%</Text>
                 </View>
             </View>
 
             {/* Indicateurs de progression */}
-            <View style={styles.progressIndicators}>
-                <View style={[styles.progressDot, styles.progressDotCompleted]}>
+            <View style={[styles.progressIndicators, { backgroundColor: headerBackgroundColor }]}>
+                <View style={[styles.progressDot, { backgroundColor: '#4CAF50' }]}>
                     <Icon name="check" size={12} color="#FFFFFF" />
                 </View>
-                <View style={[styles.progressDot, styles.progressDotActive]} />
-                <View style={styles.progressDot} />
+                <View style={[styles.progressDot, { backgroundColor: tintColor }]} />
+                <View style={[styles.progressDot, { backgroundColor: progressDotBackgroundColor }]} />
             </View>
 
             <ScrollView
@@ -321,14 +347,14 @@ const PassengersInfo = () => {
             >
                 {/* Titre principal */}
                 <View style={styles.titleSection}>
-                    <Text style={styles.mainTitle}>Vérifier et payer</Text>
-                    <Text style={styles.subtitle}>
+                    <Text style={[styles.mainTitle, { color: textColor }]}>Vérifier et payer</Text>
+                    <Text style={[styles.subtitle, { color: secondaryTextColor }]}>
                         Complétez vos informations et procédez au paiement
                     </Text>
                 </View>
 
                 {/* Carte principale */}
-                <View style={styles.mainCard}>
+                <View style={[styles.mainCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
                     {/* Section 1 : Informations du passager */}
                     <PassengersInfoBlock
                         passengers={passengers}
@@ -362,7 +388,15 @@ const PassengersInfo = () => {
             </ScrollView>
 
             {/* Bouton fixe en bas de l'écran */}
-            <View style={[styles.fixedButtonContainer, { paddingBottom: insets.bottom + 8, paddingTop: 15 }]}>
+            <View style={[
+                styles.fixedButtonContainer, 
+                { 
+                    paddingBottom: insets.bottom + 8, 
+                    paddingTop: 15,
+                    backgroundColor: headerBackgroundColor,
+                    borderTopColor: headerBorderColor
+                }
+            ]}>
                 <Pressable
                     style={[styles.confirmButton, { width: '60%', alignSelf: 'center' }]}
                     onPress={handleConfirmAndPay}
@@ -370,7 +404,6 @@ const PassengersInfo = () => {
                     <Text style={styles.confirmButtonText}>Confirmer et payer</Text>
                 </Pressable>
             </View>
-
 
             {/* Bottom sheet de sélection */}
             <SelectionBottomSheet
@@ -396,7 +429,6 @@ const PassengersInfo = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F5F5F5',
     },
     header: {
         flexDirection: 'row',
@@ -404,9 +436,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingHorizontal: 16,
         paddingBottom: 12,
-        backgroundColor: '#FFFFFF',
         borderBottomWidth: 1,
-        borderBottomColor: '#E0E0E0',
     },
     backButton: {
         padding: 8,
@@ -422,12 +452,10 @@ const styles = StyleSheet.create({
     routeBadgeText: {
         fontSize: 15,
         fontFamily: 'Ubuntu_Medium',
-        color: '#1776BA'
     },
     stepIndicator: {
         fontSize: 12,
         fontFamily: 'Ubuntu_Regular',
-        color: '#666',
     },
     progressContainer: {
         flexDirection: 'row',
@@ -436,12 +464,10 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingTop: 12,
         paddingBottom: 8,
-        backgroundColor: '#FFFFFF',
     },
     progressTitle: {
         fontSize: 16,
         fontFamily: 'Ubuntu_Medium',
-        color: '#000',
     },
     progressBarContainer: {
         flexDirection: 'row',
@@ -453,25 +479,20 @@ const styles = StyleSheet.create({
     progressBar: {
         flex: 1,
         height: 4,
-        backgroundColor: '#E0E0E0',
         borderRadius: 2,
         overflow: 'hidden',
     },
     progressFill: {
         height: '100%',
-        backgroundColor: '#1776BA',
     },
     progressText: {
         fontSize: 12,
         fontFamily: 'Ubuntu_Regular',
-        color: '#666',
     },
     progressIndicators: {
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
-        // paddingVertical: 12,
-        backgroundColor: '#FFFFFF',
         gap: 8,
         paddingBottom: 12,
     },
@@ -479,15 +500,8 @@ const styles = StyleSheet.create({
         width: 24,
         height: 24,
         borderRadius: 12,
-        backgroundColor: '#E0E0E0',
         justifyContent: 'center',
         alignItems: 'center',
-    },
-    progressDotActive: {
-        backgroundColor: '#1776BA',
-    },
-    progressDotCompleted: {
-        backgroundColor: '#4CAF50',
     },
     scrollView: {
         flex: 1,
@@ -502,32 +516,26 @@ const styles = StyleSheet.create({
     mainTitle: {
         fontSize: 28,
         fontFamily: 'Ubuntu_Bold',
-        color: '#000',
         marginBottom: 8,
     },
     subtitle: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        color: '#666',
     },
     mainCard: {
-        backgroundColor: '#FFFFFF',
         borderRadius: 12,
         padding: 16,
         marginBottom: 20,
         borderWidth: 1,
-        borderColor: '#E0E0E0',
     },
     fixedButtonContainer: {
         position: 'absolute',
         bottom: 0,
         left: 0,
         right: 0,
-        backgroundColor: '#FFFFFF',
         paddingHorizontal: 16,
         paddingTop: 12,
         borderTopWidth: 1,
-        borderTopColor: '#E0E0E0',
         shadowColor: '#000',
         shadowOffset: {
             width: 0,

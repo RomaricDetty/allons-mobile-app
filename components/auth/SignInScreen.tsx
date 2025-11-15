@@ -1,4 +1,6 @@
 import { authLogin } from '@/api/auth_register';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useThemeColor } from '@/hooks/use-theme-color';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -41,6 +43,19 @@ interface SignInScreenProps {
  * Écran de connexion avec formulaire et options de connexion sociale
  */
 export const SignInScreen = ({ onSignIn, onSwitchToSignUp, onForgotPassword }: SignInScreenProps) => {
+    const colorScheme = useColorScheme() ?? 'light';
+    
+    // Couleurs dynamiques basées sur le thème
+    const backgroundColor = useThemeColor({}, 'background');
+    const textColor = useThemeColor({}, 'text');
+    const tintColor = useThemeColor({}, 'tint');
+    
+    // Couleurs spécifiques pour l'écran
+    const scrollBackgroundColor = colorScheme === 'dark' ? '#000000' : '#F3F3F7';
+    const secondaryTextColor = colorScheme === 'dark' ? '#9BA1A6' : '#666';
+    const separatorLineColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
+    const linkColor = tintColor === '#fff' ? '#1776BA' : tintColor;
+
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -84,13 +99,13 @@ export const SignInScreen = ({ onSignIn, onSwitchToSignUp, onForgotPassword }: S
 
     return (
         <ScrollView
-            style={styles.container}
+            style={[styles.container, { backgroundColor: scrollBackgroundColor }]}
             contentContainerStyle={styles.contentContainer}
             showsVerticalScrollIndicator={false}
         >
             <View style={styles.header}>
-                <Text style={styles.title}>Se connecter</Text>
-                <Text style={styles.subtitle}>Connectez-vous pour accéder à votre compte</Text>
+                <Text style={[styles.title, { color: textColor }]}>Se connecter</Text>
+                <Text style={[styles.subtitle, { color: secondaryTextColor }]}>Connectez-vous pour accéder à votre compte</Text>
             </View>
 
             <View style={styles.form}>
@@ -121,15 +136,15 @@ export const SignInScreen = ({ onSignIn, onSwitchToSignUp, onForgotPassword }: S
             </Pressable>
 
             <View style={styles.separator}>
-                <View style={styles.separatorLine} />
-                <Text style={styles.separatorText}>OU</Text>
-                <View style={styles.separatorLine} />
+                <View style={[styles.separatorLine, { backgroundColor: separatorLineColor }]} />
+                <Text style={[styles.separatorText, { color: secondaryTextColor }]}>OU</Text>
+                <View style={[styles.separatorLine, { backgroundColor: separatorLineColor }]} />
             </View>
 
             <View style={styles.footer}>
-                <Text style={styles.footerText}>Vous n'avez pas de compte ? </Text>
+                <Text style={[styles.footerText, { color: secondaryTextColor }]}>Vous n'avez pas de compte ? </Text>
                 <Pressable onPress={onSwitchToSignUp}>
-                    <Text style={styles.footerLink}>Inscrivez-vous</Text>
+                    <Text style={[styles.footerLink, { color: linkColor }]}>Inscrivez-vous</Text>
                 </Pressable>
             </View>
         </ScrollView>
@@ -139,7 +154,6 @@ export const SignInScreen = ({ onSignIn, onSwitchToSignUp, onForgotPassword }: S
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F3F3F7',
     },
     contentContainer: {
         flexGrow: 1,
@@ -153,13 +167,11 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 32,
         fontFamily: 'Ubuntu_Bold',
-        color: '#000',
         marginBottom: 8,
     },
     subtitle: {
         fontSize: 16,
         fontFamily: 'Ubuntu_Regular',
-        color: '#666',
     },
     form: {
         marginBottom: 24,
@@ -185,13 +197,11 @@ const styles = StyleSheet.create({
     separatorLine: {
         flex: 1,
         height: 1,
-        backgroundColor: '#E0E0E0',
     },
     separatorText: {
         marginHorizontal: 16,
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        color: '#666',
     },
     footer: {
         flexDirection: 'row',
@@ -201,12 +211,10 @@ const styles = StyleSheet.create({
     footerText: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        color: '#666',
     },
     footerLink: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Medium',
-        color: '#1776BA',
     },
 });
 

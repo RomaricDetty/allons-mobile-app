@@ -1,4 +1,6 @@
 // @ts-nocheck
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useThemeColor } from '@/hooks/use-theme-color';
 import React from 'react';
 import { Image, ImageSourcePropType, Pressable, StyleSheet, View } from 'react-native';
 import { SectionHeader } from './SectionHeader';
@@ -21,9 +23,27 @@ const PaymentMethodCard = ({
     isSelected,
     onPress
 }: PaymentMethodCardProps) => {
+    const colorScheme = useColorScheme() ?? 'light';
+    
+    // Couleurs dynamiques basées sur le thème
+    const tintColor = useThemeColor({}, 'tint');
+    
+    // Couleurs spécifiques pour les cartes de paiement
+    const cardBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
+    const cardBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
+    const selectedCardBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#F0F8FF';
+    const selectedCardBorderColor = tintColor === '#fff' ? '#1776BA' : tintColor; // Utilise #1776BA si tintColor est blanc en dark mode
+
     return (
         <Pressable
-            style={[styles.paymentMethodCard, isSelected && styles.paymentMethodCardSelected]}
+            style={[
+                styles.paymentMethodCard,
+                {
+                    backgroundColor: isSelected ? selectedCardBackgroundColor : cardBackgroundColor,
+                    borderColor: isSelected ? selectedCardBorderColor : cardBorderColor,
+                    borderWidth: isSelected ? 1.5 : 1
+                }
+            ]}
             onPress={onPress}
         >
             <Image
@@ -31,7 +51,6 @@ const PaymentMethodCard = ({
                 style={[styles.paymentMethodImage, isSelected && styles.paymentMethodImageSelected]}
                 resizeMode="cover"
             />
-
         </Pressable>
     );
 };
@@ -92,29 +111,17 @@ const styles = StyleSheet.create({
     },
     paymentMethodCard: {
         width: '30%',
-        backgroundColor: '#FFFFFF',
         borderRadius: 8,
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: '#E0E0E0',
         overflow: 'hidden',
         padding: 8,
-    },
-    paymentMethodCardSelected: {
-        borderColor: '#1776BA',
-        borderWidth: 1.5,
-        backgroundColor: '#F0F8FF',
     },
     paymentMethodText: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Medium',
-        color: '#666',
         marginTop: 8,
         textAlign: 'center',
-    },
-    paymentMethodTextSelected: {
-        color: '#1776BA',
     },
     paymentMethodImage: {
         width: '100%',

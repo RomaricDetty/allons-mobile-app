@@ -1,4 +1,6 @@
 //@ts-nocheck
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useThemeColor } from '@/hooks/use-theme-color';
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -7,6 +9,7 @@ interface PasswordFieldProps {
     label: string;
     value: string;
     onChangeText: (text: string) => void;
+    onBlur?: () => void;
     placeholder?: string;
     required?: boolean;
 }
@@ -18,23 +21,41 @@ export const PasswordField = ({
     label,
     value,
     onChangeText,
+    onBlur,
     placeholder,
     required = false,
 }: PasswordFieldProps) => {
     const [isVisible, setIsVisible] = useState(false);
+    const colorScheme = useColorScheme() ?? 'light';
+    
+    // Couleurs dynamiques basées sur le thème
+    const textColor = useThemeColor({}, 'text');
+    const iconColor = useThemeColor({}, 'icon');
+    
+    // Couleurs spécifiques pour le champ
+    const inputBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#FFFFFF';
+    const inputBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
+    const placeholderColor = colorScheme === 'dark' ? '#9BA1A6' : '#A6A6AA';
 
     return (
         <View style={styles.formField}>
-            <Text style={styles.formLabel}>
+            <Text style={[styles.formLabel, { color: textColor }]}>
                 {label} {required && <Text style={styles.required}>*</Text>}
             </Text>
-            <View style={styles.inputContainer}>
+            <View style={[
+                styles.inputContainer,
+                {
+                    backgroundColor: inputBackgroundColor,
+                    borderColor: inputBorderColor
+                }
+            ]}>
                 <TextInput
-                    style={styles.formInput}
+                    style={[styles.formInput, { color: textColor }]}
                     value={value}
                     onChangeText={onChangeText}
+                    onBlur={onBlur}
                     placeholder={placeholder}
-                    placeholderTextColor="#A6A6AA"
+                    placeholderTextColor={placeholderColor}
                     secureTextEntry={!isVisible}
                 />
                 <Pressable
@@ -44,7 +65,7 @@ export const PasswordField = ({
                     <MaterialCommunityIcons
                         name={isVisible ? 'eye-off' : 'eye'}
                         size={20}
-                        color="#A6A6AA"
+                        color={placeholderColor}
                     />
                 </Pressable>
             </View>
@@ -59,7 +80,6 @@ const styles = StyleSheet.create({
     formLabel: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Medium',
-        color: '#000',
         marginBottom: 8,
     },
     required: {
@@ -68,10 +88,8 @@ const styles = StyleSheet.create({
     inputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#FFFFFF',
         borderRadius: 8,
         borderWidth: 1,
-        borderColor: '#E0E0E0',
     },
     formInput: {
         flex: 1,
@@ -79,7 +97,6 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        color: '#000',
     },
     eyeButton: {
         padding: 12,
