@@ -89,6 +89,8 @@ export default function RootLayout() {
                 <Stack.Screen name="trip/trip-summary" options={{ headerShown: false }} />
                 <Stack.Screen name="trip/passengers-info" options={{ headerShown: false }} />
                 <Stack.Screen name="profile/edit" options={{ headerShown: false }} />
+                <Stack.Screen name="trip/ticket-details" options={{ headerShown: false }} />
+                <Stack.Screen name="trip/ticket-qr" options={{ headerShown: false }} />
                 {/* <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} /> */}
             </Stack>
             <StatusBar style="auto" />

@@ -3,6 +3,8 @@ import { authGetUserInfo, updateUserInfo } from '@/api/auth_register';
 import { FormField } from '@/components/passengers/FormField';
 import { PhoneField } from '@/components/passengers/PhoneField';
 import { SectionHeader } from '@/components/passengers/SectionHeader';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useThemeColor } from '@/hooks/use-theme-color';
 import { User } from '@/interfaces';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -12,6 +14,7 @@ import {
     ActivityIndicator,
     Alert,
     KeyboardAvoidingView,
+    Modal,
     Platform,
     Pressable,
     ScrollView,
@@ -27,6 +30,30 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
  */
 export default function EditProfileScreen() {
     const insets = useSafeAreaInsets();
+    const colorScheme = useColorScheme() ?? 'light';
+    
+    // Couleurs dynamiques basées sur le thème
+    const textColor = useThemeColor({}, 'text');
+    const iconColor = useThemeColor({}, 'icon');
+    const tintColor = useThemeColor({}, 'tint');
+    
+    // Couleurs spécifiques pour l'écran
+    const scrollBackgroundColor = colorScheme === 'dark' ? '#000000' : '#F5F5F5';
+    const cardBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
+    const borderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
+    const secondaryTextColor = colorScheme === 'dark' ? '#9BA1A6' : '#666';
+    const headerBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
+    const headerBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
+    const inputBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#F3F3F7';
+    const placeholderColor = colorScheme === 'dark' ? '#9BA1A6' : '#A6A6AA';
+    const disabledInputBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#F5F5F5';
+    const disabledInputTextColor = colorScheme === 'dark' ? '#9BA1A6' : '#666';
+    const sectionBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#F3F3F7';
+    const modalBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
+    const modalBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
+    const datePickerBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
+    const loadingIndicatorColor = tintColor === '#fff' ? '#1776BA' : tintColor;
+
     const [user, setUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
@@ -276,20 +303,27 @@ export default function EditProfileScreen() {
 
     if (isLoading) {
         return (
-            <View style={[styles.container, styles.loadingContainer]}>
-                <ActivityIndicator size="large" color="#1776BA" />
+            <View style={[styles.container, styles.loadingContainer, { backgroundColor: scrollBackgroundColor }]}>
+                <ActivityIndicator size="large" color={loadingIndicatorColor} />
             </View>
         );
     }
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: scrollBackgroundColor }]}>
             {/* Header */}
-            <View style={[styles.header, { paddingTop: insets.top }]}>
+            <View style={[
+                styles.header,
+                {
+                    paddingTop: insets.top,
+                    backgroundColor: headerBackgroundColor,
+                    borderBottomColor: headerBorderColor
+                }
+            ]}>
                 <Pressable style={styles.backButton} onPress={() => router.back()}>
-                    <MaterialCommunityIcons name="arrow-left" size={25} color="#000" />
+                    <MaterialCommunityIcons name="arrow-left" size={25} color={iconColor} />
                 </Pressable>
-                <Text style={styles.headerTitle}>Modifier mes informations</Text>
+                <Text style={[styles.headerTitle, { color: textColor }]}>Modifier mes informations</Text>
                 <View style={styles.headerSpacer} />
             </View>
 
@@ -307,9 +341,9 @@ export default function EditProfileScreen() {
                     showsVerticalScrollIndicator={false}
                 >
                     {/* Carte principale */}
-                    <View style={styles.mainCard}>
+                    <View style={[styles.mainCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
                         {/* Section 1 : Informations personnelles */}
-                        <View style={styles.section}>
+                        <View style={[styles.section, { borderBottomColor: sectionBorderColor }]}>
                             <SectionHeader number={1} title="Informations personnelles" />
 
                             <FormField
@@ -349,15 +383,21 @@ export default function EditProfileScreen() {
                             />
 
                             <View style={styles.formField}>
-                                <Text style={styles.formLabel}>Date de naissance</Text>
+                                <Text style={[styles.formLabel, { color: textColor }]}>Date de naissance</Text>
                                 <Pressable
-                                    style={styles.dateInput}
+                                    style={[
+                                        styles.dateInput,
+                                        {
+                                            backgroundColor: inputBackgroundColor,
+                                            borderColor: borderColor
+                                        }
+                                    ]}
                                     onPress={() => setShowDatePicker(true)}
                                 >
                                     <Text
                                         style={[
                                             styles.dateInputText,
-                                            !formData.dateOfBirth && styles.placeholder,
+                                            { color: formData.dateOfBirth ? textColor : placeholderColor },
                                         ]}
                                     >
                                         {formData.dateOfBirth || 'jj/mm/aaaa'}
@@ -365,21 +405,29 @@ export default function EditProfileScreen() {
                                     <MaterialCommunityIcons
                                         name="calendar"
                                         size={20}
-                                        color="#A6A6AA"
+                                        color={placeholderColor}
                                     />
                                 </Pressable>
                             </View>
 
                             <View style={styles.formField}>
-                                <Text style={styles.formLabel}>Pays</Text>
-                                <View style={styles.disabledInput}>
-                                    <Text style={styles.disabledInputText}>Côte d'Ivoire</Text>
+                                <Text style={[styles.formLabel, { color: textColor }]}>Pays</Text>
+                                <View style={[
+                                    styles.disabledInput,
+                                    {
+                                        backgroundColor: disabledInputBackgroundColor,
+                                        borderColor: borderColor
+                                    }
+                                ]}>
+                                    <Text style={[styles.disabledInputText, { color: disabledInputTextColor }]}>
+                                        Côte d'Ivoire
+                                    </Text>
                                 </View>
                             </View>
                         </View>
 
                         {/* Section 2 : Adresse */}
-                        <View style={styles.section}>
+                        <View style={[styles.section, { borderBottomColor: sectionBorderColor }]}>
                             <SectionHeader number={2} title="Adresse" />
 
                             <FormField
@@ -472,19 +520,30 @@ export default function EditProfileScreen() {
 
             {/* Date Picker Modal pour iOS */}
             {Platform.OS === 'ios' && showDatePicker && (
-                <View style={styles.datePickerModal}>
+                <Modal
+                    visible={showDatePicker}
+                    transparent={true}
+                    animationType="slide"
+                    onRequestClose={() => setShowDatePicker(false)}
+                >
                     <Pressable
                         style={styles.datePickerOverlay}
                         onPress={() => setShowDatePicker(false)}
                     >
                         <View
-                            style={styles.datePickerContainer}
+                            style={[
+                                styles.datePickerContainer,
+                                {
+                                    backgroundColor: datePickerBackgroundColor,
+                                    paddingBottom: insets.bottom + 20
+                                }
+                            ]}
                             onStartShouldSetResponder={() => true}
                         >
-                            <View style={styles.datePickerHeader}>
-                                <Text style={styles.datePickerTitle}>Date de naissance</Text>
+                            <View style={[styles.datePickerHeader, { borderBottomColor: modalBorderColor }]}>
+                                <Text style={[styles.datePickerTitle, { color: textColor }]}>Date de naissance</Text>
                                 <Pressable onPress={() => setShowDatePicker(false)}>
-                                    <MaterialCommunityIcons name="check" size={24} color="#1776BA" />
+                                    <MaterialCommunityIcons name="check" size={24} color={tintColor === '#fff' ? '#1776BA' : tintColor} />
                                 </Pressable>
                             </View>
                             <View style={styles.datePickerContent}>
@@ -495,12 +554,12 @@ export default function EditProfileScreen() {
                                     onChange={handleDateChange}
                                     maximumDate={new Date()}
                                     locale="fr-FR"
-                                    themeVariant="light"
+                                    themeVariant={colorScheme === 'dark' ? 'dark' : 'light'}
                                 />
                             </View>
                         </View>
                     </Pressable>
-                </View>
+                </Modal>
             )}
 
             {/* Date Picker pour Android */}
@@ -520,7 +579,6 @@ export default function EditProfileScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F5F5F5',
     },
     loadingContainer: {
         justifyContent: 'center',
@@ -532,9 +590,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingHorizontal: 16,
         paddingBottom: 12,
-        backgroundColor: '#FFFFFF',
         borderBottomWidth: 1,
-        borderBottomColor: '#E0E0E0',
     },
     backButton: {
         padding: 8,
@@ -542,7 +598,6 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 18,
         fontFamily: 'Ubuntu_Bold',
-        color: '#000',
         flex: 1,
         textAlign: 'center',
     },
@@ -559,18 +614,15 @@ const styles = StyleSheet.create({
         padding: 16,
     },
     mainCard: {
-        backgroundColor: '#FFFFFF',
         borderRadius: 12,
         padding: 16,
         marginBottom: 20,
         borderWidth: 1,
-        borderColor: '#E0E0E0',
     },
     section: {
         marginBottom: 24,
         paddingBottom: 24,
         borderBottomWidth: 1,
-        borderBottomColor: '#F3F3F7',
     },
     sectionLast: {
         marginBottom: 0,
@@ -582,11 +634,9 @@ const styles = StyleSheet.create({
     formLabel: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Medium',
-        color: '#000',
         marginBottom: 8,
     },
     dateInput: {
-        backgroundColor: '#F3F3F7',
         borderRadius: 8,
         paddingHorizontal: 16,
         paddingVertical: 12,
@@ -594,28 +644,20 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#E0E0E0',
     },
     dateInputText: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        color: '#000',
-    },
-    placeholder: {
-        color: '#A6A6AA',
     },
     disabledInput: {
-        backgroundColor: '#F5F5F5',
         borderRadius: 8,
         paddingHorizontal: 16,
         paddingVertical: 12,
         borderWidth: 1,
-        borderColor: '#E0E0E0',
     },
     disabledInputText: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        color: '#666',
     },
     saveButton: {
         backgroundColor: '#1776BA',
@@ -637,23 +679,14 @@ const styles = StyleSheet.create({
         fontFamily: 'Ubuntu_Bold',
         color: '#FFFFFF',
     },
-    datePickerModal: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-    },
     datePickerOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
         justifyContent: 'flex-end',
     },
     datePickerContainer: {
-        backgroundColor: '#FFFFFF',
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
-        paddingBottom: 20,
     },
     datePickerHeader: {
         flexDirection: 'row',
@@ -661,12 +694,10 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         padding: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#E0E0E0',
     },
     datePickerTitle: {
         fontSize: 18,
         fontFamily: 'Ubuntu_Bold',
-        color: '#000',
     },
     datePickerContent: {
         padding: 20,

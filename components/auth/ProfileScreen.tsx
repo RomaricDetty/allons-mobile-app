@@ -1,11 +1,12 @@
 // @ts-nocheck
 import { authGetUserInfo, bookingListInfo } from '@/api/auth_register';
+import { getBookingDetails } from '@/api/booking';
 import { formatBookingDate, formatStatus, getStatusColor } from '@/constants/functions';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { Booking, ProfileScreenProps, User } from '@/interfaces';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { router } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -53,6 +54,8 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
     
     // Ajouter un état pour le modal de confirmation
     const [showLogoutModal, setShowLogoutModal] = useState(false);
+
+    const navigation = useNavigation();
 
     /**
      * Formate le nom complet de l'utilisateur
@@ -150,6 +153,18 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
             Alert.alert('Erreur', 'Une erreur est survenue lors de la récupération de la liste des réservations');
         }
     };
+
+    const handleViewBooking = async (bookingId: string) => {
+        const token = await AsyncStorage.getItem('token');
+        const response = await getBookingDetails(bookingId, token as string);
+        console.log('response booking details: ', response.data);
+        if (response.status === 200) {
+            // Utiliser navigation.navigate au lieu de router.push
+            navigation.navigate('trip/ticket-details' as never, { ticketDetails: response.data } as never);
+        } else {
+            Alert.alert('Erreur', 'Une erreur est survenue lors de la récupération des détails de la réservation');
+        }
+    }
 
     /**
      * Récupère les informations de l'utilisateur au montage de l'écran
@@ -435,7 +450,10 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
 
                             {/* Boutons d'action */}
                             <View style={styles.actionButtons}>
-                                <Pressable style={[styles.actionButton, { backgroundColor: activeTabColor, borderColor: activeTabColor }]}>
+                                <Pressable 
+                                style={[styles.actionButton, { backgroundColor: activeTabColor, borderColor: activeTabColor }]}
+                                onPress={() => handleViewBooking(booking.id)}
+                                >
                                     <MaterialCommunityIcons name="eye-outline" size={20} color="#ffffff" />
                                 </Pressable>
                                 <Pressable style={[styles.actionButton, { backgroundColor: actionButtonBackgroundColor, borderColor }]}>
