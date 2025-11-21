@@ -22,12 +22,12 @@ const SCREEN_HEIGHT = Dimensions.get('window').height;
 export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) => {
     const insets = useSafeAreaInsets();
     const colorScheme = useColorScheme() ?? 'light';
-    
+
     // Couleurs dynamiques basées sur le thème
     const textColor = useThemeColor({}, 'text');
     const iconColor = useThemeColor({}, 'icon');
     const tintColor = useThemeColor({}, 'tint');
-    
+
     // Couleurs spécifiques pour l'écran
     const scrollBackgroundColor = colorScheme === 'dark' ? '#000000' : '#F3F3F7';
     const secondaryTextColor = colorScheme === 'dark' ? '#9BA1A6' : '#666';
@@ -60,7 +60,7 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
         emergencyContactFirstName: '',
         emergencyContactLastName: '',
         emergencyContactPhone: '',
-        agreeToTerms: true,
+        agreeToTerms: false,
     });
 
     // États pour les erreurs de validation
@@ -157,7 +157,7 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
      */
     const updateField = (field: keyof SignUpFormData, value: any) => {
         setFormData(prev => ({ ...prev, [field]: value }));
-        
+
         // Valide le champ en temps réel si il a déjà été touché
         if (touchedFields.has(field)) {
             const error = validateField(field, value);
@@ -171,7 +171,7 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
                 });
             }
         }
-        
+
         // Validation spéciale pour confirmPassword qui dépend de password
         if (field === 'password' && touchedFields.has('confirmPassword')) {
             const confirmPasswordError = validateField('confirmPassword', formData.confirmPassword);
@@ -222,10 +222,10 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
      */
     const validateForm = (): boolean => {
         const newErrors: FormErrors = {};
-        
+
         // Marque tous les champs obligatoires comme touchés
         const requiredFields: (keyof SignUpFormData)[] = [
-            'firstName', 'lastName', 'username', 'dateOfBirth', 
+            'firstName', 'lastName', 'username', 'dateOfBirth',
             'civility', 'email', 'phone', 'password', 'confirmPassword'
         ];
         requiredFields.forEach(field => {
@@ -250,8 +250,10 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
      * Gère la soumission du formulaire
      */
     const handleSignUp = async () => {
+        // console.log('formData', formData);
         if (!formData.agreeToTerms) {
             setErrors(prev => ({ ...prev, agreeToTerms: 'Vous devez accepter les conditions d\'utilisation' }));
+            markFieldAsTouched('agreeToTerms');
             return;
         }
 
@@ -410,21 +412,27 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
 
                     <View style={[styles.header, { paddingTop: insets.top }]}>
                         <Text style={[styles.title, { color: textColor }]}>Inscription</Text>
-                        <Text style={[styles.subtitle, { color: secondaryTextColor }]}>
+                        {/* <Text style={[styles.subtitle, { color: secondaryTextColor }]}>
                             Créez un compte ou connectez-vous pour explorer notre application.
-                        </Text>
+                        </Text> */}
+                        <View style={[styles.footer, { justifyContent: 'flex-start' }]}>
+                            <Text style={[styles.footerText, { color: secondaryTextColor }]}>Vous avez déjà un compte ? </Text>
+                            <Pressable onPress={onSwitchToSignIn}>
+                                <Text style={[styles.footerLink, { color: linkColor }]}>Connectez-vous !</Text>
+                            </Pressable>
+                        </View>
                     </View>
 
                     <View style={styles.form}>
                         {/* Section 1: Informations personnelles */}
                         <View style={[styles.sectionCard, { backgroundColor: cardBackgroundColor, borderColor: cardBorderColor }]}>
                             <Text style={[styles.sectionTitle, { color: textColor }]}>Informations personnelles</Text>
-                            
+
                             {/* Prénom */}
                             <View>
-                                {touchedFields.has('firstName') && errors.firstName && (
+                                {/* {touchedFields.has('firstName') && errors.firstName && (
                                     <Text style={styles.errorText}>{errors.firstName}</Text>
-                                )}
+                                )} */}
                                 <AuthFormField
                                     label="Prénom"
                                     value={formData.firstName}
@@ -432,14 +440,16 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
                                     onBlur={() => handleFieldBlur('firstName')}
                                     placeholder="Votre prénom"
                                     required
+                                    errors={errors.firstName}
+                                    touchedFields={touchedFields.has('firstName')}
                                 />
                             </View>
 
                             {/* Nom */}
                             <View>
-                                {touchedFields.has('lastName') && errors.lastName && (
+                                {/* {touchedFields.has('lastName') && errors.lastName && (
                                     <Text style={styles.errorText}>{errors.lastName}</Text>
-                                )}
+                                )} */}
                                 <AuthFormField
                                     label="Nom"
                                     value={formData.lastName}
@@ -447,14 +457,16 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
                                     onBlur={() => handleFieldBlur('lastName')}
                                     placeholder="Votre nom"
                                     required
+                                    errors={errors.lastName}
+                                    touchedFields={touchedFields.has('lastName')}
                                 />
                             </View>
 
                             {/* Nom d'utilisateur */}
                             <View>
-                                {touchedFields.has('username') && errors.username && (
+                                {/* {touchedFields.has('username') && errors.username && (
                                     <Text style={styles.errorText}>{errors.username}</Text>
-                                )}
+                                )} */}
                                 <AuthFormField
                                     label="Nom d'utilisateur"
                                     value={formData.username}
@@ -462,25 +474,30 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
                                     onBlur={() => handleFieldBlur('username')}
                                     placeholder="Votre nom d'utilisateur"
                                     required
+                                    errors={errors.username}
+                                    touchedFields={touchedFields.has('username')}
                                 />
                             </View>
 
                             {/* Date de naissance */}
                             <View style={styles.formField}>
-                                {touchedFields.has('dateOfBirth') && errors.dateOfBirth && (
+                                {/* {touchedFields.has('dateOfBirth') && errors.dateOfBirth && (
                                     <Text style={styles.errorText}>{errors.dateOfBirth}</Text>
-                                )}
+                                )} */}
                                 <Text style={[styles.formLabel, { color: textColor }]}>
-                                    Date de naissance <Text style={styles.required}>*</Text>
+                                    Date de naissance <Text style={{ color: inputBorderColor }}>*</Text>
                                 </Text>
+                                {/* errors.dateOfBirth && touchedFields.has('dateOfBirth') 
+                                                ? '#FF0000' 
+                                                : inputBorderColor */}
                                 <Pressable
                                     style={[
                                         styles.dateInput,
                                         {
                                             backgroundColor: inputBackgroundColor,
                                             borderColor: errors.dateOfBirth && touchedFields.has('dateOfBirth') 
-                                                ? '#FF0000' 
-                                                : inputBorderColor
+                                            ? '#FF0000' 
+                                            : inputBorderColor
                                         }
                                     ]}
                                     onPress={() => {
@@ -500,11 +517,11 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
 
                             {/* Civilité */}
                             <View style={styles.formField}>
-                                {touchedFields.has('civility') && errors.civility && (
+                                {/* {touchedFields.has('civility') && errors.civility && (
                                     <Text style={styles.errorText}>{errors.civility}</Text>
-                                )}
+                                )} */}
                                 <Text style={[styles.formLabel, { color: textColor }]}>
-                                    Civilité <Text style={styles.required}>*</Text>
+                                    Civilité <Text style={{ color: inputBorderColor }}>*</Text>
                                 </Text>
                                 <Pressable
                                     style={[
@@ -537,9 +554,9 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
                             <Text style={[styles.sectionTitle, { color: textColor }]}>Informations de connexion</Text>
                             {/* Email */}
                             <View>
-                                {touchedFields.has('email') && errors.email && (
+                                {/* {touchedFields.has('email') && errors.email && (
                                     <Text style={styles.errorText}>{errors.email}</Text>
-                                )}
+                                )} */}
                                 <AuthFormField
                                     label="Adresse email"
                                     value={formData.email}
@@ -548,14 +565,16 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
                                     placeholder="votre@email.com"
                                     keyboardType="email-address"
                                     required
+                                    errors={errors.email}
+                                    touchedFields={touchedFields.has('email')}
                                 />
                             </View>
 
                             {/* Téléphone */}
                             <View>
-                                {touchedFields.has('phone') && errors.phone && (
+                                {/* {touchedFields.has('phone') && errors.phone && (
                                     <Text style={styles.errorText}>{errors.phone}</Text>
-                                )}
+                                )} */}
                                 <AuthFormField
                                     label="Numéro de téléphone"
                                     value={formData.phone}
@@ -564,14 +583,16 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
                                     placeholder="Ex: 0123456789"
                                     keyboardType="phone-pad"
                                     required
+                                    errors={errors.phone}
+                                    touchedFields={touchedFields.has('phone')}
                                 />
                             </View>
 
                             {/* Mot de passe */}
                             <View>
-                                {touchedFields.has('password') && errors.password && (
+                                {/* {touchedFields.has('password') && errors.password && (
                                     <Text style={styles.errorText}>{errors.password}</Text>
-                                )}
+                                )} */}
                                 <PasswordField
                                     label="Mot de passe"
                                     value={formData.password}
@@ -579,14 +600,16 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
                                     onBlur={() => handleFieldBlur('password')}
                                     placeholder="Entrez votre mot de passe"
                                     required
+                                    errors={errors.password}
+                                    touchedFields={touchedFields.has('password')}
                                 />
                             </View>
 
                             {/* Confirmer le mot de passe */}
                             <View>
-                                {touchedFields.has('confirmPassword') && errors.confirmPassword && (
+                                {/* {touchedFields.has('confirmPassword') && errors.confirmPassword && (
                                     <Text style={styles.errorText}>{errors.confirmPassword}</Text>
-                                )}
+                                )} */}
                                 <PasswordField
                                     label="Confirmer le mot de passe"
                                     value={formData.confirmPassword}
@@ -594,6 +617,8 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
                                     onBlur={() => handleFieldBlur('confirmPassword')}
                                     placeholder="Confirmer le mot de passe"
                                     required
+                                    errors={errors.confirmPassword}
+                                    touchedFields={touchedFields.has('confirmPassword')}
                                 />
                             </View>
                         </View>
@@ -657,18 +682,18 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
                         <Text style={styles.primaryButtonText}>Inscription</Text>
                     </Pressable>
 
-                    <View style={styles.separator}>
+                    {/* <View style={styles.separator}>
                         <View style={[styles.separatorLine, { backgroundColor: separatorLineColor }]} />
                         <Text style={[styles.separatorText, { color: secondaryTextColor }]}>OU</Text>
                         <View style={[styles.separatorLine, { backgroundColor: separatorLineColor }]} />
-                    </View>
+                    </View> */}
 
-                    <View style={styles.footer}>
+                    {/* <View style={styles.footer}>
                         <Text style={[styles.footerText, { color: secondaryTextColor }]}>Vous avez déjà un compte? </Text>
                         <Pressable onPress={onSwitchToSignIn}>
                             <Text style={[styles.footerLink, { color: linkColor }]}>Se connecter</Text>
                         </Pressable>
-                    </View>
+                    </View> */}
 
                     {/* Date Picker Modal */}
                     {showDatePicker && (
@@ -807,6 +832,7 @@ const styles = StyleSheet.create({
         fontFamily: 'Ubuntu_Regular',
         color: '#FF0000',
         marginTop: 4,
+        marginBottom: 8,
         // marginLeft: 4,
     },
     checkboxContainer: {

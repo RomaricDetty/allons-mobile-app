@@ -86,7 +86,7 @@ const TicketQR = () => {
                     <View style={[styles.qrContainer, { backgroundColor: qrCodeBackgroundColor }]}>
                         <QRCode
                             value={qrCodeData}
-                            size={250}
+                            size={230}
                             color={primaryBlue}
                             backgroundColor="transparent"
                         />
@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
     },
     mainCard: {
         borderRadius: 12,
-        padding: 24,
+        padding: 25,
         width: '100%',
         maxWidth: 400,
         borderWidth: 1,
@@ -161,18 +161,20 @@ const styles = StyleSheet.create({
         padding: 20,
         borderRadius: 12,
         marginBottom: 24,
-        shadowColor: '#000',
-        shadowOffset: {
-            width: 0,
-            height: 2,
-        },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
+        // borderWidth: 1,
+        // borderColor: "red",
+        // shadowColor: '#000',
+        // shadowOffset: {
+        //     width: 0,
+        //     height: 2,
+        // },
+        // shadowOpacity: 0.1,
+        // shadowRadius: 4,
+        // elevation: 3,
     },
     qrPlaceholder: {
-        width: 250,
-        height: 250,
+        width: 300,
+        height: 300,
         borderRadius: 8,
         borderWidth: 2,
         borderStyle: 'dashed',

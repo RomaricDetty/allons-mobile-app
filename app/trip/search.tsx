@@ -248,7 +248,7 @@ const TripSearch = () => {
         if (response?.data?.items?.length > 0) {
             navigation.navigate('trip/trip-list', { departures: response?.data, searchParams: { numberOfPersons } });
         } else {
-            Alert.alert('Information !', 'Aucun départ disponible pour la recherche');
+            Alert.alert('Information !', 'Aucun départ disponible pour la recherche, veuillez ajuster vos filtres de recherche.');
         }
     };
 

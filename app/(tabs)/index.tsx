@@ -24,7 +24,6 @@ export default function HomeScreen() {
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [popularTrips, setPopularTrips] = useState<PopularTrip[]>([]);
-    const [activeIndex, setActiveIndex] = useState(0);
     const colorScheme = useColorScheme() ?? 'dark';
     const backgroundColor = useThemeColor({}, 'background');
     const textColor = useThemeColor({}, 'text');
@@ -167,28 +166,25 @@ export default function HomeScreen() {
 
                     {/* Nos top itinéraires */}
                     <View style={styles.itinerarySection}>
-                        <Text style={[styles.sectionTitle, { color: textColor }]}>
-                            Nos top itinéraires
-                        </Text>
-                        {/* Carrousel des trajets populaires */}
-
                         {popularTrips.length > 0 && (
-                            <View style={[styles.subContainer, { paddingHorizontal: 0, marginTop: 0 }]}>
+                            <View style={[styles.carouselWrapper, { backgroundColor: '#1776BA' }]}>
+                                <View style={[styles.carouselTitleContainer, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' , marginBottom: 10}]}>
+                                    <Text style={[styles.sectionTitle, { color: '#ffffff', marginBottom: 0 }]}>
+                                        Nos top itinéraires
+                                    </Text>
+                                    <Pressable style={{ backgroundColor: '#ffffff', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 50 }} onPress={() => console.log('Okay')}>
+                                        <Text style={[styles.seeMoreText, { color: '#1776BA' }]}>
+                                            Plus
+                                        </Text>
+                                    </Pressable>
+                                </View>
                                 <View style={styles.sliderContainer}>
                                     <FlatList
                                         horizontal
                                         showsHorizontalScrollIndicator={false}
                                         data={popularTrips}
                                         keyExtractor={(item) => item.id}
-                                        onScroll={event => {
-                                            const slideSize = event.nativeEvent.layoutMeasurement.width;
-                                            const contentOffset = event.nativeEvent.contentOffset.x;
-                                            const index = Math.round(contentOffset / slideSize);
-                                            setActiveIndex(index);
-                                        }}
-                                        scrollEventThrottle={16}
-                                        contentContainerStyle={{ gap: 5 }}
-                                        pagingEnabled
+                                        contentContainerStyle={styles.carouselContent}
                                         renderItem={({ item }) => {
                                             return (
                                                 <DepartureCard
@@ -200,17 +196,6 @@ export default function HomeScreen() {
                                             );
                                         }}
                                     />
-                                    <View style={styles.pagination}>
-                                        {popularTrips.map((_, index) => (
-                                            <View
-                                                key={index}
-                                                style={[
-                                                    styles.paginationDot,
-                                                    index === activeIndex ? styles.paginationDotActive : null,
-                                                ]}
-                                            />
-                                        ))}
-                                    </View>
                                 </View>
                             </View>
                         )}
@@ -283,6 +268,11 @@ const styles = StyleSheet.create({
         marginLeft: 10,
         fontFamily: "Ubuntu_Regular"
     },
+    seeMoreText: {
+        fontSize: 14,
+        fontFamily: 'Ubuntu_Regular',
+        color: '#ffffff',
+    },
     itinerarySection: {
         width: '100%',
         paddingHorizontal: 20,
@@ -301,11 +291,23 @@ const styles = StyleSheet.create({
         gap: 10,
     },
 
+    carouselWrapper: {
+        width: '100%',
+        borderRadius: 15,
+        paddingVertical: 20,
+        marginTop: 10,
+    },
     sliderContainer: {
         width: '100%',
-        paddingBottom: 20,
     },
-
+    carouselContent: {
+        paddingHorizontal: 20,
+        gap: 10,
+    },
+    carouselTitleContainer: {
+        paddingHorizontal: 20,
+        paddingBottom: 10,
+    },
     bannerContainer: {
         borderRadius: 15,
         backgroundColor: '#1776ba',
@@ -375,27 +377,6 @@ const styles = StyleSheet.create({
         fontSize: 14,
     },
 
-    pagination: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginTop: 10,
-    },
-
-    paginationDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: 'rgba(23, 118, 186, 0.3)',
-        marginHorizontal: 4,
-    },
-
-    paginationDotActive: {
-        backgroundColor: '#1776ba',
-        width: 12,
-        height: 12,
-        borderRadius: 6,
-    },
 
 
 });

@@ -11,6 +11,8 @@ interface AuthFormFieldProps {
     placeholder?: string;
     required?: boolean;
     keyboardType?: 'default' | 'numeric' | 'email-address' | 'phone-pad';
+    errors?: string;
+    touchedFields?: boolean;
 }
 
 /**
@@ -24,6 +26,8 @@ export const AuthFormField = ({
     placeholder,
     required = false,
     keyboardType = 'default',
+    errors,
+    touchedFields,
 }: AuthFormFieldProps) => {
     const colorScheme = useColorScheme() ?? 'light';
     
@@ -38,15 +42,22 @@ export const AuthFormField = ({
     return (
         <View style={styles.formField}>
             <Text style={[styles.formLabel, { color: textColor }]}>
-                {label} {required && <Text style={styles.required}>*</Text>}
+                {label} {required && <Text style={{ color: inputBorderColor }}>*</Text>}
             </Text>
             <TextInput
                 style={[
                     styles.formInput,
+                    // {
+                    //     backgroundColor: inputBackgroundColor,
+                    //     borderColor: inputBorderColor,
+                    //     color: textColor
+                    // }
                     {
                         backgroundColor: inputBackgroundColor,
-                        borderColor: inputBorderColor,
-                        color: textColor
+                        color: textColor,
+                        borderColor: errors && touchedFields 
+                        ? '#FF0000' 
+                        : inputBorderColor
                     }
                 ]}
                 value={value}

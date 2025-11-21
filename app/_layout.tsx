@@ -1,12 +1,12 @@
 // @ts-nocheck
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import { SplashScreen, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Platform } from 'react-native';
 import 'react-native-reanimated';
 
 
+import { ThemeProvider } from '@/contexts/ThemeContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useEffect, useState } from 'react';
 
@@ -22,8 +22,6 @@ SplashScreen.preventAutoHideAsync();
  * Gère le chargement des fonts avant d'afficher l'interface
  */
 export default function RootLayout() {
-
-    const colorScheme = useColorScheme();
     const [fontsReady, setFontsReady] = useState(false);
 
     // Charge toutes les fonts Ubuntu nécessaires
@@ -43,12 +41,9 @@ export default function RootLayout() {
      * Nécessaire car Android peut avoir des problèmes de chargement de fonts
      */
     useEffect(() => {
-        // Log pour déboguer
-        console.log(`[Fonts] Platform: ${Platform.OS}, loaded: ${loaded}, error:`, error);
 
         // Si les fonts sont chargées avec succès
         if (loaded) {
-            console.log('[Fonts] Toutes les fonts sont chargées');
             setFontsReady(true);
             SplashScreen.hideAsync();
             return;
@@ -56,7 +51,6 @@ export default function RootLayout() {
 
         // Si erreur, on continue quand même pour ne pas bloquer l'app
         if (error) {
-            console.warn('[Fonts] Erreur lors du chargement des fonts:', error);
             setFontsReady(true);
             SplashScreen.hideAsync();
             return;
@@ -65,7 +59,6 @@ export default function RootLayout() {
         // Timeout de sécurité : après 5 secondes, on force le rendu même si les fonts ne sont pas chargées
         // Particulièrement important pour Android
         const timeoutId = setTimeout(() => {
-            console.warn('[Fonts] Timeout: on force le rendu après 5 secondes');
             setFontsReady(true);
             SplashScreen.hideAsync();
         }, 5000);
@@ -79,7 +72,19 @@ export default function RootLayout() {
     }
 
     return (
-        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <ThemeProvider>
+            <RootContent />
+        </ThemeProvider>
+    );
+}
+
+/**
+ * Composant interne pour accéder au thème après l'initialisation du ThemeProvider
+ */
+function RootContent() {
+    const colorScheme = useColorScheme();
+    return (
+        <NavigationThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
             <Stack>
                 <Stack.Screen name="index" options={{ headerShown: false }} />
                 <Stack.Screen name="onboard/index" options={{ headerShown: false }} />
@@ -94,6 +99,6 @@ export default function RootLayout() {
                 {/* <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} /> */}
             </Stack>
             <StatusBar style="auto" />
-        </ThemeProvider>
+        </NavigationThemeProvider>
     );
 }

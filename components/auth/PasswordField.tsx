@@ -12,6 +12,8 @@ interface PasswordFieldProps {
     onBlur?: () => void;
     placeholder?: string;
     required?: boolean;
+    errors?: string;
+    touchedFields?: boolean;
 }
 
 /**
@@ -24,6 +26,8 @@ export const PasswordField = ({
     onBlur,
     placeholder,
     required = false,
+    errors,
+    touchedFields,
 }: PasswordFieldProps) => {
     const [isVisible, setIsVisible] = useState(false);
     const colorScheme = useColorScheme() ?? 'light';
@@ -40,13 +44,15 @@ export const PasswordField = ({
     return (
         <View style={styles.formField}>
             <Text style={[styles.formLabel, { color: textColor }]}>
-                {label} {required && <Text style={styles.required}>*</Text>}
+                {label} {required && <Text style={{ color: inputBorderColor }}>*</Text>}
             </Text>
             <View style={[
                 styles.inputContainer,
                 {
                     backgroundColor: inputBackgroundColor,
-                    borderColor: inputBorderColor
+                    borderColor: errors && touchedFields 
+                    ? '#FF0000' 
+                    : inputBorderColor
                 }
             ]}>
                 <TextInput

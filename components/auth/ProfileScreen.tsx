@@ -2,6 +2,7 @@
 import { authGetUserInfo, bookingListInfo } from '@/api/auth_register';
 import { getBookingDetails } from '@/api/booking';
 import { formatBookingDate, formatStatus, getStatusColor } from '@/constants/functions';
+import { useTheme } from '@/contexts/ThemeContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { Booking, ProfileScreenProps, User } from '@/interfaces';
@@ -9,13 +10,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { router } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
     const insets = useSafeAreaInsets();
     const colorScheme = useColorScheme() ?? 'light';
+    const { isDarkMode, toggleTheme } = useTheme();
 
     // Couleurs dynamiques basées sur le thème
     const backgroundColor = useThemeColor({}, 'background');
@@ -51,10 +53,8 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
     const [selectedStatus, setSelectedStatus] = useState<string | any>('');
     const [showStatusModal, setShowStatusModal] = useState<boolean>(false);
     const [isLoading, setIsLoading] = useState<boolean>(true);
-
     // Ajouter un état pour le modal de confirmation
     const [showLogoutModal, setShowLogoutModal] = useState(false);
-
     const navigation = useNavigation();
 
     /**
@@ -139,10 +139,10 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
         try {
             const token = await AsyncStorage.getItem('token');
             const userId = await AsyncStorage.getItem('user_id');
-            console.log('userId getBookingList : ', userId);
-            console.log('token getBookingList : ', token);
+            // console.log('userId getBookingList : ', userId);
+            // console.log('token getBookingList : ', token);
             const response = await bookingListInfo(userId as string, token as string);
-            console.log('response booking list: ', response);
+            // console.log('response booking list: ', response);
             if (response.status === 200 && response.data?.items) {
                 setBookingList(response.data.items);
             } else {
@@ -154,6 +154,9 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
         }
     };
 
+    /**
+     * Affiche les détails d'une réservation
+     */
     const handleViewBooking = async (bookingId: string) => {
         const token = await AsyncStorage.getItem('token');
         const response = await getBookingDetails(bookingId, token as string);
@@ -177,6 +180,7 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                 try {
                     const userInfo = await getUserInfo();
                     setUser(userInfo);
+                    console.log('user info address: ', userInfo?.address);
                     getFullName();
                     formatDateOfBirth();
                     formatCivility();
@@ -299,7 +303,7 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                         <View style={styles.detailRow}>
                             <MaterialCommunityIcons name="map-marker-outline" size={18} color={secondaryTextColor} />
                             <Text style={[styles.detailLabel, { color: textColor }]}>Adresse:</Text>
-                            <Text style={[styles.detailValue, { color: secondaryTextColor }]}>{user?.address}</Text>
+                            <Text style={[styles.detailValue, { color: secondaryTextColor }]}>{user?.address ? user?.address?.city + ' ' + (user?.address?.country?.name ?? '') : ''}</Text>
                         </View>
                     )}
                 </View>
@@ -346,6 +350,30 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                         <Text style={[styles.coinsValue, { color: '#FFA726' }]}>{user?.customerProfile?.totalCoinsEarned ?? '0.00'}</Text>
                     </View>
                 </View>
+            </View>
+
+            {/* Toggle Mode Dark */}
+            <View style={[styles.themeToggleCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
+                <View style={styles.themeToggleContent}>
+                    <MaterialCommunityIcons
+                        name={isDarkMode ? "weather-night" : "weather-sunny"}
+                        size={24}
+                        color={isDarkMode ? "#FFA726" : "#FFC107"}
+                    />
+                    <View style={styles.themeToggleTextContainer}>
+                        <Text style={[styles.themeToggleLabel, { color: textColor }]}>Mode sombre</Text>
+                        <Text style={[styles.themeToggleDescription, { color: secondaryTextColor }]}>
+                            {isDarkMode ? 'Activé' : 'Désactivé'}
+                        </Text>
+                    </View>
+                </View>
+                <Switch
+                    value={isDarkMode}
+                    onValueChange={toggleTheme}
+                    trackColor={{ false: '#E0E0E0', true: '#1776BA' }}
+                    thumbColor={isDarkMode ? '#FFFFFF' : '#FFFFFF'}
+                    ios_backgroundColor="#E0E0E0"
+                />
             </View>
 
             {/* Modify Button */}
@@ -449,18 +477,20 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                             </View>
 
                             {/* Boutons d'action */}
-                            <View style={styles.actionButtons}>
-                                <Pressable
-                                    style={[styles.actionButton, { backgroundColor: activeTabColor, borderColor: activeTabColor }]}
-                                    onPress={() => handleViewBooking(booking.id)}
-                                >
-                                    <MaterialCommunityIcons name="eye-outline" size={20} color="#ffffff" />
-                                    <Text style={styles.actionButtonText}>Voir le ticket</Text>
-                                </Pressable>
-                                {/* <Pressable style={[styles.actionButton, { backgroundColor: actionButtonBackgroundColor, borderColor }]}>
+                            {booking.status === 'PAID' && (
+                                <View style={styles.actionButtons}>
+                                    <Pressable
+                                        style={[styles.actionButton, { backgroundColor: activeTabColor, borderColor: activeTabColor }]}
+                                        onPress={() => handleViewBooking(booking.id)}
+                                    >
+                                        <MaterialCommunityIcons name="eye-outline" size={20} color="#ffffff" />
+                                        <Text style={styles.actionButtonText}>Voir le ticket</Text>
+                                    </Pressable>
+                                    {/* <Pressable style={[styles.actionButton, { backgroundColor: actionButtonBackgroundColor, borderColor }]}>
                                     <MaterialCommunityIcons name="download" size={20} color={secondaryTextColor} />
                                 </Pressable> */}
-                            </View>
+                                </View>
+                            )}
                         </View>
                     ))}
                 </ScrollView>
@@ -470,7 +500,7 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
             <Modal
                 visible={showStatusModal}
                 transparent={true}
-                animationType="slide"
+                animationType="fade"
                 onRequestClose={() => setShowStatusModal(false)}
             >
                 <Pressable
@@ -731,6 +761,7 @@ const styles = StyleSheet.create({
         flex: 1,
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
+        textAlign: 'right',
     },
     emergencySection: {
         marginTop: 16,
@@ -1193,6 +1224,33 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontFamily: 'Ubuntu_Bold',
         color: '#FFFFFF',
+    },
+    themeToggleCard: {
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 16,
+        borderWidth: 1,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    themeToggleContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        flex: 1,
+    },
+    themeToggleTextContainer: {
+        flex: 1,
+    },
+    themeToggleLabel: {
+        fontSize: 16,
+        fontFamily: 'Ubuntu_Medium',
+        marginBottom: 4,
+    },
+    themeToggleDescription: {
+        fontSize: 12,
+        fontFamily: 'Ubuntu_Regular',
     },
 });
 

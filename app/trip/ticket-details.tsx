@@ -31,13 +31,16 @@ interface TicketDetails {
     currency: string;
     method: string;
     provider: string;
-    channel: string;
+    paymentProvider: string;
     createdAt: string;
     departureDateTime: string;
     departureTime: string;
     arrivalTime: string;
     duration: string;
     companyName: string;
+    bus: {
+        licencePlate: string;
+    };
     trip: {
         label: string;
         stationFrom: {
@@ -232,8 +235,8 @@ const TicketDetails = () => {
                         }
                         .qr-code {
                             margin: 0 auto 10px;
-                            width: 150px;
-                            height: 150px;
+                            width: 100px;
+                            height: 100px;
                             display: flex;
                             align-items: center;
                             justify-content: center;
@@ -260,7 +263,6 @@ const TicketDetails = () => {
                             text-align: center;
                             padding: 20px 15px;
                             background-color: #FFFFFF;
-                            margin-top: 10px;
                         }
                         .route-title {
                             font-size: 20px;
@@ -383,7 +385,7 @@ const TicketDetails = () => {
                     <!-- QR Code Section -->
                     <div class="qr-section">
                         <div class="qr-code">
-                            <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrCodeData)}" alt="QR Code" style="width: 100%; height: 100%; display: block; margin: 0 auto;" />
+                            <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(qrCodeData)}" alt="QR Code" style="width: 100%; height: 100%; display: block; margin: 0 auto;" />
                         </div>
                         <div class="qr-subtitle">Scannez pour vérifier l'authenticité du ticket</div>
                     </div>
@@ -420,11 +422,11 @@ const TicketDetails = () => {
                             </div>
                             <div class="detail-row">
                                 <span class="detail-label">Véhicule:</span>
-                                <span class="detail-value">N/A</span>
+                                <span class="detail-value">${ticket.bus.licencePlate}</span>
                             </div>
                             <div class="detail-row">
                                 <span class="detail-label">Type de transport:</span>
-                                <span class="detail-value">Aller simple</span>
+                                <span class="detail-value">${ticket.trip.type === 'ONE_WAY' ? 'Aller simple' : 'Aller-retour'}</span>
                             </div>
                         </div>
 
@@ -450,10 +452,6 @@ const TicketDetails = () => {
                             <div class="detail-row">
                                 <span class="detail-label">Prix par personne:</span>
                                 <span class="detail-value">${formatPriceWithCurrency(ticket.passengers[0]?.price || '0')}</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="detail-label">Nombre de passagers:</span>
-                                <span class="detail-value">${ticket.passengers.length}</span>
                             </div>
                             <div class="separator-line"></div>
                             <div class="total-row">
@@ -494,7 +492,7 @@ const TicketDetails = () => {
         const hours = now.getHours().toString().padStart(2, '0'); // Heure (00-23)
         const minutes = now.getMinutes().toString().padStart(2, '0'); // Minute (00-59)
         const seconds = now.getSeconds().toString().padStart(2, '0'); // Seconde (00-59)
-        
+
         return `${year}${month}${day}${hours}${minutes}${seconds}`;
     };
 
@@ -595,6 +593,17 @@ const TicketDetails = () => {
                     </View>
                 </View>
 
+                {/* Section: QR Code */}
+                <Pressable onPress={handleViewQRCode} style={[styles.sectionCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
+                    <View style={styles.sectionHeader}>
+                        <Icon name="qrcode" size={20} color={primaryBlue} />
+                        <Text style={[styles.sectionTitle, { color: textColor }]}>Code QR de vérification</Text>
+                    </View>
+                    <View style={{ alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 }}>
+                        <QRCode value={`https://allon-frontoffice-ng.onrender.com/verify-ticket/${ticket.id}?ref=${ticket.code}`} size={150} color={primaryBlue} backgroundColor="transparent" />
+                    </View>
+                </Pressable>
+
                 {/* Section: Détails du voyage */}
                 <View style={[styles.sectionCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
                     <View style={[styles.sectionHeader, { marginBottom: 20 }]}>
@@ -622,6 +631,10 @@ const TicketDetails = () => {
                     <View style={styles.detailRow}>
                         <Text style={[styles.detailLabel, { color: secondaryTextColor }]}>Compagnie</Text>
                         <Text style={[styles.detailValue, { color: textColor }]}>{ticket.companyName}</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                        <Text style={[styles.detailLabel, { color: secondaryTextColor }]}>Véhicule</Text>
+                        <Text style={[styles.detailValue, { color: textColor }]}> { ticket.bus.licencePlate } </Text>
                     </View>
                 </View>
 
@@ -720,7 +733,7 @@ const TicketDetails = () => {
                     <View style={styles.detailRow}>
                         <Text style={[styles.detailLabel, { color: secondaryTextColor }]}>Méthode de paiement</Text>
                         <Text style={[styles.detailValue, { color: textColor }]}>
-                            {formatPaymentMethod(ticket.channel)}
+                            {formatPaymentMethod(ticket.paymentProvider ?? 'N/A')}
                         </Text>
                     </View>
                     <View style={styles.detailRow}>
@@ -728,17 +741,6 @@ const TicketDetails = () => {
                         <Text style={[styles.detailValue, { color: textColor, textAlign: 'right', width: '45%' }]}>
                             {formatFullDate(ticket.createdAt)}
                         </Text>
-                    </View>
-                </View>
-
-                {/* Section: QR Code */}
-                <View style={[styles.sectionCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
-                    <View style={styles.sectionHeader}>
-                        <Icon name="qrcode" size={20} color={primaryBlue} />
-                        <Text style={[styles.sectionTitle, { color: textColor }]}>Code QR de vérification</Text>
-                    </View>
-                    <View style={{ alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 }}>
-                        <QRCode value={`https://allon-frontoffice-ng.onrender.com/verify-ticket/${ticket.id}?ref=${ticket.code}`} size={150} color={primaryBlue} backgroundColor="transparent" />
                     </View>
                 </View>
 

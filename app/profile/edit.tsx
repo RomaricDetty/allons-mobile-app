@@ -130,9 +130,11 @@ export default function EditProfileScreen() {
                     }
                     
                     // Extraire la rue et la ville de l'adresse si elle existe
-                    const addressParts = userData.address?.split(',') || [];
-                    const street = addressParts[0]?.trim() || '';
-                    const city = addressParts[1]?.trim() || '';
+                    // Le format de address est un objet : { city: "Abidjan", country: { id, name } }
+                    const street = ''; // La rue n'est pas disponible dans le format actuel
+                    const city = typeof userData.address === 'object' && userData.address !== null
+                        ? userData.address.city || ''
+                        : '';
                     
                     // Extraire le numéro du contact d'urgence (sans le code pays)
                     let emergencyPhone = userData.contactUrgent?.phone || '';
@@ -250,8 +252,11 @@ export default function EditProfileScreen() {
                         digits: formData.phone.trim(),
                     },
                 ],
-                address: formData.street.trim()
-                    ? `${formData.street.trim()}${formData.city.trim() ? `, ${formData.city.trim()}` : ''}`
+                address: formData.city.trim()
+                    ? {
+                        city: formData.city.trim(),
+                        country: user?.address?.country || {}
+                    }
                     : user?.address || null,
                 contactUrgent: {
                     fullName: formData.emergencyContactFullName.trim() || formData.emergencyContactName.trim(),
@@ -476,7 +481,7 @@ export default function EditProfileScreen() {
                             />
 
                             <FormField
-                                label="Nom complet du contact d'urgence"
+                                label="Prénom du contact d'urgence"
                                 value={formData.emergencyContactFullName}
                                 onChangeText={(text) =>
                                     setFormData((prev) => ({
@@ -484,7 +489,7 @@ export default function EditProfileScreen() {
                                         emergencyContactFullName: text,
                                     }))
                                 }
-                                placeholder="Nom complet du contact urgent"
+                                placeholder="Prénom du contact urgent"
                             />
 
                             <PhoneField
