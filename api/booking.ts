@@ -13,3 +13,41 @@ export const getBookingDetails = async (bookingId: string, token: string): Promi
         },
     });
 }
+
+
+/**
+ * Create a new booking
+ * @param bookingData - The booking data
+ * @returns AxiosResponse<any>
+ */
+export const createBooking = async (bookingData: any, token?: string): Promise<AxiosResponse<any>> => {
+    const headers: any = {};
+    
+    // Ajouter le header Authorization uniquement si le token est fourni
+    if (token && token.trim() !== '') {
+        headers.Authorization = `Bearer ${token}`;
+    }
+    
+    return await axios.post(`${baseUrl}/customers/bookings`, bookingData, {
+        headers,
+    });
+}
+
+/**
+ * Crée un paiement pour une réservation
+ * @param bookingData - Les données de paiement
+ * @param token - Le token d'authentification (optionnel)
+ * @returns AxiosResponse<any>
+ */
+export const createBookingPayment = async (bookingData: any, token?: string): Promise<AxiosResponse<any>> => {
+    const headers: any = {};
+    
+    // Ajouter le header Authorization uniquement si le token est fourni
+    if (token && token.trim() !== '') {
+        headers.Authorization = `Bearer ${token}`;
+    }
+    
+    return await axios.post(`${baseUrl}/customers/bookings/pay`, bookingData, {
+        headers,
+    });
+}

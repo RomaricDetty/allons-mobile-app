@@ -63,12 +63,14 @@ const TicketQR = () => {
                 {
                     paddingTop: insets.top,
                     backgroundColor: headerBackgroundColor,
-                    borderBottomColor: headerBorderColor
+                    borderBottomColor: headerBorderColor,
+                    alignItems: 'center',
                 }
             ]}>
                 <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
                     <Icon name="arrow-left" size={25} color={iconColor} />
                 </Pressable>
+                <Text style={[styles.qrTitle, { color: textColor, fontSize: 16, flex: 1, textAlign: 'center' }]}>Code QR de vérification</Text>
             </View>
 
             <ScrollView

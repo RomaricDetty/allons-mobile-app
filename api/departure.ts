@@ -10,3 +10,7 @@ export const getAvailableDepartures = async (queryParams: string): Promise<Axios
     console.log('queryParams => ', `${baseUrl}/customers/departures?${queryParams}`);
     return await axios.get(`${baseUrl}/customers/departures?${queryParams}`);
 }
+
+export const getDepartureAvailableSeats = async (departureId: string): Promise<AxiosResponse<any>> => {
+    return await axios.get(`${baseUrl}/customers/departures/${departureId}/seats`);
+}

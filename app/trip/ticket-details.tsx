@@ -14,6 +14,7 @@ import {
     ScrollView,
     StyleSheet,
     Text,
+    TouchableOpacity,
     View
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
@@ -599,9 +600,19 @@ const TicketDetails = () => {
                         <Icon name="qrcode" size={20} color={primaryBlue} />
                         <Text style={[styles.sectionTitle, { color: textColor }]}>Code QR de vérification</Text>
                     </View>
-                    <Pressable onPress={handleViewQRCode} style={{ alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 }}>
-                        <QRCode value={`https://allon-frontoffice-ng.onrender.com/verify-ticket/${ticket.id}?ref=${ticket.code}`} size={150} color={primaryBlue} backgroundColor="transparent" />
-                    </Pressable>
+                    <View style={styles.qrCodeContainer}>
+                        <QRCode
+                            value={`https://allon-frontoffice-ng.onrender.com/verify-ticket/${ticket.id}?ref=${ticket.code}`}
+                            size={150}
+                            color={primaryBlue}
+                            backgroundColor="transparent"
+                        />
+                        <TouchableOpacity 
+                            onPress={handleViewQRCode} 
+                            activeOpacity={1}
+                            style={styles.qrCodeOverlay}
+                        />
+                    </View>
                 </View>
 
                 {/* Section: Détails du voyage */}
@@ -634,7 +645,7 @@ const TicketDetails = () => {
                     </View>
                     <View style={styles.detailRow}>
                         <Text style={[styles.detailLabel, { color: secondaryTextColor }]}>Véhicule</Text>
-                        <Text style={[styles.detailValue, { color: textColor }]}> { ticket.bus.licencePlate } </Text>
+                        <Text style={[styles.detailValue, { color: textColor }]}> {ticket.bus.licencePlate} </Text>
                     </View>
                 </View>
 
@@ -845,6 +856,21 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 18,
         fontFamily: 'Ubuntu_Bold',
+    },
+    qrCodeContainer: {
+        width: 150,
+        height: 150,
+        alignSelf: 'center',
+        position: 'relative',
+    },
+    qrCodeOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: 150,
+        height: 150,
     },
     detailRow: {
         flexDirection: 'row',

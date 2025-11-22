@@ -69,6 +69,7 @@ export type Trip = {
     arrivalStation: string;
     options: string[];
     busType: string;
+    busSeatLayout?: number[]; // Disposition des sièges, ex: [2, 3] = 2 sièges gauche, allée, 3 sièges droite
 };
 
 /**

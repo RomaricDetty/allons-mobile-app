@@ -53,6 +53,7 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
     const [selectedStatus, setSelectedStatus] = useState<string | any>('');
     const [showStatusModal, setShowStatusModal] = useState<boolean>(false);
     const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [isLoadingBooking, setIsLoadingBooking] = useState<string | null>(null);
     // Ajouter un état pour le modal de confirmation
     const [showLogoutModal, setShowLogoutModal] = useState(false);
     const navigation = useNavigation();
@@ -158,14 +159,22 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
      * Affiche les détails d'une réservation
      */
     const handleViewBooking = async (bookingId: string) => {
-        const token = await AsyncStorage.getItem('token');
-        const response = await getBookingDetails(bookingId, token as string);
-        console.log('response booking details: ', response.data);
-        if (response.status === 200) {
-            // Utiliser navigation.navigate au lieu de router.push
-            navigation.navigate('trip/ticket-details' as never, { ticketDetails: response.data } as never);
-        } else {
+        try {
+            setIsLoadingBooking(bookingId);
+            const token = await AsyncStorage.getItem('token');
+            const response = await getBookingDetails(bookingId, token as string);
+            // console.log('response booking details: ', response.data);
+            if (response.status === 200) {
+                // Utiliser navigation.navigate au lieu de router.push
+                navigation.navigate('trip/ticket-details' as never, { ticketDetails: response.data } as never);
+            } else {
+                Alert.alert('Erreur', 'Une erreur est survenue lors de la récupération des détails de la réservation');
+            }
+        } catch (error) {
+            console.error('Erreur lors de la récupération des détails:', error);
             Alert.alert('Erreur', 'Une erreur est survenue lors de la récupération des détails de la réservation');
+        } finally {
+            setIsLoadingBooking(null);
         }
     }
 
@@ -480,11 +489,25 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                             {booking.status === 'PAID' && (
                                 <View style={styles.actionButtons}>
                                     <Pressable
-                                        style={[styles.actionButton, { backgroundColor: activeTabColor, borderColor: activeTabColor }]}
+                                        style={[
+                                            styles.actionButton, 
+                                            { 
+                                                backgroundColor: activeTabColor, 
+                                                borderColor: activeTabColor,
+                                                opacity: isLoadingBooking === booking.id ? 0.7 : 1
+                                            }
+                                        ]}
                                         onPress={() => handleViewBooking(booking.id)}
+                                        disabled={isLoadingBooking === booking.id}
                                     >
-                                        <MaterialCommunityIcons name="eye-outline" size={20} color="#ffffff" />
-                                        <Text style={styles.actionButtonText}>Voir le ticket</Text>
+                                        {isLoadingBooking === booking.id ? (
+                                            <ActivityIndicator size="small" color="#ffffff" />
+                                        ) : (
+                                            <>
+                                                <MaterialCommunityIcons name="eye-outline" size={20} color="#ffffff" />
+                                                <Text style={styles.actionButtonText}>Voir le ticket</Text>
+                                            </>
+                                        )}
                                     </Pressable>
                                     {/* <Pressable style={[styles.actionButton, { backgroundColor: actionButtonBackgroundColor, borderColor }]}>
                                     <MaterialCommunityIcons name="download" size={20} color={secondaryTextColor} />
