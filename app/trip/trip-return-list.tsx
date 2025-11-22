@@ -1,5 +1,4 @@
 // @ts-nocheck
-import { getAvailableDepartures } from '@/api/departure';
 import { BottomSheet } from '@/components/bottom-sheet';
 import { capitalizeBusType } from '@/constants/functions';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -9,8 +8,6 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import React, { useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
     FlatList,
     Pressable,
     ScrollView,
@@ -22,10 +19,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 /**
- * Écran de liste des trajets disponibles
- * Affiche les trajets trouvés avec possibilité de filtres et de tri
+ * Écran de liste des trajets retour disponibles
+ * Affiche les trajets retour trouvés avec possibilité de filtres et de tri
+ * Après sélection d'un voyage aller dans trip-list
  */
-const TripList = () => {
+const TripReturnList = () => {
     const route = useRoute();
     const navigation = useNavigation();
     const insets = useSafeAreaInsets();
@@ -36,27 +34,26 @@ const TripList = () => {
     const textColor = useThemeColor({}, 'text');
     const iconColor = useThemeColor({}, 'icon');
     const tintColor = useThemeColor({}, 'tint');
-
+    
     // Couleurs spécifiques pour l'écran
     const cardBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
     const borderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
     const secondaryTextColor = colorScheme === 'dark' ? '#9BA1A6' : '#666';
     const headerBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
     const headerBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
-    const modalBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
-    const modalBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#F3F3F7';
     const scrollBackgroundColor = colorScheme === 'dark' ? '#000000' : '#F5F5F5';
 
     // Récupération des données passées en paramètre
-    const { departures, searchParams } = (route.params as { departures?: Departures, searchParams?: SearchParams }) || {};
-    const trips = departures?.items || [];
-    const totalTrips = departures?.total || 0;
+    const { returnDepartures, outboundTrip, searchParams } = (route.params as { 
+        returnDepartures?: Departures, 
+        outboundTrip?: Trip,
+        searchParams?: SearchParams 
+    }) || {};
+    const trips = returnDepartures?.items || [];
+    const totalTrips = returnDepartures?.total || 0;
 
     // États pour les dropdowns et modals
-    const [showFiltersModal, setShowFiltersModal] = useState(false);
-    const [showDisplayModal, setShowDisplayModal] = useState(false);
     const [showSortModal, setShowSortModal] = useState(false);
-    const [loadingReturnTrips, setLoadingReturnTrips] = useState(false);
 
     // États pour les filtres
     const [selectedSort, setSelectedSort] = useState('Prix croissant');
@@ -113,61 +110,20 @@ const TripList = () => {
     const departureCity = sortedTrips[0]?.departureCity || trips[0]?.departureCity || '';
     const arrivalCity = sortedTrips[0]?.arrivalCity || trips[0]?.arrivalCity || '';
 
-
-    const formatDateToYYYYMMDD = (date: Date | null): string => {
-        if (!date) return '';
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    };
-
     /**
-     * Gère la sélection d'un trajet
-     * Pour un aller-retour, recherche les voyages retour disponibles
-     * Pour un aller simple, navigue directement vers trip-summary
+     * Gère la sélection d'un trajet retour
+     * Navigue vers trip-summary avec les deux voyages (aller et retour)
      */
-    const handleSelectTrip = async (trip: Trip) => {
-        // Si c'est un aller simple, naviguer directement vers trip-summary
-        if (searchParams?.tripType !== 'ROUND_TRIP') {
-            navigation.navigate('trip/trip-summary', { trip, searchParams });
+    const handleSelectReturnTrip = (returnTrip: Trip) => {
+        if (!outboundTrip) {
             return;
         }
-
-        // Si c'est un aller-retour, rechercher les voyages retour
-        if (!searchParams?.departureCity || !searchParams?.arrivalCity || !searchParams?.returnDate) {
-            Alert.alert('Attention !', 'Informations de recherche manquantes pour le retour');
-            return;
-        }
-
-        // Inverser les villes pour le retour
-        const returnCityFromId = searchParams.arrivalCity.id; // Ville d'arrivée devient départ
-        const returnCityToId = searchParams.departureCity.id; // Ville de départ devient arrivée
-        const returnDate = searchParams.returnDate;
-
-        // Construire les queryParams pour le retour (dateFrom vide, dateTo avec la date de retour)
-        const queryParams = `page=1&pageSize=10&cityFromId=${returnCityFromId}&cityToId=${returnCityToId}&dateFrom=&dateTo=${formatDateToYYYYMMDD(returnDate)}&companyId=&passengerCount=${searchParams.numberOfPersons}`;
-
-        setLoadingReturnTrips(true);
-        try {
-            const response = await getAvailableDepartures(queryParams);
-            setLoadingReturnTrips(false);
-
-            if (response?.data?.items?.length > 0) {
-                // Naviguer vers l'écran de sélection du voyage retour
-                navigation.navigate('trip/trip-return-list', {
-                    returnDepartures: response?.data,
-                    outboundTrip: trip, // Le voyage aller sélectionné
-                    searchParams: searchParams
-                });
-            } else {
-                Alert.alert('Information !', 'Aucun voyage retour disponible pour la date sélectionnée.');
-            }
-        } catch (error: any) {
-            setLoadingReturnTrips(false);
-            console.error('Erreur dans la récupération des voyages retour : ', error);
-            Alert.alert('Attention !', 'Une erreur est survenue lors de la recherche des voyages retour');
-        }
+        // Naviguer vers trip-summary avec les deux voyages
+        navigation.navigate('trip/trip-summary', { 
+            trip: outboundTrip, 
+            returnTrip: returnTrip,
+            searchParams 
+        });
     };
 
     /**
@@ -232,15 +188,13 @@ const TripList = () => {
                         ))}
                     </View>
 
-                    <View style={
-                        {
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            gap: 5,
-                            justifyContent: 'space-between',
-                            marginTop: 20,
-                        }
-                    }>
+                    <View style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 5,
+                        justifyContent: 'space-between',
+                        marginTop: 20,
+                    }}>
                         <View style={styles.availabilityBadge}>
                             <Text style={styles.availabilityText}>
                                 {item.availableSeats} places disponibles
@@ -252,15 +206,10 @@ const TripList = () => {
 
                 {/* Bouton Réserver */}
                 <Pressable
-                    style={[styles.selectButton, loadingReturnTrips && { opacity: 0.5 }]}
-                    onPress={() => handleSelectTrip(item)}
-                    disabled={loadingReturnTrips}
+                    style={styles.selectButton}
+                    onPress={() => handleSelectReturnTrip(item)}
                 >
-                    {loadingReturnTrips ? (
-                        <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                        <Text style={styles.selectButtonText}>{searchParams?.tripType === 'ROUND_TRIP' ? 'Sélectionner' : 'Réserver'}</Text>
-                    )}
+                    <Text style={styles.selectButtonText}>Réserver</Text>
                 </Pressable>
             </View>
         );
@@ -284,24 +233,6 @@ const TripList = () => {
                     >
                         <Icon name="arrow-left" size={25} color={iconColor} />
                     </Pressable>
-
-                    {/* Bouton Filtres */}
-                    {/* <Pressable
-                    style={styles.filterButton}
-                    onPress={() => setShowFiltersModal(true)}
-                >
-                    <Icon name="filter-variant" size={20} color="#000" />
-                    <Text style={styles.filterButtonText}>Filtres</Text>
-                </Pressable> */}
-
-                    {/* Dropdown Afficher */}
-                    {/* <Pressable
-                    style={styles.displayButton}
-                    onPress={() => setShowDisplayModal(true)}
-                >
-                    <Text style={styles.displayButtonText}>Afficher</Text>
-                    <Icon name="chevron-down" size={20} color="#000" />
-                </Pressable> */}
                 </View>
 
                 <ScrollView
@@ -317,11 +248,9 @@ const TripList = () => {
                     </View>
 
                     {/* Titre */}
-                    {searchParams?.tripType === 'ROUND_TRIP' && (
-                        <View style={styles.titleContainer}>
-                            <Text style={[styles.title, { color: textColor }]}>Voyages aller disponibles</Text>
-                        </View>
-                    )}
+                    <View style={styles.titleContainer}>
+                        <Text style={[styles.title, { color: textColor }]}>Voyages retour disponibles</Text>
+                    </View>
 
                     {/* Résumé et Tri */}
                     <View style={styles.summaryContainer}>
@@ -353,59 +282,6 @@ const TripList = () => {
                         </View>
                     )}
                 </ScrollView>
-
-                {/* Modal Filtres (à implémenter) */}
-                {/* <Modal
-                visible={showFiltersModal}
-                transparent={true}
-                animationType="slide"
-                onRequestClose={() => setShowFiltersModal(false)}
-            >
-                <Pressable
-                    style={styles.modalOverlay}
-                    onPress={() => setShowFiltersModal(false)}
-                >
-                    <View style={[styles.modalContent, { paddingBottom: insets.bottom + 20 }]}>
-                        <Text style={styles.modalTitle}>Filtres</Text>
-                        <Text style={styles.modalPlaceholder}>
-                            Les filtres seront implémentés ici
-                        </Text>
-                        <Pressable
-                            style={styles.modalCloseButton}
-                            onPress={() => setShowFiltersModal(false)}
-                        >
-                            <Text style={styles.modalCloseButtonText}>Fermer</Text>
-                        </Pressable>
-                    </View>
-                </Pressable>
-                </Modal> */}
-
-                {/* Modal Afficher (à implémenter) */}
-                {/* <Modal
-                    visible={showDisplayModal}
-                    transparent={true}
-                    animationType="slide"
-                    onRequestClose={() => setShowDisplayModal(false)}
-                >
-                    <Pressable
-                        style={styles.modalOverlay}
-                        onPress={() => setShowDisplayModal(false)}
-                    >
-                        <View style={[styles.modalContent, { paddingBottom: insets.bottom + 20 }]}>
-                            <Text style={styles.modalTitle}>Afficher</Text>
-                            <Text style={styles.modalPlaceholder}>
-                                Options d'affichage à implémenter
-                            </Text>
-                            <Pressable
-                                style={styles.modalCloseButton}
-                                onPress={() => setShowDisplayModal(false)}
-                            >
-                                <Text style={styles.modalCloseButtonText}>Fermer</Text>
-                            </Pressable>
-                        </View>
-                    </Pressable>
-                </Modal> */}
-
             </View>
             {/* BottomSheet de tri */}
             <BottomSheet
@@ -462,26 +338,6 @@ const styles = StyleSheet.create({
     backButton: {
         padding: 8,
     },
-    filterButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        padding: 8,
-    },
-    filterButtonText: {
-        fontSize: 16,
-        fontFamily: 'Ubuntu_Medium',
-    },
-    displayButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        padding: 8,
-    },
-    displayButtonText: {
-        fontSize: 16,
-        fontFamily: 'Ubuntu_Regular',
-    },
     scrollView: {
         flex: 1,
     },
@@ -499,6 +355,15 @@ const styles = StyleSheet.create({
     routeCity: {
         fontSize: 24,
         fontFamily: 'Ubuntu_Bold',
+    },
+    titleContainer: {
+        marginBottom: 15,
+        // marginTop: 10,
+    },
+    title: {
+        fontSize: 20,
+        fontFamily: 'Ubuntu_Bold',
+        textAlign: 'center',
     },
     summaryContainer: {
         flexDirection: 'row',
@@ -689,45 +554,6 @@ const styles = StyleSheet.create({
         fontFamily: 'Ubuntu_Regular',
         marginTop: 10,
     },
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        justifyContent: 'flex-end',
-    },
-    modalContent: {
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        width: '100%',
-        shadowColor: '#000',
-        shadowOffset: {
-            width: 0,
-            height: -2,
-        },
-        shadowOpacity: 0.25,
-        shadowRadius: 10,
-        elevation: 10,
-    },
-    modalTitle: {
-        fontSize: 20,
-        fontFamily: 'Ubuntu_Bold',
-        marginBottom: 20,
-    },
-    modalPlaceholder: {
-        fontSize: 14,
-        fontFamily: 'Ubuntu_Regular',
-        marginBottom: 20,
-    },
-    modalCloseButton: {
-        backgroundColor: '#1776BA',
-        borderRadius: 8,
-        paddingVertical: 12,
-        alignItems: 'center',
-    },
-    modalCloseButtonText: {
-        fontSize: 16,
-        fontFamily: 'Ubuntu_Bold',
-        color: '#FFFFFF',
-    },
     sortOption: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -742,16 +568,7 @@ const styles = StyleSheet.create({
     sortOptionTextSelected: {
         fontFamily: 'Ubuntu_Bold',
     },
-
-    titleContainer: {
-        marginBottom: 15,
-        // marginTop: 10,
-    },
-    title: {
-        fontSize: 20,
-        fontFamily: 'Ubuntu_Bold',
-        textAlign: 'center',
-    },
 });
 
-export default TripList;
+export default TripReturnList;
+

@@ -91,6 +91,7 @@ function RootContent() {
                 <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
                 <Stack.Screen name="trip/search" options={{ headerShown: false }} />
                 <Stack.Screen name="trip/trip-list" options={{ headerShown: false }} />
+                <Stack.Screen name="trip/trip-return-list" options={{ headerShown: false }} />
                 <Stack.Screen name="trip/trip-summary" options={{ headerShown: false }} />
                 <Stack.Screen name="trip/passengers-info" options={{ headerShown: false }} />
                 <Stack.Screen name="profile/edit" options={{ headerShown: false }} />

@@ -44,8 +44,13 @@ const TripSummary = () => {
     const secondaryButtonBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
 
     // Récupération des données passées en paramètre
-    const { trip, searchParams } = (route.params as { trip?: Trip, searchParams?: SearchParams }) || {};
+    const { trip, returnTrip, searchParams } = (route.params as { 
+        trip?: Trip, 
+        returnTrip?: Trip,
+        searchParams?: SearchParams 
+    }) || {};
     const numberOfPersons = searchParams?.numberOfPersons || 1;
+    const isRoundTrip = !!returnTrip;
 
     if (!trip) {
         return (
@@ -57,10 +62,13 @@ const TripSummary = () => {
 
     /**
      * Calcule le prix total pour tous les voyageurs
+     * Inclut le prix du voyage retour si c'est un aller-retour
      */
     const totalPrice = useMemo(() => {
-        return trip.price * numberOfPersons;
-    }, [trip.price, numberOfPersons]);
+        const outboundPrice = trip.price * numberOfPersons;
+        const returnPrice = returnTrip ? returnTrip.price * numberOfPersons : 0;
+        return outboundPrice + returnPrice;
+    }, [trip.price, returnTrip?.price, numberOfPersons]);
 
     /**
      * Calcule les frais (fixe à 500 FCFA pour l'instant)
@@ -102,7 +110,11 @@ const TripSummary = () => {
      * Gère la navigation vers l'étape suivante
      */
     const handleNavigateToNextStep = () => {
-        navigation.navigate('trip/passengers-info', { trip, searchParams });
+        navigation.navigate('trip/passengers-info', { 
+            trip, 
+            returnTrip: returnTrip || undefined,
+            searchParams 
+        });
     }
 
     return (
@@ -123,13 +135,16 @@ const TripSummary = () => {
                     <Icon name="arrow-left" size={25} color={iconColor} />
                 </Pressable>
 
-                <View style={styles.routeBadge}>
+                <View style={[styles.routeBadge, {width: '250'}]}>
                     <Text style={[styles.routeBadgeText, { color: tintColor }]}>
                         {trip.departureCity} <Icon name="chevron-right" size={15} color={tintColor} /> {trip.arrivalCity}
+                        {isRoundTrip && returnTrip && (
+                            <> <Icon name="chevron-right" size={15} color={tintColor} /> {returnTrip.arrivalCity}</>
+                        )} 
                     </Text>
                 </View>
 
-                <Text style={[styles.stepIndicator, { color: secondaryTextColor }]}>Étape 1 sur 3</Text>
+                <Text style={[styles.stepIndicator, { color: secondaryTextColor}]}>Étape 1 sur 3</Text>
             </View>
 
             {/* Barre de progression */}
@@ -160,10 +175,10 @@ const TripSummary = () => {
                     </Text>
                 </View>
 
-                {/* Carte principale du voyage */}
+                {/* Carte principale du voyage aller */}
                 <View style={[styles.tripCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
                     <View style={styles.tripCardHeader}>
-                        <Text style={[styles.tripCardLabel, { color: textColor }]}>Voyage</Text>
+                        <Text style={[styles.tripCardLabel, { color: textColor }]}>Voyage Aller</Text>
                         <Text style={[styles.tripCardCompany, { color: textColor }]}>{trip.company}</Text>
                     </View>
 
@@ -211,6 +226,59 @@ const TripSummary = () => {
                     </View>
                 </View>
 
+                {/* Carte du voyage retour (si aller-retour) */}
+                {isRoundTrip && returnTrip && (
+                    <View style={[styles.tripCard, { backgroundColor: cardBackgroundColor, borderColor, marginTop: 20 }]}>
+                        <View style={styles.tripCardHeader}>
+                            <Text style={[styles.tripCardLabel, { color: textColor }]}>Voyage Retour</Text>
+                            <Text style={[styles.tripCardCompany, { color: textColor }]}>{returnTrip.company}</Text>
+                        </View>
+
+                        {/* Section Départ/Arrivée */}
+                        <View style={styles.tripDetails}>
+                            <View style={styles.departureSection}>
+                                <Text style={[styles.time, { textAlign: 'left', color: textColor }]}>{returnTrip.departureTime}</Text>
+                                <Text style={[styles.city, { textAlign: 'left', color: textColor }]}>{returnTrip.departureCity}</Text>
+                                <Text style={[styles.station, { textAlign: 'left', color: secondaryTextColor }]}>{returnTrip.departureStation}</Text>
+                            </View>
+
+                            <View style={[styles.timelineContainer, { marginTop: 10 }]}>
+                                <Text style={[styles.duration, { color: secondaryTextColor }]}>{returnTrip.duration}</Text>
+                                <View style={[styles.timelineLine, { backgroundColor: separatorColor }]} />
+                                <View style={[styles.timelineDot, { backgroundColor: tintColor }]} />
+                                <Text style={[styles.date, { color: secondaryTextColor }]}>
+                                    {formatFullDate(returnTrip.departureDateTime)}
+                                </Text>
+                            </View>
+
+                            <View style={[styles.arrivalSection]}>
+                                <Text style={[styles.time, { textAlign: 'right', color: textColor }]}>{returnTrip.arrivalTime}</Text>
+                                <Text style={[styles.city, { textAlign: 'right', color: textColor }]}>{returnTrip.arrivalCity}</Text>
+                                <Text style={[styles.station, { textAlign: 'right', color: secondaryTextColor }]}>{returnTrip.arrivalStation}</Text>
+                            </View>
+                        </View>
+
+                        {/* Véhicule et Équipements */}
+                        <View style={[styles.vehicleSection, { borderTopColor: borderColor }]}>
+                            <View style={styles.vehicleInfo}>
+                                <Text style={[styles.vehicleLabel, { color: secondaryTextColor }]}>Véhicule : </Text>
+                                <Text style={[styles.vehicleNumber, { color: textColor }]}>{returnTrip.licencePlate}</Text>
+                                <View style={styles.businessBadge}>
+                                    <Text style={styles.businessBadgeText}>{capitalizeBusType(returnTrip.busType)}</Text>
+                                </View>
+                            </View>
+                            <View style={styles.amenitiesContainer}>
+                                {returnTrip.options.map((option, index) => (
+                                    <View key={index} style={[styles.amenityItem]}>
+                                        <Icon name="check-circle" size={16} color="#4CAF50" />
+                                        <Text style={[styles.amenityText, { color: textColor }]}>{option}</Text>
+                                    </View>
+                                ))}
+                            </View>
+                        </View>
+                    </View>
+                )}
+
                 {/* Section Informations voyageurs */}
                 <View style={styles.passengersSection}>
                     <Text style={[styles.sectionTitle, { color: textColor }]}>Informations voyageurs</Text>
@@ -222,14 +290,35 @@ const TripSummary = () => {
                     <Text style={[styles.priceSectionTitle, { color: textColor }]}>Répartition des prix</Text>
 
                     <View style={styles.priceDetails}>
-                        <View style={styles.priceRow}>
-                            <Text style={[styles.priceLabel, { color: textColor }]}>
-                                {numberOfPersons} {numberOfPersons > 1 ? 'voyageurs' : 'voyageur'}
-                            </Text>
-                            <Text style={[styles.priceValue, { color: textColor }]}>
-                                {formatPrice(totalPrice)}
-                            </Text>
-                        </View>
+                        {isRoundTrip && returnTrip ? (
+                            <>
+                                <View style={styles.priceRow}>
+                                    <Text style={[styles.priceLabel, { color: textColor }]}>
+                                        Aller ({numberOfPersons} {numberOfPersons > 1 ? 'voyageurs' : 'voyageur'})
+                                    </Text>
+                                    <Text style={[styles.priceValue, { color: textColor }]}>
+                                        {formatPrice(trip.price * numberOfPersons)}
+                                    </Text>
+                                </View>
+                                <View style={styles.priceRow}>
+                                    <Text style={[styles.priceLabel, { color: textColor }]}>
+                                        Retour ({numberOfPersons} {numberOfPersons > 1 ? 'voyageurs' : 'voyageur'})
+                                    </Text>
+                                    <Text style={[styles.priceValue, { color: textColor }]}>
+                                        {formatPrice(returnTrip.price * numberOfPersons)}
+                                    </Text>
+                                </View>
+                            </>
+                        ) : (
+                            <View style={styles.priceRow}>
+                                <Text style={[styles.priceLabel, { color: textColor }]}>
+                                    {numberOfPersons} {numberOfPersons > 1 ? 'voyageurs' : 'voyageur'}
+                                </Text>
+                                <Text style={[styles.priceValue, { color: textColor }]}>
+                                    {formatPrice(totalPrice)}
+                                </Text>
+                            </View>
+                        )}
                         <View style={styles.priceRow}>
                             <Text style={[styles.priceLabel, { color: textColor }]}>Taxes</Text>
                             <Text style={[styles.priceValue, { color: textColor }]}>

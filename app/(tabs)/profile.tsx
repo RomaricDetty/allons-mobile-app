@@ -8,32 +8,6 @@ import { StyleSheet } from 'react-native';
 
 type AuthScreen = 'signup' | 'signin';
 
-interface ContactUrgent {
-    fullName: string;
-    phone: string;
-}
-
-type User = {
-    id: string;
-    firstName: string;
-    lastName: string;
-    middleName?: string | null;
-    email: string;
-    username: string;
-    civility: string;
-    dateOfBirth: string;
-    picture?: string | null;
-    role?: string | null;
-    company?: string | null;
-    address?: string | null;
-    contactUrgent: ContactUrgent;
-    phones?: any[];
-    active: boolean;
-    isEmailVerified: boolean;
-    createdAt: string;
-    updatedAt: string;
-};
-
 /**
  * Écran de profil principal qui gère l'affichage des écrans d'authentification et de profil
  */
@@ -60,18 +34,18 @@ export default function TabTwoScreen() {
             // const userData = await AsyncStorage.getItem('user');
             const expiresAt = await AsyncStorage.getItem('expires_in');
             const refreshToken = await AsyncStorage.getItem('refresh_token');
-            console.log('expiresAt : ', expiresAt);
+            // console.log('expiresAt : ', expiresAt);
             const expiresAtDate = new Date(Number(expiresAt) * 1000);
             const currentDate = new Date();
-            console.log('expiresAtDate : ', expiresAtDate);
-            console.log('currentDate : ', currentDate);
-            console.log('refreshToken : ', refreshToken);
+            // console.log('expiresAtDate : ', expiresAtDate);
+            // console.log('currentDate : ', currentDate);
+            // console.log('refreshToken : ', refreshToken);
 
             if (refreshToken) {
                 const response = await refreshTokenApi(refreshToken as string);
-                console.log('response refresh token: ', response);
-                console.log('response.data : ', response.data);
-                console.log('response.status : ', response.status);
+                // console.log('response refresh token: ', response);
+                // console.log('response.data : ', response.data);
+                // console.log('response.status : ', response.status);
                 if (response.status === 200) {
                     await AsyncStorage.setItem('token', response.data.access_token);
                     // await AsyncStorage.setItem('refresh_token', response.data.refresh_token);

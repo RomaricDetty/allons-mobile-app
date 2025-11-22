@@ -594,15 +594,15 @@ const TicketDetails = () => {
                 </View>
 
                 {/* Section: QR Code */}
-                <Pressable onPress={handleViewQRCode} style={[styles.sectionCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
+                <View style={[styles.sectionCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
                     <View style={styles.sectionHeader}>
                         <Icon name="qrcode" size={20} color={primaryBlue} />
                         <Text style={[styles.sectionTitle, { color: textColor }]}>Code QR de vérification</Text>
                     </View>
-                    <View style={{ alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 }}>
+                    <Pressable onPress={handleViewQRCode} style={{ alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 }}>
                         <QRCode value={`https://allon-frontoffice-ng.onrender.com/verify-ticket/${ticket.id}?ref=${ticket.code}`} size={150} color={primaryBlue} backgroundColor="transparent" />
-                    </View>
-                </Pressable>
+                    </Pressable>
+                </View>
 
                 {/* Section: Détails du voyage */}
                 <View style={[styles.sectionCard, { backgroundColor: cardBackgroundColor, borderColor }]}>

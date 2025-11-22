@@ -44,8 +44,8 @@ const Index = () => {
      */
     useEffect(() => {
         if (showSplash && onboardingDone) {
-            // Durée aléatoire entre 3000ms (3s) et 10000ms (10s)
-            const splashDuration = Math.random() * 7000 + 3000;
+            // Durée fixe de 5 secondes
+            const splashDuration = 5000;
             
             const timer = setTimeout(() => {
                 router.replace('/(tabs)');

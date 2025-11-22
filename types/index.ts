@@ -85,6 +85,10 @@ export type Departures = {
  */
 export type SearchParams = {
     numberOfPersons: number;
+    tripType?: string; // 'ONE_WAY' ou 'ROUND_TRIP'
+    departureCity?: City;
+    arrivalCity?: City;
+    returnDate?: Date | null;
 };
 
 /**

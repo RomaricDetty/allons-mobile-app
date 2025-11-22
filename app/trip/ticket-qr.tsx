@@ -4,6 +4,7 @@ import { useThemeColor } from '@/hooks/use-theme-color';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import React from 'react';
 import {
+    Dimensions,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -23,6 +24,7 @@ const TicketQR = () => {
     const navigation = useNavigation();
     const insets = useSafeAreaInsets();
     const colorScheme = useColorScheme() ?? 'light';
+    const screenHeight = Dimensions.get('window').height;
     
     // Couleurs dynamiques basées sur le thème
     const textColor = useThemeColor({}, 'text');
@@ -54,7 +56,7 @@ const TicketQR = () => {
     const qrCodeData = `https://allon-frontoffice-ng.onrender.com/verify-ticket/${ticketId}?ref=${ticketCode}`;
 
     return (
-        <View style={[styles.container, { backgroundColor: scrollBackgroundColor }]}>
+        <View style={[styles.container, { backgroundColor: headerBackgroundColor }]}>
             {/* Header avec bouton retour */}
             <View style={[
                 styles.header,
@@ -71,22 +73,26 @@ const TicketQR = () => {
 
             <ScrollView
                 style={styles.scrollView}
-                contentContainerStyle={styles.scrollContent}
+                contentContainerStyle={[
+                    styles.scrollContent,
+                    { minHeight: screenHeight - insets.top - 60 }
+                ]}
                 showsVerticalScrollIndicator={false}
             >
                 {/* Card principale */}
-                <View style={[styles.mainCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
+                <View style={[styles.mainCard, ]}> 
+                    {/* { backgroundColor: cardBackgroundColor, borderColor } */}
                     {/* Header avec icône QR */}
-                    <View style={styles.qrHeader}>
+                    {/* <View style={styles.qrHeader}>
                         <Icon name="qrcode" size={24} color={primaryBlue} />
                         <Text style={[styles.qrTitle, { color: textColor }]}>Code QR de vérification</Text>
-                    </View>
+                    </View> */}
 
                     {/* Container QR Code */}
-                    <View style={[styles.qrContainer, { backgroundColor: qrCodeBackgroundColor }]}>
+                    <View style={[styles.qrContainer, { backgroundColor: qrCodeBackgroundColor, justifyContent: 'center', alignItems: 'center' }]}>
                         <QRCode
                             value={qrCodeData}
-                            size={230}
+                            size={300}
                             color={primaryBlue}
                             backgroundColor="transparent"
                         />
@@ -98,19 +104,20 @@ const TicketQR = () => {
                     </View>
 
                     {/* Instructions */}
-                    <View style={styles.instructionsContainer}>
+                    {/* <View style={styles.instructionsContainer}>
                         <View style={styles.instructionRow}>
-                            <View style={[styles.checkIcon, { backgroundColor: primaryBlue }]}>
+                            <View style={[styles.checkIcon]}>
                                 <Icon name="check" size={16} color="#FFFFFF" />
+                                <Image source={require('@/assets/images/allon-logo-transparent.png')} style={styles.checkIconImage} />
                             </View>
                             <Text style={[styles.instructionText, { color: textColor }]}>
-                                Scannez ce QR code pour vérifier l'authenticité du ticket
+                                Votre partenaire de voyage
                             </Text>
                         </View>
                         <Text style={[styles.instructionSubtext, { color: secondaryTextColor }]}>
                             Ce code QR contient un lien de vérification sécurisé vers votre ticket.
                         </Text>
-                    </View>
+                    </View> */}
                 </View>
             </ScrollView>
         </View>
@@ -135,16 +142,20 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     scrollContent: {
-        padding: 16,
-        paddingTop: 32,
+        // padding: 16,
+        // paddingTop: 32,
         alignItems: 'center',
+        justifyContent: 'center',
+        flexGrow: 1,
     },
     mainCard: {
         borderRadius: 12,
         padding: 25,
         width: '100%',
         maxWidth: 400,
-        borderWidth: 1,
+        // borderWidth: 1,
+        // justifyContent: 'center',
+        // alignItems: 'center',
     },
     qrHeader: {
         flexDirection: 'row',
@@ -158,9 +169,9 @@ const styles = StyleSheet.create({
     },
     qrContainer: {
         alignItems: 'center',
-        padding: 20,
+        padding: 30,
         borderRadius: 12,
-        marginBottom: 24,
+        // marginBottom: 24,
         // borderWidth: 1,
         // borderColor: "red",
         // shadowColor: '#000',
@@ -170,6 +181,7 @@ const styles = StyleSheet.create({
         // },
         // shadowOpacity: 0.1,
         // shadowRadius: 4,
+        // borderWidth: 1,
         // elevation: 3,
     },
     qrPlaceholder: {
@@ -193,17 +205,18 @@ const styles = StyleSheet.create({
     },
     instructionRow: {
         flexDirection: 'row',
-        alignItems: 'flex-start',
-        marginBottom: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        // marginBottom: 12,
         gap: 12,
+        // borderWidth: 1,
+        // borderColor: 'red',
+        textAlign: 'center',
+        // marginTop: 24,
     },
     checkIcon: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
-        marginTop: 2,
     },
     instructionText: {
         flex: 1,
@@ -216,6 +229,13 @@ const styles = StyleSheet.create({
         fontFamily: 'Ubuntu_Regular',
         lineHeight: 18,
         marginLeft: 36,
+    },
+
+    checkIconImage: {
+        width: 40,
+        height: 40,
+        marginTop: 2,
+        resizeMode: 'cover',
     },
 });
 

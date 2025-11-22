@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { authGetUserInfo } from '@/api/auth_register';
 import { EmergencyContactBlock } from '@/components/passengers/EmergencyContactBlock';
 import { ErrorModal } from '@/components/passengers/ErrorModal';
 import { PassengersInfoBlock } from '@/components/passengers/PassengersInfoBlock';
@@ -8,9 +9,11 @@ import { SummaryBlock } from '@/components/passengers/SummaryBlock';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { SearchParams, Trip } from '@/types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
+    ActivityIndicator,
     Alert,
     Pressable,
     ScrollView,
@@ -30,13 +33,13 @@ const PassengersInfo = () => {
     const navigation = useNavigation();
     const insets = useSafeAreaInsets();
     const colorScheme = useColorScheme() ?? 'light';
-    
+
     // Couleurs dynamiques basées sur le thème
     const backgroundColor = useThemeColor({}, 'background');
     const textColor = useThemeColor({}, 'text');
     const iconColor = useThemeColor({}, 'icon');
     const tintColor = useThemeColor({}, 'tint');
-    
+
     // Couleurs spécifiques pour l'écran
     const cardBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
     const borderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
@@ -48,8 +51,13 @@ const PassengersInfo = () => {
     const progressDotBackgroundColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
 
     // Récupération des données passées en paramètre
-    const { trip, searchParams } = (route.params as { trip?: Trip, searchParams?: SearchParams }) || {};
+    const { trip, returnTrip, searchParams } = (route.params as {
+        trip?: Trip,
+        returnTrip?: Trip,
+        searchParams?: SearchParams
+    }) || {};
     const numberOfPersons = searchParams?.numberOfPersons || 1;
+    const isRoundTrip = !!returnTrip;
 
     // États pour les informations des passagers
     const [passengers, setPassengers] = useState(() => {
@@ -59,6 +67,7 @@ const PassengersInfo = () => {
                 firstName: i === 0 ? '' : '',
                 lastName: i === 0 ? '' : '',
                 phone: i === 0 ? '' : '',
+                email: i === 0 ? '' : '',
                 seatNumber: null as number | null,
                 passengerType: 'adult' as string, // Type de passager par défaut
             });
@@ -68,7 +77,7 @@ const PassengersInfo = () => {
 
     // États pour les informations de contact
     const [contactPhone, setContactPhone] = useState('');
-    const [contactEmail, setContactEmail] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
 
     // États pour le contact d'urgence
     const [emergencyContact, setEmergencyContact] = useState({
@@ -86,7 +95,7 @@ const PassengersInfo = () => {
     const [showSelectionBottomSheet, setShowSelectionBottomSheet] = useState(false);
     const [selectionType, setSelectionType] = useState<'passengerType' | 'relation' | null>(null);
     const [selectionTitle, setSelectionTitle] = useState('');
-    const [selectionOptions, setSelectionOptions] = useState<Array<{value: string, label: string}>>([]);
+    const [selectionOptions, setSelectionOptions] = useState<Array<{ value: string, label: string }>>([]);
     const [currentSelectionValue, setCurrentSelectionValue] = useState<string>('');
     const [onSelectionCallback, setOnSelectionCallback] = useState<((value: string) => void) | null>(null);
 
@@ -104,10 +113,13 @@ const PassengersInfo = () => {
 
     /**
      * Calcule le prix total pour tous les voyageurs
+     * Inclut le prix du voyage retour si c'est un aller-retour
      */
     const totalPrice = useMemo(() => {
-        return trip.price * numberOfPersons;
-    }, [trip.price, numberOfPersons]);
+        const outboundPrice = trip.price * numberOfPersons;
+        const returnPrice = returnTrip ? returnTrip.price * numberOfPersons : 0;
+        return outboundPrice + returnPrice;
+    }, [trip.price, returnTrip?.price, numberOfPersons]);
 
     /**
      * Calcule les frais
@@ -142,15 +154,15 @@ const PassengersInfo = () => {
         // Validation des passagers
         passengers.forEach((passenger, index) => {
             const passengerNumber = passengers.length > 1 ? ` ${index + 1}` : '';
-            
+
             if (!passenger.firstName || passenger.firstName.trim() === '') {
                 errors.push(`Le prénom du passager ${passengerNumber} est requis`);
             }
-            
+
             if (!passenger.lastName || passenger.lastName.trim() === '') {
                 errors.push(`Le nom du passager ${passengerNumber} est requis`);
             }
-            
+
             if (!passenger.phone || passenger.phone.trim() === '') {
                 errors.push(`Le téléphone du passager ${passengerNumber} est requis`);
             }
@@ -164,19 +176,39 @@ const PassengersInfo = () => {
             }
         });
 
+        // Validation des emails distincts entre les passagers
+        const emailMap = new Map<string, number[]>();
+        passengers.forEach((passenger, index) => {
+            const email = passenger.email?.trim();
+            if (email && email !== '') {
+                if (!emailMap.has(email)) {
+                    emailMap.set(email, []);
+                }
+                emailMap.get(email)!.push(index);
+            }
+        });
+
+        // Vérifier s'il y a des emails en double
+        emailMap.forEach((indices, email) => {
+            if (indices.length > 1) {
+                const passengerNumbers = indices.map(i => passengers.length > 1 ? ` ${i + 1}` : '').join(', ');
+                errors.push(`L'email "${email}" est utilisé par plusieurs passagers (${passengerNumbers})`);
+            }
+        });
+
         // Validation du contact d'urgence
         if (!emergencyContact.firstName || emergencyContact.firstName.trim() === '') {
             errors.push('Le prénom du contact d\'urgence est requis');
         }
-        
+
         if (!emergencyContact.lastName || emergencyContact.lastName.trim() === '') {
             errors.push('Le nom du contact d\'urgence est requis');
         }
-        
+
         if (!emergencyContact.phone || emergencyContact.phone.trim() === '') {
             errors.push('Le téléphone du contact d\'urgence est requis');
         }
-        
+
         if (!emergencyContact.relation || emergencyContact.relation.trim() === '') {
             errors.push('La relation avec le contact d\'urgence est requise');
         }
@@ -195,7 +227,7 @@ const PassengersInfo = () => {
     const handleConfirmAndPay = () => {
         // Validation des champs requis
         const validationErrors = validateForm();
-        
+
         if (validationErrors) {
             console.warn('Erreurs de validation:', validationErrors);
             // setValidationErrors(validationErrors);
@@ -211,6 +243,7 @@ const PassengersInfo = () => {
             firstName: passenger.firstName.trim(),
             lastName: passenger.lastName.trim(),
             phone: passenger.phone.trim(),
+            email: passenger.email?.trim() || null,
             passengerType: passenger.passengerType,
             seatNumber: passenger.seatNumber
         }));
@@ -236,6 +269,14 @@ const PassengersInfo = () => {
                 company: trip.company,
                 companyId: trip.companyId,
             },
+            returnTrip: returnTrip ? {
+                id: returnTrip.id,
+                departureCity: returnTrip.departureCity,
+                arrivalCity: returnTrip.arrivalCity,
+                price: returnTrip.price,
+                company: returnTrip.company,
+                companyId: returnTrip.companyId,
+            } : null,
             summary: {
                 numberOfPersons: numberOfPersons,
                 totalPrice: totalPrice,
@@ -258,7 +299,7 @@ const PassengersInfo = () => {
     const openSelectionBottomSheet = (
         type: 'passengerType' | 'relation',
         title: string,
-        options: Array<{value: string, label: string}>,
+        options: Array<{ value: string, label: string }>,
         currentValue: string,
         onSelect: (value: string) => void
     ) => {
@@ -292,13 +333,74 @@ const PassengersInfo = () => {
         closeSelectionBottomSheet();
     };
 
+    const userCheckSession = async () => {
+        const token = await AsyncStorage.getItem('token');
+        const userId = await AsyncStorage.getItem('user_id');
+        // console.log('response user info: ', response);
+
+        if (token && userId) {
+            try {
+                setIsLoading(true);
+                const response = await authGetUserInfo(userId, token);
+                console.log('response user info firstName: ', response.data.firstName);
+                if (response.status === 200) {
+                    // Mettre à jour uniquement les informations du passager principal (index 0) avec les informations de l'utilisateur
+                    setPassengers(prev => {
+                        const updated = prev.map((passenger, index) => {
+                            if (index === 0) {
+                                return {
+                                    firstName: response?.data?.firstName || '',
+                                    lastName: response?.data?.lastName || '',
+                                    phone: response?.data?.phones[0]?.digits || '',
+                                    email: response?.data?.email || '',
+                                    passengerType: 'adult',
+                                    seatNumber: null
+                                };
+                            }
+                            return { ...passenger };
+                        });
+                        return updated;
+                    });
+                    setContactPhone(response?.data?.phones[0]?.digits || '');
+                    setEmergencyContact({
+                        firstName: response?.data?.contactUrgent?.fullName?.split(' ')[0] || '',
+                        lastName: response?.data?.contactUrgent?.fullName?.split(' ')[1] || '',
+                        phone: response?.data?.contactUrgent?.phone || '',
+                        email: response?.data?.email || '',
+                        // relation: response?.data?.contactUrgent?.relation || 'Autre'
+                    });
+                    setIsLoading(false);
+                    return false;
+                }
+
+                console.log('Erreur lors de la récupération des informations de l\'utilisateur');
+                setIsLoading(false);
+                // Alert.alert('Erreur', 'Une erreur est survenue lors de la récupération des informations de l\'utilisateur');
+            } catch (error) {
+                console.log('Erreur lors de la récupération des informations de l\'utilisateur ==> ,', error);
+                setIsLoading(false);
+            }
+        }
+    };
+
+    useEffect(() => {
+        userCheckSession();
+    }, []);
+
 
     return (
         <View style={[styles.container, { backgroundColor: scrollBackgroundColor }]}>
+            
+            {isLoading && (
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color={tintColor} />
+                </View>
+            )}
+
             {/* Header */}
             <View style={[
-                styles.header, 
-                { 
+                styles.header,
+                {
                     paddingTop: insets.top,
                     backgroundColor: headerBackgroundColor,
                     borderBottomColor: headerBorderColor
@@ -311,9 +413,12 @@ const PassengersInfo = () => {
                     <Icon name="arrow-left" size={25} color={iconColor} />
                 </Pressable>
 
-                <View style={styles.routeBadge}>
+                <View style={[styles.routeBadge, { width: '250' }]}>
                     <Text style={[styles.routeBadgeText, { color: tintColor }]}>
                         {trip.departureCity} <Icon name="chevron-right" size={15} color={tintColor} /> {trip.arrivalCity}
+                        {isRoundTrip && returnTrip && (
+                            <> <Icon name="chevron-right" size={15} color={tintColor} /> {returnTrip.arrivalCity}</>
+                        )}
                     </Text>
                 </View>
 
@@ -358,9 +463,7 @@ const PassengersInfo = () => {
                     {/* Section 1 : Informations du passager */}
                     <PassengersInfoBlock
                         passengers={passengers}
-                        contactEmail={contactEmail}
                         onUpdatePassenger={updatePassenger}
-                        onUpdateContactEmail={setContactEmail}
                         onOpenBottomSheet={openSelectionBottomSheet}
                     />
 
@@ -389,9 +492,9 @@ const PassengersInfo = () => {
 
             {/* Bouton fixe en bas de l'écran */}
             <View style={[
-                styles.fixedButtonContainer, 
-                { 
-                    paddingBottom: insets.bottom + 8, 
+                styles.fixedButtonContainer,
+                {
+                    paddingBottom: insets.bottom + 8,
                     paddingTop: 15,
                     backgroundColor: headerBackgroundColor,
                     borderTopColor: headerBorderColor

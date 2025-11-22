@@ -100,7 +100,7 @@ const TripSearch = () => {
         try {
             setLoadingCities(true);
             const response = await getCities();
-            console.log('Les villes disponibles : ', response?.data);
+            // console.log('Les villes disponibles : ', response?.data);
             setCities(response?.data || []);
         } catch (error: any) {
             console.error('Erreur dans la récupération des villes : ', error);
@@ -217,6 +217,19 @@ const TripSearch = () => {
     };
 
     /**
+     * Formate une date au format YYYY-MM-DD
+     * @param date - La date à formater
+     * @returns string - La date formatée au format YYYY-MM-DD ou une chaîne vide si la date est null
+     */
+    const formatDateToYYYYMMDD = (date: Date | null): string => {
+        if (!date) return '';
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    /**
      * Gère la recherche de trajet
      * @returns void
      */
@@ -234,19 +247,28 @@ const TripSearch = () => {
             return;
         }
 
-        const queryParams = `page=1&pageSize=10&cityFromId=${departureCity?.id}&cityToId=${arrivalCity?.id}&dateFrom=${departureDate?.toISOString()}&dateTo=${returnDate?.toISOString() || ''}&companyId=&passengerCount=${numberOfPersons}`;
+        const queryParams = `page=1&pageSize=10&cityFromId=${departureCity?.id}&cityToId=${arrivalCity?.id}&dateFrom=${formatDateToYYYYMMDD(departureDate)}&dateTo=&companyId=&passengerCount=${numberOfPersons}`;
 
         setLoadingDepartures(true);
         const response = await getAvailableDepartures(queryParams).catch((error: any) => {
             setLoadingDepartures(false);
-            console.error('Erreur dans la récupération des départs : ', error);
+            // console.error('Erreur dans la récupération des départs : ', error);
             Alert.alert('Attention !', 'Une erreur est survenue lors de la recherche des départs');
             return null;
         });
         console.log('Les départs disponibles : ', response?.data);
         setLoadingDepartures(false);
         if (response?.data?.items?.length > 0) {
-            navigation.navigate('trip/trip-list', { departures: response?.data, searchParams: { numberOfPersons } });
+            navigation.navigate('trip/trip-list', { 
+                departures: response?.data, 
+                searchParams: { 
+                    numberOfPersons,
+                    tripType: typeDeparture,
+                    departureCity: departureCity,
+                    arrivalCity: arrivalCity,
+                    returnDate: returnDate
+                } 
+            });
         } else {
             Alert.alert('Information !', 'Aucun départ disponible pour la recherche, veuillez ajuster vos filtres de recherche.');
         }

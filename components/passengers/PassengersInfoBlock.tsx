@@ -12,15 +12,14 @@ interface Passenger {
     firstName: string;
     lastName: string;
     phone: string;
+    email: string;
     seatNumber: number | null;
     passengerType: string;
 }
 
 interface PassengersInfoBlockProps {
     passengers: Passenger[];
-    contactEmail: string;
     onUpdatePassenger: (index: number, field: string, value: string | number) => void;
-    onUpdateContactEmail: (email: string) => void;
     onOpenBottomSheet: (
         type: 'passengerType' | 'relation',
         title: string,
@@ -35,9 +34,7 @@ interface PassengersInfoBlockProps {
  */
 export const PassengersInfoBlock = ({
     passengers,
-    contactEmail,
     onUpdatePassenger,
-    onUpdateContactEmail,
     onOpenBottomSheet
 }: PassengersInfoBlockProps) => {
     const colorScheme = useColorScheme() ?? 'light';
@@ -95,8 +92,8 @@ export const PassengersInfoBlock = ({
 
                     <FormField
                         label="Email (optionnel)"
-                        value={contactEmail}
-                        onChangeText={onUpdateContactEmail}
+                        value={passenger.email || ''}
+                        onChangeText={(text) => onUpdatePassenger(index, 'email', text)}
                         placeholder="exemple@email.com"
                         keyboardType="email-address"
                     />
