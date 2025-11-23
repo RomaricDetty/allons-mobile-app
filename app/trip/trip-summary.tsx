@@ -135,7 +135,7 @@ const TripSummary = () => {
                     <Icon name="arrow-left" size={25} color={iconColor} />
                 </Pressable>
 
-                <View style={[styles.routeBadge, {width: '250'}]}>
+                <View style={[styles.routeBadge, {width: '200'}]}>
                     <Text style={[styles.routeBadgeText, { color: tintColor }]}>
                         {trip.departureCity} <Icon name="chevron-right" size={15} color={tintColor} /> {trip.arrivalCity}
                         {isRoundTrip && returnTrip && (

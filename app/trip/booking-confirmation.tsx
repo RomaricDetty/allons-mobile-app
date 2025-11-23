@@ -1,16 +1,17 @@
 // @ts-nocheck
-import { formatFullDate, formatStatus, getStatusColor } from '@/constants/functions';
+import { formatFullDate, formatFullDateWithTime, formatStatus, getStatusColor } from '@/constants/functions';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
-import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
+import { useRoute } from '@react-navigation/native';
 import * as FileSystemLegacy from 'expo-file-system/legacy';
 import * as Print from 'expo-print';
 import { router } from 'expo-router';
 import * as Sharing from 'expo-sharing';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    BackHandler,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -27,7 +28,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
  */
 const BookingConfirmation = () => {
     const route = useRoute();
-    const navigation = useNavigation();
+    // const navigation = useNavigation();
     const insets = useSafeAreaInsets();
     const colorScheme = useColorScheme() ?? 'light';
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
@@ -261,28 +262,30 @@ const BookingConfirmation = () => {
         };
     }, [bookingResponse, paymentResponse, trip, returnTrip, passengers]);
 
+
     /**
      * Empêche le retour en arrière depuis cet écran
-     * Intercepte toutes les tentatives de navigation en arrière
-     */
-    useFocusEffect(
-        useCallback(() => {
-            // Intercepter les tentatives de retour en arrière
-            const unsubscribe = navigation.addListener('beforeRemove', (e) => {
-                // Empêcher le retour en arrière
-                e.preventDefault();
-            });
+     * Bloque le bouton retour hardware sur Android et le geste de retour
+    */
+    useEffect(() => {
+        const backHandler = BackHandler.addEventListener(
+            'hardwareBackPress',
+            () => {
+                // Bloquer complètement le retour arrière
+                console.log('Back button pressed - navigation blocked');
+                return true; // true = empêcher l'action par défaut
+            }
+        );
 
-            return unsubscribe;
-        }, [navigation])
-    );
+        // Cleanup lors du démontage du composant
+        return () => backHandler.remove();
+    }, []);
 
     /**
-     * Navigue vers l'écran d'accueil en réinitialisant la pile de navigation
+     * Navigue vers l'écran d'accueil en réinitialisant complètement la pile de navigation
+     * L'utilisateur ne pourra pas revenir en arrière sur cet écran de confirmation
      */
     const handleNavigateToHome = () => {
-        console.log('handleNavigateToHome');
-        // Utiliser router d'Expo Router pour naviguer vers l'accueil
         router.replace('/(tabs)');
     };
 
@@ -616,12 +619,33 @@ const BookingConfirmation = () => {
                         </div>
                         ` : ''}
 
-                        <!-- Passagers -->
+                        ${bookingData.returnTrip ? `
+                        <!-- Passagers - Voyage aller -->
                         <div class="section">
-                            <div class="section-title">PASSAGERS (${bookingData.passengers.length})</div>
+                            <div class="section-title">PASSAGERS - VOYAGE ALLER (${bookingData.passengers.length})</div>
                             ${bookingData.passengers.map((passenger: any, index: number) => {
-                                const isRoundTrip = bookingData.trip.type === 'ROUND_TRIP';
                                 const hasOutboundSeat = passenger.seatNumber !== null && passenger.seatNumber !== undefined;
+                                
+                                return `
+                                    <div class="passenger-card">
+                                        <div class="passenger-name">${index + 1}. ${passenger.firstName} ${passenger.lastName}</div>
+                                        ${passenger.phone ? `<div class="passenger-detail">Tel: ${passenger.phone}</div>` : ''}
+                                        ${passenger.email ? `<div class="passenger-detail">Email: ${passenger.email}</div>` : ''}
+                                        ${hasOutboundSeat ? `
+                                            <div class="seat-info">
+                                                <div class="seat-label">Siège</div>
+                                                <div class="seat-number">${passenger.seatNumber}</div>
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+
+                        <!-- Passagers - Voyage retour -->
+                        <div class="section">
+                            <div class="section-title">PASSAGERS - VOYAGE RETOUR (${bookingData.passengers.length})</div>
+                            ${bookingData.passengers.map((passenger: any, index: number) => {
                                 const hasReturnSeat = passenger.seatNumberReturn !== null && passenger.seatNumberReturn !== undefined;
                                 
                                 return `
@@ -629,22 +653,39 @@ const BookingConfirmation = () => {
                                         <div class="passenger-name">${index + 1}. ${passenger.firstName} ${passenger.lastName}</div>
                                         ${passenger.phone ? `<div class="passenger-detail">Tel: ${passenger.phone}</div>` : ''}
                                         ${passenger.email ? `<div class="passenger-detail">Email: ${passenger.email}</div>` : ''}
-                                        ${hasOutboundSeat || hasReturnSeat ? `
+                                        ${hasReturnSeat ? `
                                             <div class="seat-info">
-                                                ${hasOutboundSeat ? `
-                                                    <div class="seat-label">${isRoundTrip ? 'Siège aller' : 'Siège'}</div>
-                                                    <div class="seat-number">${passenger.seatNumber}</div>
-                                                ` : ''}
-                                                ${hasReturnSeat && isRoundTrip ? `
-                                                    <div class="seat-label" style="margin-top: 8px;">Siège retour</div>
-                                                    <div class="seat-number">${passenger.seatNumberReturn}</div>
-                                                ` : ''}
+                                                <div class="seat-label">Siège</div>
+                                                <div class="seat-number">${passenger.seatNumberReturn}</div>
                                             </div>
                                         ` : ''}
                                     </div>
                                 `;
                             }).join('')}
                         </div>
+                        ` : `
+                        <!-- Passagers -->
+                        <div class="section">
+                            <div class="section-title">PASSAGERS (${bookingData.passengers.length})</div>
+                            ${bookingData.passengers.map((passenger: any, index: number) => {
+                                const hasOutboundSeat = passenger.seatNumber !== null && passenger.seatNumber !== undefined;
+                                
+                                return `
+                                    <div class="passenger-card">
+                                        <div class="passenger-name">${index + 1}. ${passenger.firstName} ${passenger.lastName}</div>
+                                        ${passenger.phone ? `<div class="passenger-detail">Tel: ${passenger.phone}</div>` : ''}
+                                        ${passenger.email ? `<div class="passenger-detail">Email: ${passenger.email}</div>` : ''}
+                                        ${hasOutboundSeat ? `
+                                            <div class="seat-info">
+                                                <div class="seat-label">Siège</div>
+                                                <div class="seat-number">${passenger.seatNumber}</div>
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                        `}
 
                         <!-- Détails du paiement -->
                         <div class="section">
@@ -826,7 +867,9 @@ const BookingConfirmation = () => {
                 <View style={[styles.progressDot, { backgroundColor: '#4CAF50' }]}>
                     <Icon name="check" size={12} color="#FFFFFF" />
                 </View>
-                <View style={[styles.progressDot, { backgroundColor: tintColor }]} />
+                <View style={[styles.progressDot, { backgroundColor: '#4CAF50' }]}>
+                    <Icon name="check" size={12} color="#FFFFFF" />
+                </View>
             </View>
 
             <ScrollView
@@ -960,72 +1003,171 @@ const BookingConfirmation = () => {
                 )}
 
                 {/* Section: Passagers */}
-                <View style={[styles.sectionCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
-                    <View style={styles.sectionHeader}>
-                        <Icon name="account-group-outline" size={20} color={primaryBlue} />
-                        <Text style={[styles.sectionTitle, { color: textColor }]}>
-                            {bookingData.passengers.length > 1 ? 'Passagers' : 'Passager'} ({bookingData.passengers.length})
-                        </Text>
-                    </View>
-                    {bookingData.passengers.map((passenger: any, index: number) => {
-                        const hasOutboundSeat = passenger.seatNumber !== null && passenger.seatNumber !== undefined;
-                        const hasReturnSeat = passenger.seatNumberReturn !== null && passenger.seatNumberReturn !== undefined;
-                        const isRoundTrip = bookingData.trip.type === 'ROUND_TRIP';
-                        
-                        return (
-                            <View
-                                key={index}
-                                style={[
-                                    styles.passengerCard,
-                                    {
-                                        backgroundColor: colorScheme === 'dark' ? '#2C2C2E' : '#F5F5F5',
-                                        borderColor: borderColor
-                                    }
-                                ]}
-                            >
-                                <View style={styles.passengerInfo}>
-                                    <Text style={[styles.passengerName, { color: textColor }]}>
-                                        {passenger.firstName} {passenger.lastName}
-                                    </Text>
-                                    {passenger.email && (
-                                        <Text style={[styles.passengerDetail, { color: secondaryTextColor }]}>
-                                            {passenger.email}
-                                        </Text>
-                                    )}
-                                    {passenger.phone && (
-                                        <Text style={[styles.passengerDetail, { color: secondaryTextColor }]}>
-                                            {passenger.phone}
-                                        </Text>
-                                    )}
-                                </View>
-                                {(hasOutboundSeat || hasReturnSeat) && (
-                                    <View style={styles.seatInfo}>
+                {bookingData.returnTrip ? (
+                    <>
+                        {/* Passagers - Voyage aller */}
+                        <View style={[styles.sectionCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
+                            <View style={styles.sectionHeader}>
+                                <Icon name="account-group-outline" size={20} color={primaryBlue} />
+                                <Text style={[styles.sectionTitle, { color: textColor }]}>
+                                    Passagers - Voyage aller ({bookingData.passengers.length})
+                                </Text>
+                            </View>
+                            {bookingData.passengers.map((passenger: any, index: number) => {
+                                const hasOutboundSeat = passenger.seatNumber !== null && passenger.seatNumber !== undefined;
+                                
+                                return (
+                                    <View
+                                        key={`outbound-${index}`}
+                                        style={[
+                                            styles.passengerCard,
+                                            {
+                                                backgroundColor: colorScheme === 'dark' ? '#2C2C2E' : '#F5F5F5',
+                                                borderColor: borderColor
+                                            }
+                                        ]}
+                                    >
+                                        <View style={styles.passengerInfo}>
+                                            <Text style={[styles.passengerName, { color: textColor }]}>
+                                                {passenger.firstName} {passenger.lastName}
+                                            </Text>
+                                            {passenger.email && (
+                                                <Text style={[styles.passengerDetail, { color: secondaryTextColor }]}>
+                                                    {passenger.email}
+                                                </Text>
+                                            )}
+                                            {passenger.phone && (
+                                                <Text style={[styles.passengerDetail, { color: secondaryTextColor }]}>
+                                                    {passenger.phone}
+                                                </Text>
+                                            )}
+                                        </View>
                                         {hasOutboundSeat && (
+                                            <View style={styles.seatInfo}>
+                                                <View style={styles.seatInfoItem}>
+                                                    <Text style={[styles.seatLabel, { color: secondaryTextColor }]}>
+                                                        Siège
+                                                    </Text>
+                                                    <Text style={[styles.seatNumber, { color: primaryBlue }]}>
+                                                        {passenger.seatNumber}
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                        )}
+                                    </View>
+                                );
+                            })}
+                        </View>
+
+                        {/* Passagers - Voyage retour */}
+                        <View style={[styles.sectionCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
+                            <View style={styles.sectionHeader}>
+                                <Icon name="account-group-outline" size={20} color={primaryBlue} />
+                                <Text style={[styles.sectionTitle, { color: textColor }]}>
+                                    Passagers - Voyage retour ({bookingData.passengers.length})
+                                </Text>
+                            </View>
+                            {bookingData.passengers.map((passenger: any, index: number) => {
+                                const hasReturnSeat = passenger.seatNumberReturn !== null && passenger.seatNumberReturn !== undefined;
+                                
+                                return (
+                                    <View
+                                        key={`return-${index}`}
+                                        style={[
+                                            styles.passengerCard,
+                                            {
+                                                backgroundColor: colorScheme === 'dark' ? '#2C2C2E' : '#F5F5F5',
+                                                borderColor: borderColor
+                                            }
+                                        ]}
+                                    >
+                                        <View style={styles.passengerInfo}>
+                                            <Text style={[styles.passengerName, { color: textColor }]}>
+                                                {passenger.firstName} {passenger.lastName}
+                                            </Text>
+                                            {passenger.email && (
+                                                <Text style={[styles.passengerDetail, { color: secondaryTextColor }]}>
+                                                    {passenger.email}
+                                                </Text>
+                                            )}
+                                            {passenger.phone && (
+                                                <Text style={[styles.passengerDetail, { color: secondaryTextColor }]}>
+                                                    {passenger.phone}
+                                                </Text>
+                                            )}
+                                        </View>
+                                        {hasReturnSeat && (
+                                            <View style={styles.seatInfo}>
+                                                <View style={styles.seatInfoItem}>
+                                                    <Text style={[styles.seatLabel, { color: secondaryTextColor }]}>
+                                                        Siège
+                                                    </Text>
+                                                    <Text style={[styles.seatNumber, { color: primaryBlue }]}>
+                                                        {passenger.seatNumberReturn}
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                        )}
+                                    </View>
+                                );
+                            })}
+                        </View>
+                    </>
+                ) : (
+                    /* Passagers - Voyage simple */
+                    <View style={[styles.sectionCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
+                        <View style={styles.sectionHeader}>
+                            <Icon name="account-group-outline" size={20} color={primaryBlue} />
+                            <Text style={[styles.sectionTitle, { color: textColor }]}>
+                                {bookingData.passengers.length > 1 ? 'Passagers' : 'Passager'} ({bookingData.passengers.length})
+                            </Text>
+                        </View>
+                        {bookingData.passengers.map((passenger: any, index: number) => {
+                            const hasOutboundSeat = passenger.seatNumber !== null && passenger.seatNumber !== undefined;
+                            
+                            return (
+                                <View
+                                    key={index}
+                                    style={[
+                                        styles.passengerCard,
+                                        {
+                                            backgroundColor: colorScheme === 'dark' ? '#2C2C2E' : '#F5F5F5',
+                                            borderColor: borderColor
+                                        }
+                                    ]}
+                                >
+                                    <View style={styles.passengerInfo}>
+                                        <Text style={[styles.passengerName, { color: textColor }]}>
+                                            {passenger.firstName} {passenger.lastName}
+                                        </Text>
+                                        {passenger.email && (
+                                            <Text style={[styles.passengerDetail, { color: secondaryTextColor }]}>
+                                                {passenger.email}
+                                            </Text>
+                                        )}
+                                        {passenger.phone && (
+                                            <Text style={[styles.passengerDetail, { color: secondaryTextColor }]}>
+                                                {passenger.phone}
+                                            </Text>
+                                        )}
+                                    </View>
+                                    {hasOutboundSeat && (
+                                        <View style={styles.seatInfo}>
                                             <View style={styles.seatInfoItem}>
                                                 <Text style={[styles.seatLabel, { color: secondaryTextColor }]}>
-                                                    {isRoundTrip ? 'Siège aller' : 'Siège'}
+                                                    Siège
                                                 </Text>
                                                 <Text style={[styles.seatNumber, { color: primaryBlue }]}>
                                                     {passenger.seatNumber}
                                                 </Text>
                                             </View>
-                                        )}
-                                        {hasReturnSeat && isRoundTrip && (
-                                            <View style={[styles.seatInfoItem, { marginTop: hasOutboundSeat ? 8 : 0 }]}>
-                                                <Text style={[styles.seatLabel, { color: secondaryTextColor }]}>
-                                                    Siège retour
-                                                </Text>
-                                                <Text style={[styles.seatNumber, { color: primaryBlue }]}>
-                                                    {passenger.seatNumberReturn}
-                                                </Text>
-                                            </View>
-                                        )}
-                                    </View>
-                                )}
-                            </View>
-                        );
-                    })}
-                </View>
+                                        </View>
+                                    )}
+                                </View>
+                            );
+                        })}
+                    </View>
+                )}
 
                 {/* Section: Détails du paiement */}
                 <View style={[styles.sectionCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
@@ -1082,7 +1224,7 @@ const BookingConfirmation = () => {
                     <View style={styles.detailRow}>
                         <Text style={[styles.detailLabel, { color: secondaryTextColor }]}>Date de réservation</Text>
                         <Text style={[styles.detailValue, { color: textColor, textAlign: 'right', width: '45%' }]}>
-                            {formatFullDate(bookingData.createdAt)}
+                            {formatFullDateWithTime(bookingData.createdAt)}
                         </Text>
                     </View>
                 </View>

@@ -124,7 +124,7 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
         const token = await AsyncStorage.getItem('token');
         const userId = await AsyncStorage.getItem('user_id');
         const response = await authGetUserInfo(userId, token);
-        // console.log('response user info: ', response);
+        console.log('response user info ======> ', response.data);
         if (response.status === 200) {
             return response.data;
         } else {
@@ -209,6 +209,13 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
      */
     const handleUpdateUserInfo = () => {
         router.push('/profile/edit');
+    };
+
+    /**
+     * Capitalise la première lettre d'une chaîne
+     */
+    const capitalizeFirstLetter = (string: string) => {
+        return string ? string.charAt(0).toUpperCase() + string.slice(1) : '';
     };
 
     /**
@@ -322,8 +329,8 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                     <View style={[styles.emergencySection, { borderTopColor: borderColor }]}>
                         <Text style={[styles.sectionTitle, { color: textColor }]}>Contact d'urgence</Text>
                         <View style={[styles.emergencyInfo, { backgroundColor: emergencyInfoBackgroundColor }]}>
-                            <Text style={[styles.emergencyName, { color: textColor }]}>{user?.contactUrgent.fullName}</Text>
-                            <Text style={[styles.emergencyPhone, { color: secondaryTextColor }]}>{user?.contactUrgent.phone}</Text>
+                            <Text style={[styles.emergencyName, { color: textColor }]}>{user?.contactUrgent?.fullName}</Text>
+                            <Text style={[styles.emergencyPhone, { color: secondaryTextColor }]}>{user?.contactUrgent?.phone}</Text>
                         </View>
                     </View>
                 )}
@@ -347,7 +354,11 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                     <MaterialCommunityIcons name="wallet" size={24} color="#4CAF50" />
                     <View style={styles.statsContent}>
                         <Text style={[styles.statsLabel, { color: secondaryTextColor }]}>Type de client</Text>
-                        <Text style={[styles.clientTypeValue, { color: '#4CAF50' }]}>{user?.customerProfile?.loyaltyTier ?? 'bronze'}</Text>
+                        <Text style={[styles.clientTypeValue, { color: '#4CAF50' }]}>
+                            {user?.customerProfile?.loyaltyTier && user.customerProfile.loyaltyTier.trim()
+                                ? user.customerProfile.loyaltyTier.charAt(0).toUpperCase() + user.customerProfile.loyaltyTier.slice(1).toLowerCase()
+                                : 'Bronze'}
+                        </Text>
                     </View>
                 </View>
 
@@ -992,7 +1003,6 @@ const styles = StyleSheet.create({
     clientTypeValue: {
         fontSize: 24,
         fontFamily: 'Ubuntu_Bold',
-        textTransform: 'lowercase',
     },
     coinsCard: {
         borderRadius: 12,

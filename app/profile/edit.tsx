@@ -69,6 +69,7 @@ export default function EditProfileScreen() {
         street: '',
         city: '',
         postalCode: '',
+        emergencyContactFirstName: '',
         emergencyContactName: '',
         emergencyContactFullName: '',
         emergencyContactPhone: '',
@@ -142,6 +143,20 @@ export default function EditProfileScreen() {
                         emergencyPhone = emergencyPhone.replace('+225', '');
                     }
                     
+                    // Extraire le nom et prénom du contact d'urgence depuis fullName
+                    const fullName = userData.contactUrgent?.fullName || '';
+                    let emergencyFirstName = '';
+                    let emergencyLastName = '';
+                    if (fullName.trim()) {
+                        const firstSpaceIndex = fullName.indexOf(' ');
+                        if (firstSpaceIndex !== -1) {
+                            emergencyFirstName = fullName.substring(0, firstSpaceIndex).trim();
+                            emergencyLastName = fullName.substring(firstSpaceIndex + 1).trim();
+                        } else {
+                            emergencyFirstName = fullName.trim();
+                        }
+                    }
+                    
                     setFormData({
                         firstName: userData.firstName || '',
                         lastName: userData.lastName || '',
@@ -151,8 +166,9 @@ export default function EditProfileScreen() {
                         street: street,
                         city: city,
                         postalCode: '', // Non disponible dans l'interface User actuelle
-                        emergencyContactName: userData.contactUrgent?.fullName?.split(' ')[0] || '',
-                        emergencyContactFullName: userData.contactUrgent?.fullName || '',
+                        emergencyContactFirstName: emergencyFirstName,
+                        emergencyContactName: emergencyLastName,
+                        emergencyContactFullName: fullName,
                         emergencyContactPhone: emergencyPhone,
                     });
                 }
@@ -469,27 +485,45 @@ export default function EditProfileScreen() {
                             <SectionHeader number={3} title="Contact d'urgence" />
 
                             <FormField
-                                label="Nom du contact d'urgence"
-                                value={formData.emergencyContactName}
-                                onChangeText={(text) =>
+                                label="Nom complet du contact d'urgence"
+                                value={formData.emergencyContactFullName}
+                                onChangeText={(text) => {
+                                    // Split sur le premier espace trouvé
+                                    const firstSpaceIndex = text.indexOf(' ');
+                                    let firstName = '';
+                                    let lastName = '';
+                                    
+                                    if (firstSpaceIndex !== -1) {
+                                        // Si un espace est trouvé, première partie = prénom, reste = nom
+                                        firstName = text.substring(0, firstSpaceIndex).trim();
+                                        lastName = text.substring(firstSpaceIndex + 1).trim();
+                                    } else {
+                                        // Si pas d'espace, tout va dans le prénom
+                                        firstName = text.trim();
+                                    }
+                                    
                                     setFormData((prev) => ({
                                         ...prev,
-                                        emergencyContactName: text,
-                                    }))
-                                }
-                                placeholder="Nom du contact urgent"
+                                        emergencyContactFullName: text,
+                                        emergencyContactFirstName: firstName,
+                                        emergencyContactName: lastName,
+                                    }));
+                                }}
+                                placeholder="Prénom Nom du contact urgent"
                             />
 
                             <FormField
                                 label="Prénom du contact d'urgence"
-                                value={formData.emergencyContactFullName}
-                                onChangeText={(text) =>
-                                    setFormData((prev) => ({
-                                        ...prev,
-                                        emergencyContactFullName: text,
-                                    }))
-                                }
-                                placeholder="Prénom du contact urgent"
+                                value={formData.emergencyContactFirstName}
+                                editable={false}
+                                placeholder="Prénom (rempli automatiquement)"
+                            />
+
+                            <FormField
+                                label="Nom du contact d'urgence"
+                                value={formData.emergencyContactName}
+                                editable={false}
+                                placeholder="Nom (rempli automatiquement)"
                             />
 
                             <PhoneField

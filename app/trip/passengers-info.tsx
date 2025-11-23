@@ -716,7 +716,7 @@ const PassengersInfo = () => {
                     <Icon name="arrow-left" size={25} color={iconColor} />
                 </Pressable>
 
-                <View style={[styles.routeBadge, { width: '250' }]}>
+                <View style={[styles.routeBadge, { width: '200' }]}>
                     <Text style={[styles.routeBadgeText, { color: tintColor }]}>
                         {trip.departureCity} <Icon name="chevron-right" size={15} color={tintColor} /> {trip.arrivalCity}
                         {isRoundTrip && returnTrip && (
@@ -1065,9 +1065,9 @@ const styles = StyleSheet.create({
     seatSelectionSection: {
         marginTop: 24,
         marginBottom: 24,
-        paddingTop: 24,
+        // paddingTop: 24,
         paddingBottom: 24,
-        borderTopWidth: 1,
+        // borderTopWidth: 1,
         borderBottomWidth: 1,
     },
     seatSelectionHeader: {

@@ -27,11 +27,11 @@ export const capitalizeBusType = (busType: string) => {
  */
 export const formatFullDate = (dateString: string): string => {
     const date = new Date(dateString);
-    const days = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+    const days = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
     const months = [
-        'janvier', 'février', 'mars', 'avril', 
-        'mai', 'juin', 'juillet', 'août', 'septembre', 
-        'octobre', 'novembre', 'décembre'
+        'Janvier', 'Février', 'Mars', 'Avril', 
+        'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 
+        'Octobre', 'Novembre', 'Décembre'
     ];
     const dayName = days[date.getDay()];
     const day = date.getDate();
@@ -39,6 +39,29 @@ export const formatFullDate = (dateString: string): string => {
     const year = date.getFullYear();
 
     return `${dayName} ${day} ${month} ${year}`;
+};
+
+/**
+ * Formate la date en français complet avec l'heure
+ */
+export const formatFullDateWithTime = (dateString: string): string => {
+    const date = new Date(dateString);
+    const days = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+    const months = [
+        'Janvier', 'Février', 'Mars', 'Avril', 
+        'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 
+        'Octobre', 'Novembre', 'Décembre'
+    ];
+    const dayName = days[date.getDay()];
+    const capitalizedDayName = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+    const day = date.getDate();
+    const month = months[date.getMonth()];
+    const capitalizedMonth = month.charAt(0).toUpperCase() + month.slice(1);
+    const year = date.getFullYear();
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+
+    return `${capitalizedDayName} ${day} ${capitalizedMonth} ${year} à ${hours}:${minutes}`;
 };
 
 /**
