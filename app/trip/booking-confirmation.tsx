@@ -782,7 +782,7 @@ const BookingConfirmation = () => {
             const dateFormatted = formatDateForFileName();
 
             // Définir le nom du fichier
-            const fileName = `Receipt-${bookingData.code}-${dateFormatted}.pdf`;
+            const fileName = `Invoice-${bookingData.code}-${dateFormatted}.pdf`;
 
             // Générer le PDF
             const { uri } = await Print.printToFileAsync({
