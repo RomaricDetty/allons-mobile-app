@@ -6,6 +6,8 @@ import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
 
+import { ConnectivityGuard } from '@/components/ConnectivityGuard';
+import { ConnectivityProvider } from '@/contexts/ConnectivityContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useEffect, useState } from 'react';
@@ -73,7 +75,9 @@ export default function RootLayout() {
 
     return (
         <ThemeProvider>
-            <RootContent />
+            <ConnectivityProvider>
+                <RootContent />
+            </ConnectivityProvider>
         </ThemeProvider>
     );
 }
@@ -85,23 +89,26 @@ function RootContent() {
     const colorScheme = useColorScheme();
     return (
         <NavigationThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-            <Stack>
-                <Stack.Screen name="index" options={{ headerShown: false }} />
-                <Stack.Screen name="onboard/index" options={{ headerShown: false }} />
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen name="trip/search" options={{ headerShown: false }} />
-                <Stack.Screen name="trip/trip-list" options={{ headerShown: false }} />
-                <Stack.Screen name="trip/trip-return-list" options={{ headerShown: false }} />
-                <Stack.Screen name="trip/trip-summary" options={{ headerShown: false }} />
-                <Stack.Screen name="trip/passengers-info" options={{ headerShown: false }} />
-                <Stack.Screen name="trip/seat-selection" options={{ headerShown: false }} />
-                <Stack.Screen name="trip/booking-confirmation" options={{ headerShown: false }} />
-                <Stack.Screen name="profile/edit" options={{ headerShown: false }} />
-                <Stack.Screen name="trip/ticket-details" options={{ headerShown: false }} />
-                <Stack.Screen name="trip/ticket-qr" options={{ headerShown: false }} />
-                {/* <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} /> */}
-            </Stack>
-            <StatusBar style="auto" />
+            <ConnectivityGuard>
+                <Stack>
+                    <Stack.Screen name="index" options={{ headerShown: false }} />
+                    <Stack.Screen name="onboard/index" options={{ headerShown: false }} />
+                    <Stack.Screen name="no-internet" options={{ headerShown: false }} />
+                    <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                    <Stack.Screen name="trip/search" options={{ headerShown: false }} />
+                    <Stack.Screen name="trip/trip-list" options={{ headerShown: false }} />
+                    <Stack.Screen name="trip/trip-return-list" options={{ headerShown: false }} />
+                    <Stack.Screen name="trip/trip-summary" options={{ headerShown: false }} />
+                    <Stack.Screen name="trip/passengers-info" options={{ headerShown: false }} />
+                    <Stack.Screen name="trip/seat-selection" options={{ headerShown: false }} />
+                    <Stack.Screen name="trip/booking-confirmation" options={{ headerShown: false }} />
+                    <Stack.Screen name="profile/edit" options={{ headerShown: false }} />
+                    <Stack.Screen name="trip/ticket-details" options={{ headerShown: false }} />
+                    <Stack.Screen name="trip/ticket-qr" options={{ headerShown: false }} />
+                    {/* <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} /> */}
+                </Stack>
+                <StatusBar style="auto" />
+            </ConnectivityGuard>
         </NavigationThemeProvider>
     );
 }
