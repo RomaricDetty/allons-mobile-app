@@ -2,9 +2,10 @@
 import { useConnectivity } from '@/contexts/ConnectivityContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
+import NetInfo from '@react-native-community/netinfo';
 import { router } from 'expo-router';
-import React, { useEffect } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
@@ -15,6 +16,7 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
  */
 export default function NoInternetScreen() {
     const { isConnected, isInternetReachable } = useConnectivity();
+    const [isChecking, setIsChecking] = useState(false);
     const insets = useSafeAreaInsets();
     const colorScheme = useColorScheme() ?? 'light';
     const backgroundColor = useThemeColor({}, 'background');
@@ -22,17 +24,57 @@ export default function NoInternetScreen() {
     const secondaryTextColor = useThemeColor({}, 'secondaryText');
     const iconColor = colorScheme === 'dark' ? '#9BA1A6' : '#9BA1A6';
 
-    // Redirige vers l'écran d'accueil dès que la connexion est rétablie
+    /**
+     * Redirige vers l'écran d'accueil dès que la connexion est rétablie
+     * Se base principalement sur isConnected car isInternetReachable peut être null/false
+     * même avec une connexion active
+     */
     useEffect(() => {
-        if (isConnected && isInternetReachable) {
+        console.log('--------------------------------');
+        console.log('[NoInternet] isConnected:', isConnected);
+
+        console.log('[NoInternet] isInternetReachable:', isInternetReachable);
+        
+        // Si isConnected est true, on considère qu'il y a une connexion
+        // isInternetReachable peut être null/false même avec une connexion active
+        if (isConnected) {
+            console.log('[NoInternet] Connexion détectée, redirection dans 1 seconde...');
             // Petit délai pour s'assurer que la connexion est stable
             const timer = setTimeout(() => {
+                console.log('[NoInternet] Redirection vers /(tabs)');
                 router.replace('/(tabs)');
             }, 1000);
 
-            return () => clearTimeout(timer);
+            return () => {
+                console.log('[NoInternet] Nettoyage du timer');
+                clearTimeout(timer);
+            };
         }
     }, [isConnected, isInternetReachable]);
+
+    /**
+     * Vérifie manuellement la connexion internet
+     * Force une nouvelle vérification de l'état de connectivité
+     */
+    const handleCheckConnection = async () => {
+        setIsChecking(true);
+        try {
+            const state = await NetInfo.fetch();
+            console.log('[NoInternet] Vérification manuelle - isConnected:', state.isConnected);
+            console.log('[NoInternet] Vérification manuelle - isInternetReachable:', state.isInternetReachable);
+            
+            // Si la connexion est détectée, rediriger
+            if (state.isConnected) {
+                setTimeout(() => {
+                    router.replace('/(tabs)');
+                }, 500);
+            }
+        } catch (error) {
+            console.error('[NoInternet] Erreur lors de la vérification:', error);
+        } finally {
+            setIsChecking(false);
+        }
+    };
 
     return (
         <View style={[styles.container, { paddingTop: insets.top, backgroundColor }]}>
@@ -56,13 +98,26 @@ export default function NoInternetScreen() {
                     Vérifiez votre connexion réseau et réessayez.
                 </Text>
 
-                {/* Indicateur de vérification */}
-                <View style={styles.checkingContainer}>
-                    <ActivityIndicator size="small" color="#1776BA" />
-                    <Text style={styles.checkingText}>
-                        Vérification de la connexion...
+                {/* Bouton de vérification manuelle */}
+                <TouchableOpacity
+                    style={[styles.checkButton, isChecking && styles.checkButtonDisabled]}
+                    onPress={handleCheckConnection}
+                    disabled={isChecking}
+                    activeOpacity={0.7}
+                >
+                    {isChecking ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                        <MaterialCommunityIcons
+                            name="refresh"
+                            size={20}
+                            color="#FFFFFF"
+                        />
+                    )}
+                    <Text style={styles.checkButtonText}>
+                        {isChecking ? 'Vérification...' : 'Réessayer'}
                     </Text>
-                </View>
+                </TouchableOpacity>
             </View>
         </View>
     );
@@ -95,15 +150,24 @@ const styles = StyleSheet.create({
         marginBottom: 40,
         lineHeight: 22,
     },
-    checkingContainer: {
+    checkButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 10,
+        justifyContent: 'center',
+        backgroundColor: '#1776BA',
+        paddingHorizontal: 24,
+        paddingVertical: 12,
+        borderRadius: 8,
+        gap: 8,
+        minWidth: 140,
     },
-    checkingText: {
-        fontSize: 14,
-        fontFamily: 'Ubuntu_Regular',
-        color: '#1776BA',
+    checkButtonDisabled: {
+        opacity: 0.6,
+    },
+    checkButtonText: {
+        fontSize: 16,
+        fontFamily: 'Ubuntu_Medium',
+        color: '#FFFFFF',
     },
 });
 

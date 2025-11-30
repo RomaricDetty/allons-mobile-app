@@ -27,8 +27,14 @@ export function ConnectivityGuard({ children }: ConnectivityGuardProps) {
             currentPath.startsWith(route)
         );
 
+        // Si on est sur no-internet et que la connexion revient, laisser NoInternetScreen gérer la redirection
+        if (currentPath === '/no-internet' && isConnected) {
+            return; // NoInternetScreen s'occupera de la redirection
+        }
+
         // Si pas de connexion et que la route nécessite internet, rediriger vers no-internet
-        if (requiresInternet && (!isConnected || !isInternetReachable)) {
+        // On se base principalement sur isConnected car isInternetReachable peut être null/false
+        if (requiresInternet && !isConnected) {
             if (currentPath !== '/no-internet') {
                 router.replace('/no-internet');
             }
