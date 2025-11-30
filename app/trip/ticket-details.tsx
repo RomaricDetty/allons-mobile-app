@@ -4,12 +4,14 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as FileSystemLegacy from 'expo-file-system/legacy';
+import * as MediaLibrary from 'expo-media-library';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    Platform,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -20,6 +22,7 @@ import {
 import QRCode from 'react-native-qrcode-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { captureRef } from 'react-native-view-shot';
 
 /**
  * Interface pour les détails complets d'un ticket
@@ -95,6 +98,9 @@ const TicketDetails = () => {
     const scrollBackgroundColor = colorScheme === 'dark' ? '#000000' : '#F5F5F5';
     const primaryBlue = tintColor === '#fff' ? '#1776BA' : tintColor;
     const statusColor = getStatusColor('PAID');
+
+    // Référence pour capturer la section QR code
+    const ticketViewRef = useRef<View>(null);
 
     // Récupération des données du ticket
     const ticket = route.params?.ticketDetails as TicketDetails | undefined;
@@ -560,6 +566,49 @@ const TicketDetails = () => {
         }
     };
 
+    /**
+     * Sauvegarde le billet dans Photos (iOS) ou Galerie (Android)
+     */
+    const handleSaveToPhotos = async () => {
+        try {
+            // Demande la permission
+            const { status } = await MediaLibrary.requestPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert(
+                    'Permission requise',
+                    'Veuillez autoriser l\'accès à la galerie pour sauvegarder votre billet'
+                );
+                return;
+            }
+
+            // Capture l'image du billet complet
+            if (!ticketViewRef.current) return;
+
+            const uri = await captureRef(ticketViewRef, {
+                format: 'png',
+                quality: 1,
+                result: 'tmpfile',
+            });
+
+            // Sauvegarde dans la galerie
+            await MediaLibrary.saveToLibraryAsync(uri);
+
+            Alert.alert(
+                'Billet sauvegardé',
+                Platform.OS === 'ios'
+                    ? 'Votre billet a été sauvegardé dans Photos'
+                    : 'Votre billet a été sauvegardé dans la galerie',
+                [{ text: 'OK' }]
+            );
+        } catch (error) {
+            console.error('Erreur lors de la sauvegarde:', error);
+            Alert.alert(
+                'Erreur',
+                'Impossible de sauvegarder le billet. Veuillez réessayer.'
+            );
+        }
+    };
+
     return (
         <View style={[styles.container, { backgroundColor: scrollBackgroundColor }]}>
             {/* Header avec bouton retour */}
@@ -581,37 +630,39 @@ const TicketDetails = () => {
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
-                {/* Header bleu avec route et référence */}
-                <View style={[styles.blueHeader, { backgroundColor: primaryBlue }]}>
-                    <Text style={[styles.routeTitle, { width: '80%', textAlign: 'left' }]}>
-                        {ticket.trip.stationFrom.city} → {ticket.trip.stationTo.city}
-                    </Text>
-                    <Text style={[styles.referenceText, { width: '80%', textAlign: 'left' }]}>
-                        Référence: {ticket.code}
-                    </Text>
-                    <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>
-                        <Text style={styles.statusBadgeText}>{formatStatus(ticket.status)}</Text>
+                <View ref={ticketViewRef} collapsable={false}>
+                    {/* Header bleu avec route et référence */}
+                    <View style={[styles.blueHeader, { backgroundColor: primaryBlue }]}>
+                        <Text style={[styles.routeTitle, { width: '80%', textAlign: 'left' }]}>
+                            {ticket.trip.stationFrom.city} → {ticket.trip.stationTo.city}
+                        </Text>
+                        <Text style={[styles.referenceText, { width: '80%', textAlign: 'left' }]}>
+                            Référence: {ticket.code}
+                        </Text>
+                        <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>
+                            <Text style={styles.statusBadgeText}>{formatStatus(ticket.status)}</Text>
+                        </View>
                     </View>
-                </View>
 
-                {/* Section: QR Code */}
-                <View style={[styles.sectionCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
-                    <View style={styles.sectionHeader}>
-                        <Icon name="qrcode" size={20} color={primaryBlue} />
-                        <Text style={[styles.sectionTitle, { color: textColor }]}>Code QR de vérification</Text>
-                    </View>
-                    <View style={styles.qrCodeContainer}>
-                        <QRCode
-                            value={`https://allon-frontoffice-ng.onrender.com/verify-ticket/${ticket.id}?ref=${ticket.code}`}
-                            size={150}
-                            color={primaryBlue}
-                            backgroundColor="transparent"
-                        />
-                        <TouchableOpacity 
-                            onPress={handleViewQRCode} 
-                            activeOpacity={1}
-                            style={styles.qrCodeOverlay}
-                        />
+                    {/* Section: QR Code */}
+                    <View style={[styles.sectionCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
+                        <View style={styles.sectionHeader}>
+                            <Icon name="qrcode" size={20} color={primaryBlue} />
+                            <Text style={[styles.sectionTitle, { color: textColor }]}>Code QR de vérification</Text>
+                        </View>
+                        <View style={styles.qrCodeContainer}>
+                            <QRCode
+                                value={`https://allon-frontoffice-ng.onrender.com/verify-ticket/${ticket.id}?ref=${ticket.code}`}
+                                size={150}
+                                color={primaryBlue}
+                                backgroundColor="transparent"
+                            />
+                            <TouchableOpacity
+                                onPress={handleViewQRCode}
+                                activeOpacity={1}
+                                style={styles.qrCodeOverlay}
+                            />
+                        </View>
                     </View>
                 </View>
 
@@ -744,7 +795,7 @@ const TicketDetails = () => {
                     <View style={styles.detailRow}>
                         <Text style={[styles.detailLabel, { color: secondaryTextColor }]}>Méthode de paiement</Text>
                         <Text style={[styles.detailValue, { color: textColor }]}>
-                            {formatPaymentMethod(ticket.paymentProvider ?? 'N/A')}
+                            {formatPaymentMethod(ticket.paymentProvider.split('_').join(' ') ?? 'N/A')}
                         </Text>
                     </View>
                     <View style={styles.detailRow}>
@@ -774,6 +825,16 @@ const TicketDetails = () => {
                         </>
                     )}
                 </Pressable>
+                {/* Bouton sauvegarder dans Photos/Galerie */}
+                {/* <Pressable
+                    style={[styles.actionButton, { backgroundColor: primaryBlue, borderColor: primaryBlue, marginTop: 20 }]}
+                    onPress={handleSaveToPhotos}
+                >
+                    <Icon name={Platform.OS === 'ios' ? 'image-outline' : 'download'} size={20} color="#FFFFFF" />
+                    <Text style={[styles.actionButtonText, { color: '#FFFFFF' }]}>
+                        {Platform.OS === 'ios' ? 'Sauvegarder dans Photos' : 'Sauvegarder dans la galerie'}
+                    </Text>
+                </Pressable> */}
                 {/* <Pressable
                         style={[styles.actionButton, { borderColor: primaryBlue, marginTop: 12 }]}
                         onPress={handleViewQRCode}

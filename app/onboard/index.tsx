@@ -8,18 +8,16 @@ import {
     StyleSheet, Text, View
 } from 'react-native';
 
+
 const Onboard = () => {
     /**
-     * Dimensions of the window
-     * @type {Dimensions}
-     * Get the width and height of the window
-     * @returns void
+     * Dimensions de la fenêtre
+     * Récupère la largeur et la hauteur
      */
     const { width, height } = Dimensions.get('window');
 
     /**
-     * Images for the onboarding
-     * @type {Array<{id: number, bg: ImageSourcePropType, person: ImageSourcePropType, text_1: string, text_2: string, color_text: string}>}
+     * Images pour l'onboarding
      */
     const imagesOnboarding = [
         {
@@ -46,31 +44,20 @@ const Onboard = () => {
             text_2: 'Casser votre tirelire !',
             color_text: ''
         }
-    ]
+    ];
 
     /**
-     * ScrollX value
-     * @type {Animated.Value}
+     * Valeur du scroll horizontal
      */
     const scrollX = React.useRef(new Animated.Value(0)).current;
+
     /**
-     * Current index
-     * @type {number}
+     * Index actuel de la slide
      */
     const [currentIndex, setCurrentIndex] = React.useState(0);
-    /**
-     * On view change reference
-     * @type {React.RefObject<{viewableItems: {index: number}[]}>}
-     */
-
-    // @ts-ignore
-    const onViewChangeRef = React.useRef(({ viewableItems }) => {
-        setCurrentIndex(viewableItems[0]?.index ?? 0);
-    });
 
     /**
-     * Configuration pour onViewableItemsChanged
-     * Améliore la détection des items visibles
+     * Configuration pour la détection des items visibles
      */
     const viewabilityConfig = React.useRef({
         itemVisiblePercentThreshold: 50,
@@ -78,8 +65,7 @@ const Onboard = () => {
     }).current;
 
     /**
-     * Configuration du callback pour onViewableItemsChanged
-     * Utilise useCallback pour éviter les recalculs
+     * Callback lors du changement d'item visible
      */
     const onViewableItemsChanged = React.useCallback(
         ({ viewableItems }: { viewableItems: Array<{ index: number | null }> }) => {
@@ -91,8 +77,7 @@ const Onboard = () => {
     );
 
     /**
-     * Optimisation: getItemLayout pour améliorer les performances du scroll
-     * Indique à React Native la position exacte de chaque item
+     * Optimisation: calcule la position exacte de chaque item
      */
     const getItemLayout = React.useCallback(
         (_: any, index: number) => ({
@@ -104,26 +89,27 @@ const Onboard = () => {
     );
 
     /**
-     * Go to the app
-     * Set the onboarding status to '1' in the AsyncStorage
-     * and redirect to the tabs screen
-     * @returns void
+     * Navigation vers l'application principale
+     * Enregistre que l'onboarding a été complété
      */
     const goToApp = async () => {
         await AsyncStorage.setItem('onboarding', '1');
         router.replace('/(tabs)');
-    }
+    };
 
     /**
-     * Dots component
-     * Display the dots for the onboarding
-     * @returns React.ReactNode
+     * Composant des indicateurs de pagination (dots)
      */
     const Dots = () => {
         const dotPosition = Animated.divide(scrollX, width);
         return (
-            // @ts-ignore
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', position: 'absolute', bottom: Platform.OS === 'android' ? 30 : 35 }}>
+            <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                position: 'absolute',
+                bottom: Platform.OS === 'android' ? 30 : 35
+            }}>
                 {imagesOnboarding.map((_, index) => {
                     const dotColor = dotPosition.interpolate({
                         inputRange: [index - 1, index, index + 1],
@@ -138,7 +124,6 @@ const Onboard = () => {
                     return (
                         <Animated.View
                             key={`dot-${index}`}
-                            // @ts-ignore
                             style={{
                                 borderRadius: 10,
                                 marginHorizontal: 5,
@@ -154,53 +139,52 @@ const Onboard = () => {
     };
 
     return (
-        <View key={`onboard-container`} style={styles.container}>
-            {/* Logo affiché une seule fois pour toutes les slides */}
+        <View style={styles.container}>
+            {/* Logo affiché en overlay sur toutes les slides */}
             <View
-                key={`logo-container`}
                 style={{
                     position: 'absolute',
                     top: Platform.OS === 'android' ? height * 0.05 : height * 0.06,
                     alignSelf: 'center',
-                    zIndex: 10
+                    zIndex: 999,
+                    elevation: 999,
                 }}
             >
-                {/* <Image
-                    source={require('@/assets/images/icon.png')}
+                <Image
+                    source={require('@/assets/images/onboarding/logo-allon-blanc.png')}
                     resizeMode="contain"
-                    style={{
-                        width: 80,
-                        height: 80
-                    }}
-                /> */}
-                <Image source={require('@/assets/images/onboarding/logo-allon-blanc.png')} resizeMode="cover" style={{ width: 75, height: 75 }} />
-                {/* <Text style={{ fontSize: 32, fontFamily: 'Ubuntu_Bold', color: '#ffffff' }}>AllOn</Text> */}
+                    style={{ width: 75, height: 75 }}
+                    fadeDuration={0}
+                    // Fallback si la charge des assets échoue
+                    defaultSource={require('@/assets/images/onboarding/logo-allon-blanc.png')}
+                />
             </View>
 
+            {/* Liste horizontale des slides d'onboarding */}
             <Animated.FlatList
                 horizontal
                 pagingEnabled
                 data={imagesOnboarding}
-                scrollEventThrottle={1} // Réduit à 1 pour maximum de fluidité
+                scrollEventThrottle={16}
                 snapToAlignment="center"
-                decelerationRate="fast" // Améliore la sensation de snap
+                decelerationRate="fast"
                 onScroll={Animated.event(
                     [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-                    { 
-                        useNativeDriver: false, // Nécessaire pour contentOffset
-                        listener: undefined, // Évite les callbacks supplémentaires
+                    {
+                        useNativeDriver: false,
+                        listener: undefined,
                     },
                 )}
                 onViewableItemsChanged={onViewableItemsChanged}
                 viewabilityConfig={viewabilityConfig}
                 showsHorizontalScrollIndicator={false}
                 keyExtractor={item => `${item.id}`}
-                getItemLayout={getItemLayout} // Optimisation importante
-                removeClippedSubviews={true} // Améliore les performances (surtout Android)
-                windowSize={3} // Réduit le nombre d'items rendus
-                initialNumToRender={1} // Rend seulement le premier item initialement
-                maxToRenderPerBatch={1} // Réduit le rendu par batch
-                updateCellsBatchingPeriod={50} // Optimise les mises à jour
+                getItemLayout={getItemLayout}
+                removeClippedSubviews={true}
+                windowSize={3}
+                initialNumToRender={1}
+                maxToRenderPerBatch={1}
+                updateCellsBatchingPeriod={50}
                 renderItem={({ item, index }: { item: typeof imagesOnboarding[0]; index: number }) => {
                     return (
                         <View
@@ -218,7 +202,7 @@ const Onboard = () => {
                                         justifyContent: 'flex-end',
                                         width: '100%'
                                     }}
-                                    imageStyle={{ resizeMode: 'cover' }} // Optimise le rendu de l'image
+                                    imageStyle={{ resizeMode: 'cover' }}
                                 >
                                     <Text style={{
                                         color: item?.color_text ? item?.color_text : '#fff',
@@ -238,13 +222,13 @@ const Onboard = () => {
                                             width: width,
                                             height: height - 100
                                         }}
-                                        // Optimisations pour les images
                                         progressiveRenderingEnabled={Platform.OS === 'android'}
-                                        fadeDuration={0} // Évite le fade qui peut causer des saccades
+                                        fadeDuration={0}
                                     />
                                 </ImageBackground>
                             </View>
 
+                            {/* Bouton "Commencer" sur la dernière slide */}
                             {index === imagesOnboarding.length - 1 &&
                                 <Pressable
                                     onPress={goToApp}
@@ -272,19 +256,20 @@ const Onboard = () => {
                     );
                 }}
             />
-            {/* @ts-ignore */}
-            <View key={`dots-container`} style={{ alignItems: 'center', justifyContent: 'center' }}>
+
+            {/* Indicateurs de pagination */}
+            <View style={{ alignItems: 'center', justifyContent: 'center' }}>
                 <Dots />
             </View>
         </View>
-    )
-}
+    );
+};
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
         justifyContent: 'center'
     },
-})
+});
 
-export default Onboard
+export default Onboard;

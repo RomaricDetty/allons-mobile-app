@@ -1,12 +1,13 @@
 // @ts-nocheck
 import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
+import { Asset } from 'expo-asset';
 import { useFonts } from 'expo-font';
 import { SplashScreen, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
-
 import { ConnectivityGuard } from '@/components/ConnectivityGuard';
+import CustomSplashScreen from '@/components/custom-splashscreen';
 import { ConnectivityProvider } from '@/contexts/ConnectivityContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -16,18 +17,18 @@ export const unstable_settings = {
     anchor: '(tabs)',
 };
 
-// Empêche le SplashScreen de se cacher automatiquement avant le chargement complet des assets
+// Empêche le SplashScreen par défaut de se cacher automatiquement
 SplashScreen.preventAutoHideAsync();
 
 /**
  * Layout racine de l'application
- * Gère le chargement des fonts avant d'afficher l'interface
+ * Gère le chargement des fonts et des images avant d'afficher l'interface
  */
 export default function RootLayout() {
-    const [fontsReady, setFontsReady] = useState(false);
+    const [isAppReady, setIsAppReady] = useState(false);
 
     // Charge toutes les fonts Ubuntu nécessaires
-    const [loaded, error] = useFonts({
+    const [fontsLoaded, fontsError] = useFonts({
         Ubuntu_Bold: require("@/assets/fonts/Ubuntu-Bold.ttf"),
         Ubuntu_BoldItalic: require("@/assets/fonts/Ubuntu-BoldItalic.ttf"),
         Ubuntu_Italic: require("@/assets/fonts/Ubuntu-Italic.ttf"),
@@ -39,38 +40,73 @@ export default function RootLayout() {
     });
 
     /**
-     * Cache le SplashScreen et autorise le rendu avec gestion du timeout
-     * Nécessaire car Android peut avoir des problèmes de chargement de fonts
+     * Cache le splash natif dès que possible pour afficher le custom splash
      */
     useEffect(() => {
+        const hideSplash = async () => {
+            try {
+                // Cache immédiatement le splash natif pour montrer le custom splash
+                await SplashScreen.hideAsync();
+            } catch (error) {
+                // Ignore les erreurs si le splash est déjà caché
+                console.warn('Splash déjà caché:', error);
+            }
+        };
+        
+        hideSplash();
+    }, []);
 
-        // Si les fonts sont chargées avec succès
-        if (loaded) {
-            setFontsReady(true);
-            SplashScreen.hideAsync();
-            return;
+    /**
+     * Précharge tous les assets critiques de l'application
+     * Inclut les fonts et les images de l'onboarding
+     */
+    useEffect(() => {
+        async function prepareApp() {
+            try {
+                // Attendre que les fonts soient chargées
+                if (!fontsLoaded && !fontsError) {
+                    return;
+                }
+
+                // Si erreur de fonts, on log mais on continue
+                if (fontsError) {
+                    console.warn('Erreur de chargement des fonts:', fontsError);
+                }
+
+                // Précharge les images avec timeout global de 10 secondes
+                const loadAssetsWithTimeout = Promise.race([
+                    Promise.all([
+                        Asset.fromModule(require('@/assets/images/onboarding/logo-allon-blanc.png')).downloadAsync(),
+                        Asset.fromModule(require('@/assets/images/onboarding/bg_voyage.png')).downloadAsync(),
+                        Asset.fromModule(require('@/assets/images/onboarding/person_travel_1.png')).downloadAsync(),
+                        Asset.fromModule(require('@/assets/images/onboarding/person_travel_2.png')).downloadAsync(),
+                        Asset.fromModule(require('@/assets/images/onboarding/person_travel_3.png')).downloadAsync(),
+                    ]),
+                    new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('Timeout de chargement des assets')), 10000)
+                    )
+                ]);
+
+                await loadAssetsWithTimeout;
+                console.log('Tous les assets de l\'onboarding sont chargés');
+
+            } catch (error) {
+                console.warn('Erreur lors du préchargement des assets:', error);
+                // Continue quand même pour ne pas bloquer l'app
+            } finally {
+                // Garde le custom splash au minimum 2 secondes pour une bonne UX
+                setTimeout(() => {
+                    setIsAppReady(true);
+                }, 2500);
+            }
         }
 
-        // Si erreur, on continue quand même pour ne pas bloquer l'app
-        if (error) {
-            setFontsReady(true);
-            SplashScreen.hideAsync();
-            return;
-        }
+        prepareApp();
+    }, [fontsLoaded, fontsError]);
 
-        // Timeout de sécurité : après 5 secondes, on force le rendu même si les fonts ne sont pas chargées
-        // Particulièrement important pour Android
-        const timeoutId = setTimeout(() => {
-            setFontsReady(true);
-            SplashScreen.hideAsync();
-        }, 5000);
-
-        return () => clearTimeout(timeoutId);
-    }, [loaded, error]);
-
-    // Ne rend rien jusqu'à ce que fontsReady soit true
-    if (!fontsReady) {
-        return null;
+    // Affiche le SplashScreen personnalisé pendant le chargement
+    if (!isAppReady) {
+        return <CustomSplashScreen />;
     }
 
     return (
@@ -105,9 +141,11 @@ function RootContent() {
                     <Stack.Screen name="profile/edit" options={{ headerShown: false }} />
                     <Stack.Screen name="trip/ticket-details" options={{ headerShown: false }} />
                     <Stack.Screen name="trip/ticket-qr" options={{ headerShown: false }} />
-                    {/* <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} /> */}
                 </Stack>
-                <StatusBar style="auto" />
+                <StatusBar 
+                    style={colorScheme === 'dark' ? 'light' : 'dark'} 
+                    backgroundColor={colorScheme === 'dark' ? '#121212' : '#ffffff'} 
+                />
             </ConnectivityGuard>
         </NavigationThemeProvider>
     );
