@@ -10,11 +10,11 @@ const CustomSplashScreen = () => {
                 { 
                     fontSize: 50, 
                     fontFamily: 'Ubuntu_Bold', 
-                    color: '#1776BA' 
+                    color: '#ffffff',
                 }
             }>AllOn</Text>
             <Image
-                source={require('@/assets/images/allon-logo-transparent.png')}
+                source={require('@/assets/images/onboarding/logo-allon-blanc.png')}
                 resizeMode="contain"
                 style={styles.logo}
             />
@@ -25,11 +25,14 @@ const CustomSplashScreen = () => {
 const styles = StyleSheet.create({
     splashContainer: {
         flex: 1,
-        backgroundColor: '#ffffff',
+        backgroundColor: '#1776BA',
         justifyContent: 'center',
         alignItems: 'center',
         width: width,
         height: height,
+        // position: 'absolute',
+        // bottom: 30,
+        // zIndex: 1000,
     },
     logo: {
         width: 80,
