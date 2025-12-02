@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { authGetUserInfo } from '@/api/auth_register';
 import { createBooking, createBookingPayment } from '@/api/booking';
+import { getDepartureAvailableSeats } from '@/api/departure';
 import { EmergencyContactBlock } from '@/components/passengers/EmergencyContactBlock';
 import { ErrorModal } from '@/components/passengers/ErrorModal';
 import { PassengersInfoBlock } from '@/components/passengers/PassengersInfoBlock';
@@ -25,7 +26,6 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-// import { getDepartureAvailableSeats } from '@/api/departure';
 
 /**
  * Retire le préfixe +225 d'un numéro de téléphone si présent
@@ -127,6 +127,9 @@ const PassengersInfo = () => {
     // État pour le modal d'erreur
     const [showErrorModal, setShowErrorModal] = useState(false);
     const [validationErrors, setValidationErrors] = useState<string[]>([]);
+    
+    // État pour suivre si l'attribution automatique a déjà été effectuée
+    const [seatsAutoAssigned, setSeatsAutoAssigned] = useState(false);
 
     if (!trip) {
         return (
@@ -161,6 +164,121 @@ const PassengersInfo = () => {
         const updated = [...passengers];
         updated[index] = { ...updated[index], [field]: value };
         setPassengers(updated);
+    };
+
+    /**
+     * Attribue automatiquement les sièges aux passagers
+     * @param leg - La légende du trajet (OUTBOUND ou RETURN)
+     * @returns true si des sièges ont été attribués, false sinon
+     */
+    const assignSeatsAutomatically = async (leg: 'OUTBOUND' | 'RETURN' = 'OUTBOUND'): Promise<boolean> => {
+        const currentTripForLeg = leg === 'OUTBOUND' ? trip : returnTrip;
+        
+        if (!currentTripForLeg?.id || !passengers || passengers.length === 0) {
+            return false;
+        }
+
+        try {
+            const response = await getDepartureAvailableSeats(currentTripForLeg.id);
+            
+            if (response.status === 200 && response.data) {
+                const seatsData = response.data.seats || response.data || [];
+                const totalSeatsCount = response.data.totalSeats || currentTripForLeg.totalSeats || 50;
+                
+                const seatsArray: Array<{
+                    number: number;
+                    available: boolean;
+                    booked: boolean;
+                    blocked: boolean;
+                    locked: boolean;
+                }> = [];
+                
+                for (let i = 1; i <= totalSeatsCount; i++) {
+                    const seatData = Array.isArray(seatsData) 
+                        ? seatsData.find((s: any) => s.number === i || s.seatNumber === i)
+                        : seatsData[i];
+                    
+                    const seatStatus = seatData?.status?.toUpperCase() || 'AVAILABLE';
+                    const isAvailable = seatStatus === 'AVAILABLE';
+                    const isBooked = seatStatus === 'BOOKED';
+                    const isLocked = seatStatus === 'LOCKED';
+                    const isBlocked = seatStatus === 'BLOCKED';
+                    
+                    seatsArray.push({
+                        number: i,
+                        available: isAvailable,
+                        booked: isBooked,
+                        locked: isLocked,
+                        blocked: isBlocked
+                    });
+                }
+
+                // Attribution automatique après le dernier siège réservé
+                let seatsAssigned = false;
+                
+                setPassengers(currentPassengers => {
+                    if (currentPassengers.length === 0) {
+                        return currentPassengers;
+                    }
+                    
+                    const initialSelections = new Map<number, number>();
+                    let lastBookedSeatNumber = 0;
+                    
+                    seatsArray.forEach(seat => {
+                        if (seat.booked && seat.number > lastBookedSeatNumber) {
+                            lastBookedSeatNumber = seat.number;
+                        }
+                    });
+
+                    let nextAvailableSeatNumber = lastBookedSeatNumber + 1;
+                    
+                    for (let index = 0; index < currentPassengers.length; index++) {
+                        const passenger = currentPassengers[index];
+                        const passengerHasSeat = Array.from(initialSelections.values()).includes(index);
+                        const passengerSeatNumber = leg === 'OUTBOUND' 
+                            ? passenger?.seatNumber 
+                            : passenger?.seatNumberReturn;
+                        
+                        if (!passengerSeatNumber && !passengerHasSeat) {
+                            while (nextAvailableSeatNumber <= totalSeatsCount) {
+                                const seat = seatsArray.find(s => s.number === nextAvailableSeatNumber);
+                                if (seat && seat.available && !seat.booked && !seat.locked && !seat.blocked && !initialSelections.has(seat.number)) {
+                                    initialSelections.set(seat.number, index);
+                                    nextAvailableSeatNumber++;
+                                    break;
+                                }
+                                nextAvailableSeatNumber++;
+                            }
+                        }
+                    }
+
+                    // Mettre à jour les passagers avec les sièges attribués
+                    if (initialSelections.size > 0) {
+                        seatsAssigned = true;
+                        const updatedPassengers = [...currentPassengers];
+                        initialSelections.forEach((passengerIndex, seatNumber) => {
+                            if (updatedPassengers[passengerIndex]) {
+                                if (leg === 'OUTBOUND') {
+                                    updatedPassengers[passengerIndex].seatNumber = seatNumber;
+                                } else {
+                                    updatedPassengers[passengerIndex].seatNumberReturn = seatNumber;
+                                }
+                            }
+                        });
+                        return updatedPassengers;
+                    }
+                    
+                    return currentPassengers;
+                });
+                
+                return seatsAssigned;
+            }
+            return false;
+        } catch (error: any) {
+            console.error('Erreur lors de l\'attribution automatique des sièges:', error);
+            // Ne pas afficher d'alerte, l'utilisateur pourra sélectionner manuellement
+            return false;
+        }
     };
 
     /**
@@ -677,6 +795,40 @@ const PassengersInfo = () => {
     useEffect(() => {
         userCheckSession();
     }, []);
+
+    /**
+     * Attribue automatiquement les sièges après le chargement des informations utilisateur
+     */
+    useEffect(() => {
+        if (passengers && passengers.length > 0 && trip && !seatsAutoAssigned) {
+            // Vérifier si des sièges ont déjà été attribués
+            const hasSeatsAssigned = passengers.some(p => 
+                (p.seatNumber !== null && p.seatNumber !== undefined) || 
+                (p.seatNumberReturn !== null && p.seatNumberReturn !== undefined)
+            );
+            
+            if (!hasSeatsAssigned) {
+                // Attendre un peu pour que les données soient bien chargées
+                const timer = setTimeout(async () => {
+                    // Attribuer les sièges pour l'aller
+                    const outboundAssigned = await assignSeatsAutomatically('OUTBOUND');
+                    
+                    // Si c'est un aller-retour, attribuer aussi les sièges pour le retour
+                    if (isRoundTrip && returnTrip) {
+                        await assignSeatsAutomatically('RETURN');
+                    }
+                    
+                    if (outboundAssigned) {
+                        setSeatsAutoAssigned(true);
+                    }
+                }, 500);
+                
+                return () => clearTimeout(timer);
+            } else {
+                setSeatsAutoAssigned(true);
+            }
+        }
+    }, [trip?.id, returnTrip?.id]);
 
     /**
      * Réinitialise les champs de paiement quand la méthode change

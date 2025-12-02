@@ -3,10 +3,11 @@ import { getDepartureAvailableSeats } from '@/api/departure';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    Dimensions,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -115,36 +116,16 @@ const SeatSelection = () => {
                     });
                 }
 
-                // Sélection automatique après le dernier siège réservé
+                // Utiliser les sièges déjà attribués depuis passengers-info
                 const initialSelections = new Map<number, number>();
                 
-                if (totalPassengers > 0) {
-                    let lastBookedSeatNumber = 0;
-                    seatsArray.forEach(seat => {
-                        if (seat.booked && seat.number > lastBookedSeatNumber) {
-                            lastBookedSeatNumber = seat.number;
+                if (totalPassengers > 0 && passengers) {
+                    passengers.forEach((passenger, index) => {
+                        const passengerSeatNumber = passenger?.seatNumber;
+                        if (passengerSeatNumber && passengerSeatNumber > 0) {
+                            initialSelections.set(passengerSeatNumber, index);
                         }
                     });
-
-                    let nextAvailableSeatNumber = lastBookedSeatNumber + 1;
-                    
-                    for (let index = 0; index < totalPassengers; index++) {
-                        const passenger = passengers?.[index];
-                        const passengerHasSeat = Array.from(initialSelections.values()).includes(index);
-                        const passengerSeatNumber = passenger?.seatNumber;
-                        
-                        if (!passengerSeatNumber && !passengerHasSeat) {
-                            while (nextAvailableSeatNumber <= totalSeatsCount) {
-                                const seat = seatsArray.find(s => s.number === nextAvailableSeatNumber);
-                                if (seat && seat.available && !seat.booked && !seat.locked && !seat.blocked && !initialSelections.has(seat.number)) {
-                                    initialSelections.set(seat.number, index);
-                                    nextAvailableSeatNumber++;
-                                    break;
-                                }
-                                nextAvailableSeatNumber++;
-                            }
-                        }
-                    }
                 }
 
                 setSelectedSeats(initialSelections);
@@ -256,6 +237,56 @@ const SeatSelection = () => {
         const layout = currentTrip?.busSeatLayout;
         return Array.isArray(layout) && layout.length >= 2 ? [layout[0], layout[1]] : [2, 2];
     };
+
+    /**
+     * Calcule la taille optimale des sièges selon la disposition
+     * @returns Un objet avec width et height pour les sièges
+     */
+    const seatDimensions = useMemo(() => {
+        const [leftSeatsCount, rightSeatsCount] = getSeatLayout();
+        const maxSeatsPerSide = Math.max(leftSeatsCount, rightSeatsCount);
+        const totalSeatsPerRow = leftSeatsCount + rightSeatsCount;
+        
+        // Obtenir la largeur réelle de l'écran
+        const screenWidth = Dimensions.get('window').width;
+        
+        // Largeur disponible (en tenant compte de tous les éléments fixes)
+        // scrollContent padding: 16 de chaque côté = 32px
+        // busSeatsArea padding: 16 de chaque côté = 32px
+        // rowNumberContainer: 30 de chaque côté = 60px
+        // aisle: 50px
+        // gap entre sièges: 6px (pour chaque groupe de sièges)
+        const scrollContentPadding = 32; // 16 * 2
+        const busSeatsAreaPadding = 32; // 16 * 2
+        const rowNumbersWidth = 60; // 30 * 2
+        const aisleWidth = 50;
+        const leftGapsWidth = (leftSeatsCount - 1) * 6; // Espacement entre sièges gauche
+        const rightGapsWidth = (rightSeatsCount - 1) * 6; // Espacement entre sièges droite
+        const maxGapsWidth = Math.max(leftGapsWidth, rightGapsWidth);
+        
+        // Calculer la largeur disponible pour les sièges avec une marge de sécurité réduite
+        // On calcule pour le côté avec le plus de sièges (le plus contraignant)
+        const totalFixedWidth = scrollContentPadding + busSeatsAreaPadding + rowNumbersWidth + aisleWidth;
+        const safetyMargin = 20; // Marge de sécurité réduite pour permettre des sièges plus grands
+        
+        // Largeur disponible pour un côté (gauche ou droite)
+        // On divise l'espace restant en deux (gauche et droite) et on soustrait les gaps
+        const availableWidthForOneSide = (screenWidth - totalFixedWidth - safetyMargin) / 2;
+        const gapsForMaxSide = (maxSeatsPerSide - 1) * 6;
+        const seatWidth = Math.floor((availableWidthForOneSide - gapsForMaxSide) / maxSeatsPerSide);
+        
+        // Limites ajustées pour permettre des sièges plus grands
+        // Pour [3, 2], maxSeatsPerSide = 3, on permet des sièges jusqu'à 45px
+        const optimizedWidth = Math.max(35, Math.min(45, seatWidth));
+        
+        // La hauteur est proportionnelle à la largeur
+        const optimizedHeight = Math.max(42, Math.min(52, optimizedWidth + 2));
+        
+        return {
+            width: optimizedWidth,
+            height: optimizedHeight
+        };
+    }, [currentTrip?.busSeatLayout]);
 
     /**
      * Organise les sièges en rangées
@@ -465,6 +496,8 @@ const SeatSelection = () => {
                                                             backgroundColor: getSeatColor(seat),
                                                             borderColor: seat.selected ? primaryBlue : 'transparent',
                                                             borderWidth: seat.selected ? 2 : 0,
+                                                            width: seatDimensions.width,
+                                                            height: seatDimensions.height,
                                                         }
                                                     ]}
                                                     onPress={() => handleSeatSelect(seat.number)}
@@ -508,6 +541,8 @@ const SeatSelection = () => {
                                                             backgroundColor: getSeatColor(seat),
                                                             borderColor: seat.selected ? primaryBlue : 'transparent',
                                                             borderWidth: seat.selected ? 2 : 0,
+                                                            width: seatDimensions.width,
+                                                            height: seatDimensions.height,
                                                         }
                                                     ]}
                                                     onPress={() => handleSeatSelect(seat.number)}
@@ -765,6 +800,7 @@ const styles = StyleSheet.create({
     seatRowWithNumbers: {
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'center',
         marginBottom: 8,
     },
     rowNumberContainer: {
@@ -779,13 +815,16 @@ const styles = StyleSheet.create({
     seatsGroup: {
         flexDirection: 'row',
         gap: 6,
+        justifyContent: 'center',
+        alignItems: 'center',
+        // flex: 1, // Permet aux groupes de prendre la même largeur pour un meilleur centrage
     },
     aisle: {
         width: 50,
     },
     seat: {
-        width: 48,
-        height: 48,
+        // Les dimensions sont maintenant calculées dynamiquement selon la disposition
+        // width et height sont définis inline dans le style du composant
         borderRadius: 8,
         justifyContent: 'center',
         alignItems: 'center',
@@ -795,13 +834,13 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     seatNumber: {
-        fontSize: 14,
+        fontSize: 11,
         fontFamily: 'Ubuntu_Bold',
     },
     passengerNumber: {
-        fontSize: 10,
+        fontSize: 8,
         fontFamily: 'Ubuntu_Medium',
-        marginTop: 2,
+        marginTop: 1,
     },
     busBackRounded: {
         height: 40,
