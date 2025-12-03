@@ -141,24 +141,11 @@ const Onboard = () => {
     return (
         <View style={styles.container}>
             {/* Logo affiché en overlay sur toutes les slides */}
-            <View
-                style={{
-                    position: 'absolute',
-                    top: Platform.OS === 'android' ? height * 0.05 : height * 0.06,
-                    alignSelf: 'center',
-                    zIndex: 999,
-                    elevation: 999,
-                }}
-            >
-                <Image
-                    source={require('@/assets/images/onboarding/logo-allon-blanc.png')}
-                    resizeMode="contain"
-                    style={{ width: 75, height: 75 }}
-                    fadeDuration={0}
-                    // Fallback si la charge des assets échoue
-                    defaultSource={require('@/assets/images/onboarding/logo-allon-blanc.png')}
-                />
-            </View>
+            <Image
+                source={require('@/assets/images/onboarding/logo-allon-blanc.png')}
+                resizeMode="contain"
+                style={styles.logo}
+            />
 
             {/* Liste horizontale des slides d'onboarding */}
             <Animated.FlatList
@@ -269,6 +256,14 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         justifyContent: 'center'
+    },
+    logo: {
+        width: 80,
+        height: 80,
+        position: 'absolute',
+        top: Platform.OS === 'android' ? 30 : 55,
+        zIndex: 1000,
+        alignSelf: 'center',
     },
 });
 

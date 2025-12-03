@@ -293,7 +293,7 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                     <View style={styles.detailRow}>
                         <MaterialCommunityIcons name="email-outline" size={18} color={secondaryTextColor} />
                         <Text style={[styles.detailLabel, { color: textColor }]}>Email:</Text>
-                        <Text style={[styles.detailValue, { color: secondaryTextColor }]}>{user?.email}</Text>
+                        <Text style={[styles.detailValue, { color: secondaryTextColor }]}>{user?.email ?? 'Non renseigné'}</Text>
                         {user?.isEmailVerified && (
                             <MaterialCommunityIcons name="check-circle" size={16} color="#4CAF50" />
                         )}
@@ -301,7 +301,7 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                     <View style={styles.detailRow}>
                         <MaterialCommunityIcons name="account-outline" size={18} color={secondaryTextColor} />
                         <Text style={[styles.detailLabel, { color: textColor }]}>Nom d'utilisateur:</Text>
-                        <Text style={[styles.detailValue, { color: secondaryTextColor }]}>@{user?.username}</Text>
+                        <Text style={[styles.detailValue, { color: secondaryTextColor }]}>{'@'+ user?.username ?? 'Non renseigné'}</Text>
                     </View>
                     <View style={styles.detailRow}>
                         <MaterialCommunityIcons name="phone-outline" size={18} color={secondaryTextColor} />
@@ -329,8 +329,8 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                     <View style={[styles.emergencySection, { borderTopColor: borderColor }]}>
                         <Text style={[styles.sectionTitle, { color: textColor }]}>Contact d'urgence</Text>
                         <View style={[styles.emergencyInfo, { backgroundColor: emergencyInfoBackgroundColor }]}>
-                            <Text style={[styles.emergencyName, { color: textColor }]}>{user?.contactUrgent?.fullName}</Text>
-                            <Text style={[styles.emergencyPhone, { color: secondaryTextColor }]}>{user?.contactUrgent?.phone}</Text>
+                            <Text style={[styles.emergencyName, { color: textColor }]}>{user?.contactUrgent?.fullName ?? 'Non renseigné'}</Text>
+                            <Text style={[styles.emergencyPhone, { color: secondaryTextColor }]}>{user?.contactUrgent?.phone ?? 'Non renseigné'}</Text>
                         </View>
                     </View>
                 )}

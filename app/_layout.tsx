@@ -40,12 +40,18 @@ export default function RootLayout() {
     });
 
     /**
-     * Cache le splash natif dès que possible pour afficher le custom splash
+     * Cache le splash natif uniquement après le chargement des fonts
+     * pour afficher le custom splash avec les fonts disponibles
      */
     useEffect(() => {
         const hideSplash = async () => {
+            // Attendre que les fonts soient chargées avant de cacher le splash natif
+            if (!fontsLoaded && !fontsError) {
+                return;
+            }
+
             try {
-                // Cache immédiatement le splash natif pour montrer le custom splash
+                // Cache le splash natif une fois les fonts chargées
                 await SplashScreen.hideAsync();
             } catch (error) {
                 // Ignore les erreurs si le splash est déjà caché
@@ -54,7 +60,7 @@ export default function RootLayout() {
         };
         
         hideSplash();
-    }, []);
+    }, [fontsLoaded, fontsError]);
 
     /**
      * Précharge tous les assets critiques de l'application
@@ -81,6 +87,7 @@ export default function RootLayout() {
                         Asset.fromModule(require('@/assets/images/onboarding/person_travel_1.png')).downloadAsync(),
                         Asset.fromModule(require('@/assets/images/onboarding/person_travel_2.png')).downloadAsync(),
                         Asset.fromModule(require('@/assets/images/onboarding/person_travel_3.png')).downloadAsync(),
+                        Asset.fromModule(require('@/assets/images/onboarding/logo-allon-blanc.png')).downloadAsync(),
                     ]),
                     new Promise((_, reject) => 
                         setTimeout(() => reject(new Error('Timeout de chargement des assets')), 10000)
@@ -104,7 +111,12 @@ export default function RootLayout() {
         prepareApp();
     }, [fontsLoaded, fontsError]);
 
-    // Affiche le SplashScreen personnalisé pendant le chargement
+    // Affiche le SplashScreen personnalisé uniquement après le chargement des fonts
+    // Garde le splash natif visible tant que les fonts ne sont pas chargées
+    if (!fontsLoaded && !fontsError) {
+        return null; // Le splash natif reste visible
+    }
+
     if (!isAppReady) {
         return <CustomSplashScreen />;
     }
