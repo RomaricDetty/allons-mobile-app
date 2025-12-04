@@ -22,24 +22,24 @@ const Onboard = () => {
     const imagesOnboarding = [
         {
             id: 1,
-            bg: require('../../assets/images/onboarding/bg_voyage.png'),
-            person: require('../../assets/images/onboarding/person_travel_1.png'),
+            bg: require('@/assets/images/onboarding/bg_voyage.png'),
+            person: require('@/assets/images/onboarding/person_travel_1.png'),
             text_1: 'Voyagez malin',
             text_2: 'Payez moins !',
             color_text: ''
         },
         {
             id: 2,
-            bg: require('../../assets/images/onboarding/bg_voyage.png'),
-            person: require('../../assets/images/onboarding/person_travel_2.png'),
+            bg: require('@/assets/images/onboarding/bg_voyage.png'),
+            person: require('@/assets/images/onboarding/person_travel_2.png'),
             text_1: 'Voyagez en toute ',
             text_2: 'Sécurité !',
             color_text: ''
         },
         {
             id: 3,
-            bg: require('../../assets/images/onboarding/bg_voyage.png'),
-            person: require('../../assets/images/onboarding/person_travel_3.png'),
+            bg: require('@/assets/images/onboarding/bg_voyage.png'),
+            person: require('@/assets/images/onboarding/person_travel_3.png'),
             text_1: 'Partez loin sans',
             text_2: 'Casser votre tirelire !',
             color_text: ''
@@ -150,10 +150,11 @@ const Onboard = () => {
             {/* Liste horizontale des slides d'onboarding */}
             <Animated.FlatList
                 horizontal
-                pagingEnabled
+                pagingEnabled={Platform.OS === 'ios'}
+                snapToInterval={Platform.OS === 'android' ? width : undefined}
+                snapToAlignment={Platform.OS === 'ios' ? "center" : "start"}
                 data={imagesOnboarding}
                 scrollEventThrottle={16}
-                snapToAlignment="center"
                 decelerationRate="fast"
                 onScroll={Animated.event(
                     [{ nativeEvent: { contentOffset: { x: scrollX } } }],
@@ -167,18 +168,20 @@ const Onboard = () => {
                 showsHorizontalScrollIndicator={false}
                 keyExtractor={item => `${item.id}`}
                 getItemLayout={getItemLayout}
-                removeClippedSubviews={true}
+                removeClippedSubviews={Platform.OS === 'ios'}
                 windowSize={3}
                 initialNumToRender={1}
                 maxToRenderPerBatch={1}
                 updateCellsBatchingPeriod={50}
+                contentContainerStyle={{ paddingHorizontal: 0 }}
                 renderItem={({ item, index }: { item: typeof imagesOnboarding[0]; index: number }) => {
                     return (
                         <View
                             style={{
                                 width: width,
                                 height: height,
-                                alignItems: 'center'
+                                alignItems: 'center',
+                                overflow: 'hidden'
                             }}>
                             <View style={{ flex: 3 }}>
                                 <ImageBackground
@@ -255,13 +258,14 @@ const Onboard = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        justifyContent: 'center'
+        justifyContent: 'center',
+        overflow: 'hidden'
     },
     logo: {
         width: 80,
         height: 80,
         position: 'absolute',
-        top: Platform.OS === 'android' ? 30 : 55,
+        top: Platform.OS === 'android' ? 35 : 55,
         zIndex: 1000,
         alignSelf: 'center',
     },

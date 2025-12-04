@@ -275,7 +275,7 @@ export default function EditProfileScreen() {
                     }
                     : user?.address || null,
                 contactUrgent: {
-                    fullName: formData.emergencyContactFullName.trim() || formData.emergencyContactName.trim(),
+                    fullName: formData.emergencyContactFirstName.trim() + ' ' + formData.emergencyContactName.trim(),
                     phone: `+225${formData.emergencyContactPhone.trim()}`,
                 },
             };
@@ -484,7 +484,7 @@ export default function EditProfileScreen() {
                         <View style={styles.sectionLast}>
                             <SectionHeader number={3} title="Contact d'urgence" />
 
-                            <FormField
+                            {/* <FormField
                                 label="Nom complet du contact d'urgence"
                                 value={formData.emergencyContactFullName}
                                 onChangeText={(text) => {
@@ -510,20 +510,30 @@ export default function EditProfileScreen() {
                                     }));
                                 }}
                                 placeholder="Prénom Nom du contact urgent"
-                            />
+                            /> */}
 
                             <FormField
                                 label="Prénom du contact d'urgence"
                                 value={formData.emergencyContactFirstName}
-                                editable={false}
-                                placeholder="Prénom (rempli automatiquement)"
+                                placeholder="Prénom du contact d'urgence"
+                                onChangeText={(text) =>
+                                    setFormData((prev) => ({
+                                        ...prev,
+                                        emergencyContactFirstName: text,
+                                    }))
+                                }
                             />
 
                             <FormField
                                 label="Nom du contact d'urgence"
                                 value={formData.emergencyContactName}
-                                editable={false}
-                                placeholder="Nom (rempli automatiquement)"
+                                placeholder="Nom du contact d'urgence"
+                                onChangeText={(text) =>
+                                    setFormData((prev) => ({
+                                        ...prev,
+                                        emergencyContactName: text,
+                                    }))
+                                }
                             />
 
                             <PhoneField
