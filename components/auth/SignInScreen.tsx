@@ -1,11 +1,14 @@
+//@ts-nocheck
 import { authLogin } from '@/api/auth_register';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AuthFormField } from './AuthFormField';
 import { PasswordField } from './PasswordField';
+// const logoImage = require('@/assets/images/allon-logo.png');
+// const logoImageWhite = require('@/assets/images/allon-logo-white.png');
 
 interface ContactUrgent {
     fullName: string;
@@ -50,15 +53,18 @@ export const SignInScreen = ({ onSignIn, onSwitchToSignUp, onForgotPassword }: S
     const textColor = useThemeColor({}, 'text');
     const tintColor = useThemeColor({}, 'tint');
     
-    // Couleurs spécifiques pour l'écran
+    // Couleurs spécifiques pour l'écran - style moderne avec fond blanc
     const scrollBackgroundColor = colorScheme === 'dark' ? '#000000' : '#F3F3F7';
-    const secondaryTextColor = colorScheme === 'dark' ? '#9BA1A6' : '#666';
+    const secondaryTextColor = colorScheme === 'dark' ? '#9BA1A6' : '#666666';
     const separatorLineColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
-    const linkColor = tintColor === '#fff' ? '#1776BA' : tintColor;
+    const linkColor = '#000000';
+    const cardBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
+    const cardBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [rememberMe, setRememberMe] = useState(false);
 
     /**
      * Handle the sign in action
@@ -97,32 +103,58 @@ export const SignInScreen = ({ onSignIn, onSwitchToSignUp, onForgotPassword }: S
 
 
 
+    /**
+     * Composant logo simple avec deux formes en 'C' stylisées
+     */
+    const Logo = () => (
+        <View style={styles.logoContainer}>
+            
+            {/* Forme avant (plus foncée) */}
+            <View style={styles.logoFront}>
+                <Image 
+                    source={require('@/assets/images/allon-logo-transparent.png')} 
+                    resizeMode="cover" 
+                    style={{ width: 100, height: 100 }} 
+                />
+            </View>
+        </View>
+    );
+
     return (
         <ScrollView
             style={[styles.container, { backgroundColor: scrollBackgroundColor }]}
             contentContainerStyle={styles.contentContainer}
             showsVerticalScrollIndicator={false}
         >
+            <Logo />
+            
             <View style={styles.header}>
-                <Text style={[styles.title, { color: textColor }]}>Se connecter</Text>
-                <Text style={[styles.subtitle, { color: secondaryTextColor }]}>Connectez-vous pour accéder à votre compte</Text>
+                <Text style={[styles.title, { color: textColor }]}>Bienvenue !</Text>
+                <Text style={[styles.subtitle, { color: secondaryTextColor }]}>Veuillez renseigner vos informations de connexion.</Text>
             </View>
 
-            <View style={styles.form}>
-                <AuthFormField
-                    label="Adresse email"
-                    value={email}
-                    onChangeText={setEmail}
-                    placeholder="Entrez votre email"
-                    keyboardType="email-address"
-                />
-                <PasswordField
-                    label="Mot de passe"
-                    value={password}
-                    onChangeText={setPassword}
-                    placeholder="Entrez votre mot de passe"
-                />
+            <View style={[styles.sectionCard, { backgroundColor: cardBackgroundColor, borderColor: cardBorderColor }]}>
+                <View style={styles.form}>
+                    <AuthFormField
+                        label="Adresse email ou nom d'utilisateur"
+                        value={email}
+                        onChangeText={setEmail}
+                        placeholder=""
+                        keyboardType="email-address"
+                    />
+                    <PasswordField
+                        label="Mot de passe"
+                        value={password}
+                        onChangeText={setPassword}
+                        placeholder=""
+                    />
 
+                    {/* <View style={[styles.optionsRow, { alignSelf: 'flex-end' }]}>
+                        <Pressable onPress={onForgotPassword}>
+                            <Text style={[styles.forgotPassword, { color: "#1776BA" }]}>Mot de passe oublié ?</Text>
+                        </Pressable>
+                    </View> */}
+                </View>
             </View>
 
             <Pressable
@@ -135,16 +167,11 @@ export const SignInScreen = ({ onSignIn, onSwitchToSignUp, onForgotPassword }: S
                 )}
             </Pressable>
 
-            <View style={styles.separator}>
-                <View style={[styles.separatorLine, { backgroundColor: separatorLineColor }]} />
-                <Text style={[styles.separatorText, { color: secondaryTextColor }]}>OU</Text>
-                <View style={[styles.separatorLine, { backgroundColor: separatorLineColor }]} />
-            </View>
-
+           
             <View style={styles.footer}>
                 <Text style={[styles.footerText, { color: secondaryTextColor }]}>Vous n'avez pas de compte ? </Text>
                 <Pressable onPress={onSwitchToSignUp}>
-                    <Text style={[styles.footerLink, { color: linkColor }]}>Inscrivez-vous</Text>
+                    <Text style={[styles.footerLink, { color: "#1776BA" }]}>Inscrivez-vous !</Text>
                 </Pressable>
             </View>
         </ScrollView>
@@ -159,49 +186,112 @@ const styles = StyleSheet.create({
         flexGrow: 1,
         justifyContent: 'center',
         padding: 20,
-        paddingTop: 40,
+        paddingTop: 60,
+    },
+    logoContainer: {
+        width: 60,
+        height: 60,
+        alignSelf: 'center',
+        marginBottom: 40,
+        position: 'relative',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    logoBack: {
+        position: 'absolute',
+        width: 60,
+        height: 60,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    logoFront: {
+        position: 'absolute',
+        width: 60,
+        height: 60,
+        justifyContent: 'center',
+        alignItems: 'center',
+        transform: [{ translateX: 3 }, { translateY: 3 }],
+    },
+    logoCShape: {
+        width: 40,
+        height: 40,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    logoArc: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        borderWidth: 3,
+        borderRightWidth: 0,
+    },
+    logoArcBack: {
+        borderColor: '#E0E0E0',
+        opacity: 0.4,
+    },
+    logoArcFront: {
+        borderColor: '#000000',
+        opacity: 1,
     },
     header: {
         marginBottom: 32,
+        alignItems: 'center',
     },
     title: {
         fontSize: 32,
         fontFamily: 'Ubuntu_Bold',
         marginBottom: 8,
+        textAlign: 'center',
     },
     subtitle: {
         fontSize: 16,
         fontFamily: 'Ubuntu_Regular',
+        textAlign: 'center',
     },
     form: {
-        marginBottom: 24,
+        // marginBottom: 24,
+        padding: 10,
+    },
+    optionsRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginTop: 8,
+        // marginBottom: 8,
+    },
+    forgotPassword: {
+        fontSize: 14,
+        fontFamily: 'Ubuntu_Regular',
     },
     primaryButton: {
         backgroundColor: '#1776BA',
-        borderRadius: 8,
-        paddingVertical: 14,
+        borderRadius: 16,
+        paddingVertical: 16,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 24,
+        marginBottom: 16,
     },
     primaryButtonText: {
         fontSize: 16,
         fontFamily: 'Ubuntu_Bold',
         color: '#FFFFFF',
     },
-    separator: {
+    googleButton: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        paddingVertical: 16,
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
         marginBottom: 24,
+        gap: 8,
     },
-    separatorLine: {
-        flex: 1,
-        height: 1,
-    },
-    separatorText: {
-        marginHorizontal: 16,
-        fontSize: 14,
+    googleButtonText: {
+        fontSize: 16,
         fontFamily: 'Ubuntu_Regular',
+        color: '#1776BA',
     },
     footer: {
         flexDirection: 'row',
@@ -215,6 +305,12 @@ const styles = StyleSheet.create({
     footerLink: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Medium',
+    },
+    sectionCard: {
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 20,
+        borderWidth: 1,
     },
 });
 

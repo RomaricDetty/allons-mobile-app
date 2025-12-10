@@ -51,3 +51,12 @@ export const createBookingPayment = async (bookingData: any, token?: string): Pr
         headers,
     });
 }
+
+/**
+ * Recherche un ticket par référence (sans authentification)
+ * @param referenceCode - Le code de référence du ticket
+ * @returns AxiosResponse<any>
+ */
+export const getBookingByReference = async (referenceCode: string): Promise<AxiosResponse<any>> => {
+    return await axios.get(`${baseUrl}/bookings/reference/${referenceCode}`);
+}

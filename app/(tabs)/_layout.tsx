@@ -28,6 +28,7 @@ export default function TabLayout() {
                     tabBarIcon: ({ color }) => <MaterialCommunityIcons size={28} name="home-outline" color={color} />,
                 }}
             />
+            
             <Tabs.Screen
                 name="profile"
                 options={{

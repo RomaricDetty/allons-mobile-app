@@ -1,8 +1,10 @@
 import { Civility, PhoneType } from "@/types";
 
 export interface ContactUrgent {
-    fullName: string;
+    firstName: string;
+    lastName: string;
     phone: string;
+    relationship?: string;
 }
 
 /**
@@ -60,9 +62,17 @@ export interface Booking {
         label: string;
         stationFrom: {
             city: string;
+            coordinate: {
+                latitude: number;
+                longitude: number;
+            };
         };
         stationTo: {
             city: string;
+            coordinate: {
+                latitude: number;
+                longitude: number;
+            };
         };
     };
 }
@@ -91,6 +101,7 @@ export interface SignUpFormData {
     emergencyContactFirstName: string;
     emergencyContactLastName: string;
     emergencyContactPhone: string;
+    emergencyContactRelation: string;
     agreeToTerms: boolean;
 }
 

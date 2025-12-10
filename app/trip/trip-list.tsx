@@ -12,14 +12,141 @@ import {
     ActivityIndicator,
     Alert,
     FlatList,
+    Modal,
     Pressable,
     ScrollView,
     StyleSheet,
     Text,
-    View
+    TextInput,
+    View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+
+/**
+ * Convertit un nom d'aménité en nom d'icône MaterialCommunityIcons valide
+ * @param amenityName - Le nom d'aménité provenant de l'API (en français)
+ * @returns Le nom d'icône MaterialCommunityIcons correspondant, ou 'help-circle' par défaut
+ */
+const getAmenityIcon = (amenityName: string): string => {
+    // Mapping basé sur les noms d'icônes MaterialCommunityIcons valides
+    const iconMapping: Record<string, string> = {
+        // WiFi et connectivité
+        'wifi': 'wifi',
+        'wi-fi': 'wifi',
+        'internet': 'wifi',
+        'réseau': 'network',
+        'network': 'network',
+        
+        // Climatisation
+        'climatisation': 'air-conditioner',
+        'climatiseur': 'air-conditioner',
+        'air-conditioner': 'air-conditioner',
+        'air-conditioning': 'air-conditioner',
+        'ac': 'air-conditioner',
+        'climat': 'air-conditioner',
+        
+        // Prise électrique et USB
+        'prises usb': 'usb-port',
+        'prise usb': 'usb-port',
+        'usb': 'usb-port',
+        'port usb': 'usb-port',
+        'prise électrique': 'power-socket-eu',
+        'prises électriques': 'power-socket-eu',
+        'power': 'power-socket-eu',
+        'power-socket': 'power-socket-eu',
+        'outlet': 'power-socket-eu',
+        'plug': 'power-socket-eu',
+        'electric': 'power-socket-eu',
+        'électrique': 'power-socket-eu',
+        
+        // Toilettes
+        'toilettes': 'toilet',
+        'toilette': 'toilet',
+        'toilet': 'toilet',
+        'restroom': 'toilet',
+        'wc': 'toilet',
+        'bathroom': 'toilet',
+        'sanitaires': 'toilet',
+        
+        // Divertissement
+        'télévision': 'television',
+        'television': 'television',
+        'tv': 'television',
+        'téléviseur': 'television',
+        'écran': 'monitor',
+        'screen': 'monitor',
+        'monitor': 'monitor',
+        'entertainment': 'television',
+        'divertissement': 'television',
+        
+        // Confort et sièges
+        'sièges inclinables': 'seat-recline-normal',
+        'siège inclinable': 'seat-recline-normal',
+        'reclining-seat': 'seat-recline-normal',
+        'sièges': 'seat',
+        'siège': 'seat',
+        'seat': 'seat',
+        'places': 'seat',
+        'place': 'seat',
+        'legroom': 'seat-legroom-extra',
+        'espace jambes': 'seat-legroom-extra',
+        'couverture': 'blanket',
+        'blanket': 'blanket',
+        'oreiller': 'pillow',
+        'pillow': 'pillow',
+        
+        // Nourriture et boissons
+        'nourriture': 'food',
+        'food': 'food',
+        'repas': 'food',
+        'boisson': 'cup',
+        'drink': 'cup',
+        'boissons': 'cup',
+        'snack': 'food-variant',
+        'collation': 'food-variant',
+        'restaurant': 'silverware-fork-knife',
+        'restauration': 'silverware-fork-knife',
+        
+        // Bagages
+        'bagages': 'luggage',
+        'bagage': 'luggage',
+        'luggage': 'luggage',
+        'baggage': 'luggage',
+        'stockage': 'package-variant',
+        'storage': 'package-variant',
+        
+        // Autres
+        'chargement': 'battery-charging',
+        'charging': 'battery-charging',
+        'charge': 'battery-charging',
+        'téléphone': 'phone',
+        'phone': 'phone',
+        'musique': 'music',
+        'music': 'music',
+        'lampe de lecture': 'lightbulb-on',
+        'reading-light': 'lightbulb-on',
+        'rideau': 'curtains',
+        'curtain': 'curtains',
+        'curtains': 'curtains',
+        'fenêtre': 'window-open',
+        'window': 'window-open',
+    };
+    
+    // Normaliser le nom (minuscules, supprimer les accents, remplacer les espaces et tirets)
+    const normalized = amenityName
+        .toLowerCase()
+        .trim()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '') // Supprimer les accents
+        .replace(/[\s_-]+/g, '-');
+    
+    // Chercher d'abord avec le nom normalisé, puis avec le nom original en minuscules
+    return iconMapping[normalized] || 
+           iconMapping[amenityName.toLowerCase().trim()] || 
+           normalized || 
+           'help-circle';
+};
 
 /**
  * Écran de liste des trajets disponibles
@@ -51,6 +178,7 @@ const TripList = () => {
     const { departures, searchParams } = (route.params as { departures?: Departures, searchParams?: SearchParams }) || {};
     const trips = departures?.items || [];
     const totalTrips = departures?.total || 0;
+    const filters = departures?.filters;
 
     // États pour les dropdowns et modals
     const [showFiltersModal, setShowFiltersModal] = useState(false);
@@ -60,6 +188,14 @@ const TripList = () => {
 
     // États pour les filtres
     const [selectedSort, setSelectedSort] = useState('Prix croissant');
+    const [minPrice, setMinPrice] = useState(() => filters?.priceRange?.min?.toString() || '0');
+    const [maxPrice, setMaxPrice] = useState(() => filters?.priceRange?.max?.toString() || '50000');
+    
+    // États pour les filtres dynamiques depuis departures.filters
+    const [selectedTimeSlots, setSelectedTimeSlots] = useState<Set<string>>(new Set());
+    const [selectedCompanies, setSelectedCompanies] = useState<Set<string>>(new Set());
+    const [selectedAmenities, setSelectedAmenities] = useState<Set<string>>(new Set());
+    const [selectedBusTypes, setSelectedBusTypes] = useState<Set<string>>(new Set());
 
     // Options de tri
     const sortOptions = [
@@ -78,10 +214,62 @@ const TripList = () => {
     };
 
     /**
-     * Trie la liste des trajets selon le critère sélectionné
+     * Vérifie si une heure est dans un créneau horaire
+     */
+    const isTimeInSlot = (time: string, startTime: string, endTime: string): boolean => {
+        const tripMinutes = timeToMinutes(time);
+        const startMinutes = timeToMinutes(startTime);
+        const endMinutes = timeToMinutes(endTime);
+        
+        // Gérer le cas où le créneau passe minuit (ex: 18h-24h)
+        if (endMinutes < startMinutes) {
+            return tripMinutes >= startMinutes || tripMinutes <= endMinutes;
+        }
+        return tripMinutes >= startMinutes && tripMinutes <= endMinutes;
+    };
+
+    /**
+     * Filtre et trie la liste des trajets selon les critères sélectionnés
      */
     const sortedTrips = useMemo(() => {
-        const tripsCopy = [...trips];
+        const min = parseInt(minPrice) || 0;
+        const max = parseInt(maxPrice) || 50000;
+
+        // Filtrage par prix
+        let filteredTrips = trips.filter(trip => {
+            const price = trip.price;
+            if (price < min || price > max) return false;
+
+            // Filtrage par créneaux horaires
+            if (selectedTimeSlots.size > 0 && filters?.timeSlots) {
+                const matchesTimeSlot = filters.timeSlots.some((slot: any) => 
+                    selectedTimeSlots.has(slot.id) && 
+                    isTimeInSlot(trip.departureTime, slot.startTime, slot.endTime)
+                );
+                if (!matchesTimeSlot) return false;
+            }
+
+            // Filtrage par compagnies
+            if (selectedCompanies.size > 0) {
+                if (!selectedCompanies.has(trip.companyId)) return false;
+            }
+
+            // Filtrage par types de bus
+            if (selectedBusTypes.size > 0) {
+                if (!selectedBusTypes.has(trip.busType.toLowerCase())) return false;
+            }
+
+            // Filtrage par équipements (amenities)
+            // Note: Cette logique dépend de la structure des données des trajets
+            // Si les trajets ont une propriété amenities, on peut filtrer ici
+            // Pour l'instant, on suppose que tous les trajets passent ce filtre
+            // si aucun équipement n'est sélectionné ou si le trajet correspond
+
+            return true;
+        });
+
+        // Tri selon le critère sélectionné
+        const tripsCopy = [...filteredTrips];
 
         switch (selectedSort) {
             case 'Prix croissant':
@@ -107,7 +295,115 @@ const TripList = () => {
             default:
                 return tripsCopy;
         }
-    }, [trips, selectedSort]);
+    }, [trips, selectedSort, minPrice, maxPrice, selectedTimeSlots, selectedCompanies, selectedBusTypes, filters]);
+
+    /**
+     * Réinitialise tous les filtres à leurs valeurs par défaut
+     */
+    const resetAllFilters = () => {
+        setMinPrice(filters?.priceRange?.min?.toString() || '0');
+        setMaxPrice(filters?.priceRange?.max?.toString() || '50000');
+        setSelectedTimeSlots(new Set());
+        setSelectedCompanies(new Set());
+        setSelectedAmenities(new Set());
+        setSelectedBusTypes(new Set());
+    };
+
+    /**
+     * Gère la sélection/désélection d'un créneau horaire
+     */
+    const toggleTimeSlot = (id: string) => {
+        setSelectedTimeSlots(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(id)) {
+                newSet.delete(id);
+            } else {
+                newSet.add(id);
+            }
+            return newSet;
+        });
+    };
+
+    /**
+     * Gère la sélection/désélection d'une compagnie
+     */
+    const toggleCompany = (id: string) => {
+        setSelectedCompanies(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(id)) {
+                newSet.delete(id);
+            } else {
+                newSet.add(id);
+            }
+            return newSet;
+        });
+    };
+
+    /**
+     * Gère la sélection/désélection d'un équipement
+     */
+    const toggleAmenity = (id: string) => {
+        setSelectedAmenities(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(id)) {
+                newSet.delete(id);
+            } else {
+                newSet.add(id);
+            }
+            return newSet;
+        });
+    };
+
+    /**
+     * Gère la sélection/désélection d'un type de bus
+     */
+    const toggleBusType = (id: string) => {
+        setSelectedBusTypes(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(id)) {
+                newSet.delete(id);
+            } else {
+                newSet.add(id);
+            }
+            return newSet;
+        });
+    };
+
+    /**
+     * Incrémente la valeur du prix minimum
+     */
+    const incrementMinPrice = () => {
+        const current = parseInt(minPrice) || 0;
+        setMinPrice(String(current + 1));
+    };
+
+    /**
+     * Décrémente la valeur du prix minimum
+     */
+    const decrementMinPrice = () => {
+        const current = parseInt(minPrice) || 0;
+        if (current > 0) {
+            setMinPrice(String(current - 1));
+        }
+    };
+
+    /**
+     * Incrémente la valeur du prix maximum
+     */
+    const incrementMaxPrice = () => {
+        const current = parseInt(maxPrice) || 50000;
+        setMaxPrice(String(current + 1));
+    };
+
+    /**
+     * Décrémente la valeur du prix maximum
+     */
+    const decrementMaxPrice = () => {
+        const current = parseInt(maxPrice) || 50000;
+        if (current > 0) {
+            setMaxPrice(String(current - 1));
+        }
+    };
 
     // Récupération des villes depuis le premier trajet
     const departureCity = sortedTrips[0]?.departureCity || trips[0]?.departureCity || '';
@@ -266,6 +562,8 @@ const TripList = () => {
         );
     };
 
+    console.log("Departures filters ===>, ", JSON.stringify(departures?.filters, null, 2));
+
     return (
         <>
             <View style={[styles.container, { backgroundColor: scrollBackgroundColor }]}>
@@ -286,22 +584,22 @@ const TripList = () => {
                     </Pressable>
 
                     {/* Bouton Filtres */}
-                    {/* <Pressable
-                    style={styles.filterButton}
-                    onPress={() => setShowFiltersModal(true)}
-                >
-                    <Icon name="filter-variant" size={20} color="#000" />
-                    <Text style={styles.filterButtonText}>Filtres</Text>
-                </Pressable> */}
+                    <Pressable
+                        style={[styles.filterButton, { backgroundColor: cardBackgroundColor, borderColor }]}
+                        onPress={() => setShowFiltersModal(true)}
+                    >
+                        <Icon name="filter-variant" size={20} color={textColor} />
+                        <Text style={[styles.filterButtonText, { color: textColor }]}>Filtres</Text>
+                    </Pressable>
 
                     {/* Dropdown Afficher */}
                     {/* <Pressable
-                    style={styles.displayButton}
-                    onPress={() => setShowDisplayModal(true)}
-                >
-                    <Text style={styles.displayButtonText}>Afficher</Text>
-                    <Icon name="chevron-down" size={20} color="#000" />
-                </Pressable> */}
+                        style={[styles.displayButton, { backgroundColor: cardBackgroundColor, borderColor }]}
+                        onPress={() => setShowDisplayModal(true)}
+                    >
+                        <Text style={[styles.displayButtonText, { color: textColor }]}>Afficher</Text>
+                        <Icon name="chevron-down" size={20} color={textColor} />
+                    </Pressable> */}
                 </View>
 
                 <ScrollView
@@ -326,7 +624,7 @@ const TripList = () => {
                     {/* Résumé et Tri */}
                     <View style={styles.summaryContainer}>
                         <Text style={[styles.summaryText, { color: secondaryTextColor }]}>
-                            {totalTrips} {totalTrips > 1 ? 'trajets disponibles' : 'trajet disponible'}
+                            {sortedTrips.length} {sortedTrips.length > 1 ? 'trajets disponibles' : 'trajet disponible'}
                         </Text>
                         <Pressable
                             style={styles.sortButton}
@@ -355,30 +653,290 @@ const TripList = () => {
                 </ScrollView>
 
                 {/* Modal Filtres (à implémenter) */}
-                {/* <Modal
-                visible={showFiltersModal}
-                transparent={true}
-                animationType="slide"
-                onRequestClose={() => setShowFiltersModal(false)}
-            >
-                <Pressable
-                    style={styles.modalOverlay}
-                    onPress={() => setShowFiltersModal(false)}
+                <Modal
+                    visible={showFiltersModal}
+                    transparent={true}
+                    animationType="slide"
+                    onRequestClose={() => setShowFiltersModal(false)}
                 >
-                    <View style={[styles.modalContent, { paddingBottom: insets.bottom + 20 }]}>
-                        <Text style={styles.modalTitle}>Filtres</Text>
-                        <Text style={styles.modalPlaceholder}>
-                            Les filtres seront implémentés ici
-                        </Text>
-                        <Pressable
-                            style={styles.modalCloseButton}
-                            onPress={() => setShowFiltersModal(false)}
+                    <Pressable
+                        style={styles.modalOverlay}
+                        onPress={() => setShowFiltersModal(false)}
+                    >
+                        <View 
+                            style={[styles.modalContent, { 
+                                backgroundColor: modalBackgroundColor 
+                            }]}
+                            onStartShouldSetResponder={() => true}
                         >
-                            <Text style={styles.modalCloseButtonText}>Fermer</Text>
-                        </Pressable>
-                    </View>
-                </Pressable>
-                </Modal> */}
+                            {/* En-tête du modal */}
+                            <View style={styles.modalHeader}>
+                                <Text style={[styles.modalTitle, { color: textColor }]}>Filtrer par</Text>
+                                <Pressable onPress={resetAllFilters}>
+                                    <Text style={[styles.resetButton, { color: tintColor }]}>Réinitialiser</Text>
+                                </Pressable>
+                            </View>
+
+                            <ScrollView 
+                                style={styles.modalScrollView}
+                                contentContainerStyle={styles.modalScrollContent}
+                                showsVerticalScrollIndicator={true}
+                            >
+                                {/* Section Prix du billet */}
+                                <View style={styles.filterSection}>
+                                    <Text style={[styles.filterCategory, { color: textColor }]}>Prix du billet</Text>
+                                    
+                                    {/* Champ Min */}
+                                    <View style={styles.priceInputContainer}>
+                                        <Text style={[styles.priceLabel, { color: textColor }]}>Min</Text>
+                                        <View style={[styles.priceInputWrapper, { borderColor, backgroundColor: cardBackgroundColor }]}>
+                                            <TextInput
+                                                style={[styles.priceInput, { color: textColor }]}
+                                                value={minPrice}
+                                                onChangeText={setMinPrice}
+                                                keyboardType="numeric"
+                                                placeholder="0"
+                                                placeholderTextColor={secondaryTextColor}
+                                            />
+                                            <View style={styles.stepperContainer}>
+                                                <Pressable 
+                                                    style={styles.stepperButton}
+                                                    onPress={incrementMinPrice}
+                                                >
+                                                    <Icon name="chevron-up" size={16} color={textColor} />
+                                                </Pressable>
+                                                <Pressable 
+                                                    style={styles.stepperButton}
+                                                    onPress={decrementMinPrice}
+                                                >
+                                                    <Icon name="chevron-down" size={16} color={textColor} />
+                                                </Pressable>
+                                            </View>
+                                        </View>
+                                    </View>
+
+                                    {/* Champ Max */}
+                                    <View style={styles.priceInputContainer}>
+                                        <Text style={[styles.priceLabel, { color: textColor }]}>Max</Text>
+                                        <View style={[styles.priceInputWrapper, { borderColor, backgroundColor: cardBackgroundColor }]}>
+                                            <TextInput
+                                                style={[styles.priceInput, { color: textColor }]}
+                                                value={maxPrice}
+                                                onChangeText={setMaxPrice}
+                                                keyboardType="numeric"
+                                                placeholder="50000"
+                                                placeholderTextColor={secondaryTextColor}
+                                            />
+                                            <View style={styles.stepperContainer}>
+                                                <Pressable 
+                                                    style={styles.stepperButton}
+                                                    onPress={incrementMaxPrice}
+                                                >
+                                                    <Icon name="chevron-up" size={16} color={textColor} />
+                                                </Pressable>
+                                                <Pressable 
+                                                    style={styles.stepperButton}
+                                                    onPress={decrementMaxPrice}
+                                                >
+                                                    <Icon name="chevron-down" size={16} color={textColor} />
+                                                </Pressable>
+                                            </View>
+                                        </View>
+                                    </View>
+                                </View>
+
+                            {/* Section Créneaux horaires */}
+                            {filters?.timeSlots && filters.timeSlots.length > 0 && (
+                                <View style={styles.filterSection}>
+                                    <Text style={[styles.filterCategory, { color: textColor }]}>Créneaux horaires</Text>
+                                    {filters.timeSlots.map((slot: any) => {
+                                        const isSelected = selectedTimeSlots.has(slot.id);
+                                        return (
+                                            <Pressable
+                                                key={slot.id}
+                                                style={[
+                                                    styles.filterOption,
+                                                    { 
+                                                        borderColor: isSelected ? "#1776BA" : borderColor,
+                                                        borderWidth: isSelected ? 1 : 0.5,
+                                                        backgroundColor: cardBackgroundColor 
+                                                    }
+                                                ]}
+                                                onPress={() => toggleTimeSlot(slot.id)}
+                                            >
+                                                <View style={styles.filterOptionContent}>
+                                                    <Text style={[
+                                                        styles.filterOptionText,
+                                                        { color: isSelected ? "#1776BA" : textColor }
+                                                    ]}>
+                                                        {slot.label}
+                                                    </Text>
+                                                    {slot.count !== undefined && (
+                                                        <Text style={[
+                                                            styles.filterOptionCount,
+                                                            { color: isSelected ? "#1776BA" : secondaryTextColor }
+                                                        ]}>
+                                                            ({slot.count})
+                                                        </Text>
+                                                    )}
+                                                </View>
+                                                {/* {isSelected && (
+                                                    <Icon name="check-circle" size={20} color={tintColor} />
+                                                )} */}
+                                            </Pressable>
+                                        );
+                                    })}
+                                </View>
+                            )}
+
+                            {/* Section Compagnies */}
+                            {filters?.companies && filters.companies.length > 0 && (
+                                <View style={styles.filterSection}>
+                                    <Text style={[styles.filterCategory, { color: textColor }]}>Compagnies</Text>
+                                    {filters.companies.map((company: any) => {
+                                        const isSelected = selectedCompanies.has(company.id);
+                                        return (
+                                            <Pressable
+                                                key={company.id}
+                                                style={[
+                                                    styles.filterOption,
+                                                    { 
+                                                        borderColor: isSelected ? "#1776BA" : borderColor,
+                                                        borderWidth: isSelected ? 1 : 0.5,
+                                                        backgroundColor: cardBackgroundColor 
+                                                    }
+                                                ]}
+                                                onPress={() => toggleCompany(company.id)}
+                                            >
+                                                <View style={styles.filterOptionContent}>
+                                                    <Text style={[
+                                                        styles.filterOptionText,
+                                                        { color: isSelected ? "#1776BA" : textColor }
+                                                    ]}>
+                                                        {company.name}
+                                                    </Text>
+                                                    {company.count !== undefined && (
+                                                        <Text style={[
+                                                            styles.filterOptionCount,
+                                                            { color: isSelected ? "#1776BA" : secondaryTextColor }
+                                                        ]}>
+                                                            ({company.count})
+                                                        </Text>
+                                                    )}
+                                                </View>
+                                                {/* {isSelected && (
+                                                    <Icon name="check-circle" size={20} color={tintColor} />
+                                                )} */}
+                                            </Pressable>
+                                        );
+                                    })}
+                                </View>
+                            )}
+
+                            {/* Section Équipements */}
+                            {filters?.amenities && filters.amenities.length > 0 && (
+                                <View style={styles.filterSection}>
+                                    <Text style={[styles.filterCategory, { color: textColor }]}>Équipements</Text>
+                                    {filters.amenities.map((amenity: any) => {
+                                        const isSelected = selectedAmenities.has(amenity.id);
+                                        return (
+                                            <Pressable
+                                                key={amenity.id}
+                                                style={[
+                                                    styles.filterOption,
+                                                    { 
+                                                        borderColor: isSelected ? "#1776BA" : borderColor,
+                                                        borderWidth: isSelected ? 1 : 0.5,
+                                                        backgroundColor: cardBackgroundColor 
+                                                    }
+                                                ]}
+                                                onPress={() => toggleAmenity(amenity.id)}
+                                            >
+                                                <View style={styles.filterOptionContent}>
+                                                    {amenity.icon && (
+                                                        <Icon name={getAmenityIcon(amenity.name.toLowerCase())} size={20} color={isSelected ? '#1776BA' : textColor} />
+                                                    )}
+                                                    <Text style={[
+                                                        styles.filterOptionText,
+                                                        { color: isSelected ? "#1776BA" : textColor }
+                                                    ]}>
+                                                        {amenity.name}
+                                                    </Text>
+                                                    {amenity.count !== undefined && (
+                                                        <Text style={[
+                                                            styles.filterOptionCount,
+                                                            { color: isSelected ? "#1776BA" : secondaryTextColor }
+                                                        ]}>
+                                                            ({amenity.count})
+                                                        </Text>
+                                                    )}
+                                                </View>
+                                                {/* {isSelected && (
+                                                    <Icon name="check-circle" size={20} color={tintColor} />
+                                                )} */}
+                                            </Pressable>
+                                        );
+                                    })}
+                                </View>
+                            )}
+
+                            {/* Section Types de bus */}
+                            {filters?.busTypes && filters.busTypes.length > 0 && (
+                                <View style={styles.filterSection}>
+                                    <Text style={[styles.filterCategory, { color: textColor }]}>Types de bus</Text>
+                                    {filters.busTypes.map((busType: any) => {
+                                        const isSelected = selectedBusTypes.has(busType.id);
+                                        return (
+                                            <Pressable
+                                                key={busType.id}
+                                                style={[
+                                                    styles.filterOption,
+                                                    { 
+                                                        borderColor: isSelected ? "#1776BA" : borderColor,
+                                                        borderWidth: isSelected ? 1 : 0.5,
+                                                        backgroundColor: cardBackgroundColor 
+                                                    }
+                                                ]}
+                                                onPress={() => toggleBusType(busType.id)}
+                                            >
+                                                <View style={styles.filterOptionContent}>
+                                                    <Text style={[
+                                                        styles.filterOptionText,
+                                                        { color: isSelected ? "#1776BA" : textColor }
+                                                    ]}>
+                                                        {busType.name}
+                                                    </Text>
+                                                    {busType.count !== undefined && (
+                                                        <Text style={[
+                                                            styles.filterOptionCount,
+                                                            { color: isSelected ? "#1776BA" : secondaryTextColor }
+                                                        ]}>
+                                                            ({busType.count})
+                                                        </Text>
+                                                    )}
+                                                </View>
+                                                {/* {isSelected && (
+                                                    <Icon name="check-circle" size={20} color={tintColor} />
+                                                )} */}
+                                            </Pressable>
+                                        );
+                                    })}
+                                </View>
+                            )}
+                            </ScrollView>
+
+                            {/* Bouton Fermer */}
+                            <View style={[styles.modalCloseButtonContainer, { paddingBottom: insets.bottom + 10 }]}>
+                                <Pressable
+                                    style={[styles.modalCloseButton, { backgroundColor: "#1776BA" }]}
+                                    onPress={() => setShowFiltersModal(false)}
+                                >
+                                    <Text style={[styles.modalCloseButtonText, { color: '#FFFFFF' }]}>Fermer</Text>
+                                </Pressable>
+                            </View>
+                        </View>
+                    </Pressable>
+                </Modal>
 
                 {/* Modal Afficher (à implémenter) */}
                 {/* <Modal
@@ -698,6 +1256,9 @@ const styles = StyleSheet.create({
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
         width: '100%',
+        maxHeight: '90%',
+        minHeight: 300,
+        flexDirection: 'column',
         shadowColor: '#000',
         shadowOffset: {
             width: 0,
@@ -707,10 +1268,18 @@ const styles = StyleSheet.create({
         shadowRadius: 10,
         elevation: 10,
     },
+    modalScrollView: {
+        maxHeight: 500,
+    },
+    modalScrollContent: {
+        paddingBottom: 20,
+    },
     modalTitle: {
         fontSize: 20,
         fontFamily: 'Ubuntu_Bold',
-        marginBottom: 20,
+    },
+    modalCloseButtonContainer: {
+        paddingHorizontal: 20,
     },
     modalPlaceholder: {
         fontSize: 14,
@@ -751,6 +1320,84 @@ const styles = StyleSheet.create({
         fontSize: 20,
         fontFamily: 'Ubuntu_Bold',
         textAlign: 'center',
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 24,
+        paddingHorizontal: 20,
+        paddingTop: 20,
+    },
+    resetButton: {
+        fontSize: 16,
+        fontFamily: 'Ubuntu_Medium',
+    },
+    filterSection: {
+        paddingHorizontal: 20,
+        marginBottom: 24,
+    },
+    filterCategory: {
+        fontSize: 16,
+        fontFamily: 'Ubuntu_Regular',
+        marginBottom: 16,
+    },
+    priceInputContainer: {
+        marginBottom: 20,
+    },
+    priceLabel: {
+        fontSize: 14,
+        fontFamily: 'Ubuntu_Regular',
+        marginBottom: 8,
+    },
+    priceInputWrapper: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderRadius: 8,
+        paddingHorizontal: 12,
+    },
+    priceInput: {
+        flex: 1,
+        fontSize: 16,
+        fontFamily: 'Ubuntu_Regular',
+        paddingVertical: 12,
+    },
+    stepperContainer: {
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    stepperButton: {
+        padding: 4,
+    },
+    filterOption: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderRadius: 15,
+        borderWidth: 1,
+        marginBottom: 8,
+    },
+    filterOptionContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+        gap: 8,
+    },
+    filterOptionIcon: {
+        fontSize: 18,
+    },
+    filterOptionText: {
+        fontSize: 16,
+        fontFamily: 'Ubuntu_Regular',
+        flex: 1,
+    },
+    filterOptionCount: {
+        fontSize: 14,
+        fontFamily: 'Ubuntu_Regular',
     },
 });
 

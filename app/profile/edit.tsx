@@ -3,6 +3,8 @@ import { authGetUserInfo, updateUserInfo } from '@/api/auth_register';
 import { FormField } from '@/components/passengers/FormField';
 import { PhoneField } from '@/components/passengers/PhoneField';
 import { SectionHeader } from '@/components/passengers/SectionHeader';
+import { SelectField } from '@/components/passengers/SelectField';
+import { SelectionBottomSheet } from '@/components/passengers/SelectionBottomSheet';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { User } from '@/interfaces';
@@ -58,6 +60,14 @@ export default function EditProfileScreen() {
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [showDatePicker, setShowDatePicker] = useState(false);
+    
+    // États pour le bottom sheet de sélection
+    const [showSelectionBottomSheet, setShowSelectionBottomSheet] = useState(false);
+    const [selectionType, setSelectionType] = useState<'passengerType' | 'relation' | null>(null);
+    const [selectionTitle, setSelectionTitle] = useState('');
+    const [selectionOptions, setSelectionOptions] = useState<Array<{ value: string, label: string }>>([]);
+    const [currentSelectionValue, setCurrentSelectionValue] = useState<string>('');
+    const [onSelectionCallback, setOnSelectionCallback] = useState<((value: string) => void) | null>(null);
 
     // États pour les champs du formulaire
     const [formData, setFormData] = useState({
@@ -73,6 +83,7 @@ export default function EditProfileScreen() {
         emergencyContactName: '',
         emergencyContactFullName: '',
         emergencyContactPhone: '',
+        emergencyContactRelation: '',
     });
 
     /**
@@ -144,18 +155,21 @@ export default function EditProfileScreen() {
                     }
                     
                     // Extraire le nom et prénom du contact d'urgence depuis fullName
-                    const fullName = userData.contactUrgent?.fullName || '';
-                    let emergencyFirstName = '';
-                    let emergencyLastName = '';
-                    if (fullName.trim()) {
-                        const firstSpaceIndex = fullName.indexOf(' ');
-                        if (firstSpaceIndex !== -1) {
-                            emergencyFirstName = fullName.substring(0, firstSpaceIndex).trim();
-                            emergencyLastName = fullName.substring(firstSpaceIndex + 1).trim();
-                        } else {
-                            emergencyFirstName = fullName.trim();
-                        }
-                    }
+                    const fullName = userData.contactUrgent?.firstName + ' ' + userData.contactUrgent?.lastName || '';
+                    let emergencyFirstName = userData.contactUrgent?.firstName || '';
+                    let emergencyLastName = userData.contactUrgent?.lastName || '';
+                    // if (fullName.trim()) {
+                    //     const firstSpaceIndex = fullName.indexOf(' ');
+                    //     if (firstSpaceIndex !== -1) {
+                    //         emergencyFirstName = fullName.substring(0, firstSpaceIndex).trim();
+                    //         emergencyLastName = fullName.substring(firstSpaceIndex + 1).trim();
+                    //     } else {
+                    //         emergencyFirstName = fullName.trim();
+                    //     }
+                    // }
+                    
+                    // Extraire la relation du contact d'urgence
+                    const emergencyRelation = userData.contactUrgent?.relationship || '';
                     
                     setFormData({
                         firstName: userData.firstName || '',
@@ -170,6 +184,7 @@ export default function EditProfileScreen() {
                         emergencyContactName: emergencyLastName,
                         emergencyContactFullName: fullName,
                         emergencyContactPhone: emergencyPhone,
+                        emergencyContactRelation: emergencyRelation,
                     });
                 }
             } catch (error) {
@@ -195,6 +210,46 @@ export default function EditProfileScreen() {
         } catch {
             return '';
         }
+    };
+
+    /**
+     * Ouvre le bottom sheet de sélection
+     */
+    const openSelectionBottomSheet = (
+        type: 'passengerType' | 'relation',
+        title: string,
+        options: Array<{ value: string, label: string }>,
+        currentValue: string,
+        onSelect: (value: string) => void
+    ) => {
+        setSelectionType(type);
+        setSelectionTitle(title);
+        setSelectionOptions(options);
+        setCurrentSelectionValue(currentValue);
+        setOnSelectionCallback(() => onSelect);
+        setShowSelectionBottomSheet(true);
+    };
+
+    /**
+     * Ferme le bottom sheet de sélection
+     */
+    const closeSelectionBottomSheet = () => {
+        setShowSelectionBottomSheet(false);
+        setSelectionType(null);
+        setSelectionTitle('');
+        setSelectionOptions([]);
+        setCurrentSelectionValue('');
+        setOnSelectionCallback(null);
+    };
+
+    /**
+     * Gère la sélection d'une valeur
+     */
+    const handleSelection = (value: string) => {
+        if (onSelectionCallback) {
+            onSelectionCallback(value);
+        }
+        closeSelectionBottomSheet();
     };
 
     /**
@@ -275,8 +330,10 @@ export default function EditProfileScreen() {
                     }
                     : user?.address || null,
                 contactUrgent: {
-                    fullName: formData.emergencyContactFirstName.trim() + ' ' + formData.emergencyContactName.trim(),
+                    firstName: formData.emergencyContactFirstName.trim(),
+                    lastName: formData.emergencyContactName.trim(),
                     phone: `+225${formData.emergencyContactPhone.trim()}`,
+                    relationship: formData.emergencyContactRelation.trim() || undefined,
                 },
             };
 
@@ -546,6 +603,29 @@ export default function EditProfileScreen() {
                                     }))
                                 }
                             />
+
+                            <SelectField
+                                label="Relation"
+                                value={formData.emergencyContactRelation}
+                                placeholder="Sélectionner une relation"
+                                required
+                                selectionType="relation"
+                                options={[
+                                    {value: 'parent', label: 'Parent'},
+                                    {value: 'conjoint', label: 'Conjoint(e)'},
+                                    {value: 'enfant', label: 'Enfant'},
+                                    {value: 'frere-soeur', label: 'Frère/Sœur'},
+                                    {value: 'ami', label: 'Ami(e)'},
+                                    {value: 'autre', label: 'Autre'}
+                                ]}
+                                onSelect={(value) =>
+                                    setFormData((prev) => ({
+                                        ...prev,
+                                        emergencyContactRelation: value,
+                                    }))
+                                }
+                                onOpenBottomSheet={openSelectionBottomSheet}
+                            />
                         </View>
                     </View>
 
@@ -621,6 +701,16 @@ export default function EditProfileScreen() {
                     maximumDate={new Date()}
                 />
             )}
+
+            {/* Bottom Sheet de sélection */}
+            <SelectionBottomSheet
+                visible={showSelectionBottomSheet}
+                title={selectionTitle}
+                options={selectionOptions}
+                currentValue={currentSelectionValue}
+                onSelect={handleSelection}
+                onClose={closeSelectionBottomSheet}
+            />
         </View>
     );
 }

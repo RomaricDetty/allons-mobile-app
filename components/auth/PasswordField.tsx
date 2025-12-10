@@ -36,10 +36,10 @@ export const PasswordField = ({
     const textColor = useThemeColor({}, 'text');
     const iconColor = useThemeColor({}, 'icon');
     
-    // Couleurs spécifiques pour le champ
-    const inputBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#FFFFFF';
-    const inputBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
-    const placeholderColor = colorScheme === 'dark' ? '#9BA1A6' : '#A6A6AA';
+    // Couleurs spécifiques pour le champ - style moderne avec fond gris clair
+    const inputBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#F5F5F5';
+    const inputBorderColor = colorScheme === 'dark' ? '#3A3A3C' : 'transparent';
+    const placeholderColor = colorScheme === 'dark' ? '#9BA1A6' : '#999999';
 
     return (
         <View style={styles.formField}>
@@ -94,14 +94,14 @@ const styles = StyleSheet.create({
     inputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        borderRadius: 8,
-        borderWidth: 1,
+        borderRadius: 16,
+        borderWidth: 0,
     },
     formInput: {
         flex: 1,
         paddingHorizontal: 16,
-        paddingVertical: 12,
-        fontSize: 14,
+        paddingVertical: 14,
+        fontSize: 16,
         fontFamily: 'Ubuntu_Regular',
     },
     eyeButton: {

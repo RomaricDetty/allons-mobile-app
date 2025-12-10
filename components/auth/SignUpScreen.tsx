@@ -60,6 +60,7 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
         emergencyContactFirstName: '',
         emergencyContactLastName: '',
         emergencyContactPhone: '',
+        emergencyContactRelation: '',
         agreeToTerms: false,
     });
 
@@ -70,12 +71,23 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
     // États pour les modals et pickers
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [showCivilityPicker, setShowCivilityPicker] = useState(false);
+    const [showRelationPicker, setShowRelationPicker] = useState(false);
 
     // Options pour la civilité
     const civilityOptions = [
         { value: 'MR', label: 'Monsieur' },
         { value: 'MRS', label: 'Madame' },
         { value: 'MISS', label: 'Mademoiselle' },
+    ];
+
+    // Options pour la relation du contact d'urgence
+    const relationOptions = [
+        { value: 'parent', label: 'Parent' },
+        { value: 'conjoint', label: 'Conjoint(e)' },
+        { value: 'enfant', label: 'Enfant' },
+        { value: 'frere-soeur', label: 'Frère/Sœur' },
+        { value: 'ami', label: 'Ami(e)' },
+        { value: 'autre', label: 'Autre' },
     ];
 
     /**
@@ -274,8 +286,10 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
                 username: formData.username,
                 contactUrgent: emergencyContactFullName && formData.emergencyContactPhone
                     ? {
-                        fullName: emergencyContactFullName,
+                        firstName: formData.emergencyContactFirstName,
+                        lastName: formData.emergencyContactLastName,
                         phone: formData.emergencyContactPhone,
+                        relationship: formData.emergencyContactRelation || undefined,
                     }
                     : undefined,
                 email: formData.email,
@@ -380,6 +394,21 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
     const handleSelectCivility = (value: string) => {
         updateField('civility', value);
         setShowCivilityPicker(false);
+    };
+
+    /**
+     * Ouvre le bottom sheet pour la relation
+     */
+    const handleOpenRelationPicker = () => {
+        setShowRelationPicker(true);
+    };
+
+    /**
+     * Gère la sélection de la relation
+     */
+    const handleSelectRelation = (value: string) => {
+        updateField('emergencyContactRelation', value);
+        setShowRelationPicker(false);
     };
 
     /**
@@ -660,6 +689,36 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
                                     keyboardType="phone-pad"
                                 />
                             </View>
+
+                            {/* Contact d'urgence - Relation */}
+                            <View style={styles.formField}>
+                                <Text style={[styles.formLabel, { color: textColor }]}>
+                                    Relation
+                                </Text>
+                                <Pressable
+                                    style={[
+                                        styles.selectInput,
+                                        {
+                                            backgroundColor: inputBackgroundColor,
+                                            borderColor: inputBorderColor
+                                        }
+                                    ]}
+                                    onPress={() => {
+                                        handleOpenRelationPicker();
+                                        markFieldAsTouched('emergencyContactRelation');
+                                    }}
+                                >
+                                    <Text style={[
+                                        styles.selectText,
+                                        { color: formData.emergencyContactRelation ? textColor : placeholderColor }
+                                    ]}>
+                                        {formData.emergencyContactRelation 
+                                            ? relationOptions.find(opt => opt.value === formData.emergencyContactRelation)?.label || ''
+                                            : 'Sélectionner une relation'}
+                                    </Text>
+                                    <MaterialCommunityIcons name="chevron-down" size={20} color={iconColor} />
+                                </Pressable>
+                            </View>
                         </View>
 
                         {/* Checkbox conditions d'utilisation */}
@@ -761,6 +820,16 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
                         onSelect={handleSelectCivility}
                         onClose={() => setShowCivilityPicker(false)}
                     />
+
+                    {/* Relation Bottom Sheet */}
+                    <SelectionBottomSheet
+                        visible={showRelationPicker}
+                        title="Relation"
+                        options={relationOptions}
+                        currentValue={formData.emergencyContactRelation}
+                        onSelect={handleSelectRelation}
+                        onClose={() => setShowRelationPicker(false)}
+                    />
                 </ScrollView>
             )}
         </>
@@ -802,26 +871,38 @@ const styles = StyleSheet.create({
         color: '#FF0000',
     },
     dateInput: {
-        borderRadius: 8,
-        paddingHorizontal: 16,
-        paddingVertical: 12,
+        // borderRadius: 8,
+        // paddingHorizontal: 16,
+        // paddingVertical: 12,
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        borderWidth: 1,
+        // borderWidth: 1,
+        borderRadius: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        fontSize: 16,
+        fontFamily: 'Ubuntu_Regular',
+        borderWidth: 0,
     },
     dateInputText: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
     },
     selectInput: {
-        borderRadius: 8,
-        paddingHorizontal: 16,
-        paddingVertical: 12,
+        // borderRadius: 8,
+        // paddingHorizontal: 16,
+        // paddingVertical: 12,
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        borderWidth: 1,
+        // borderWidth: 1,
+        borderRadius: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        fontSize: 16,
+        fontFamily: 'Ubuntu_Regular',
+        borderWidth: 0,
     },
     selectText: {
         fontSize: 14,
@@ -841,12 +922,18 @@ const styles = StyleSheet.create({
         paddingHorizontal: 4,
     },
     primaryButton: {
+        // backgroundColor: '#1776BA',
+        // borderRadius: 8,
+        // paddingVertical: 14,
+        // alignItems: 'center',
+        // justifyContent: 'center',
+        // marginBottom: 24,
         backgroundColor: '#1776BA',
-        borderRadius: 8,
-        paddingVertical: 14,
+        borderRadius: 16,
+        paddingVertical: 16,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 24,
+        marginBottom: 16,
     },
     primaryButtonText: {
         fontSize: 16,

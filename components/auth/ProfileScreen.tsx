@@ -301,7 +301,7 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                     <View style={styles.detailRow}>
                         <MaterialCommunityIcons name="account-outline" size={18} color={secondaryTextColor} />
                         <Text style={[styles.detailLabel, { color: textColor }]}>Nom d'utilisateur:</Text>
-                        <Text style={[styles.detailValue, { color: secondaryTextColor }]}>{'@'+ user?.username ?? 'Non renseigné'}</Text>
+                        <Text style={[styles.detailValue, { color: secondaryTextColor }]}>{'@' + user?.username ?? 'Non renseigné'}</Text>
                     </View>
                     <View style={styles.detailRow}>
                         <MaterialCommunityIcons name="phone-outline" size={18} color={secondaryTextColor} />
@@ -329,8 +329,9 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                     <View style={[styles.emergencySection, { borderTopColor: borderColor }]}>
                         <Text style={[styles.sectionTitle, { color: textColor }]}>Contact d'urgence</Text>
                         <View style={[styles.emergencyInfo, { backgroundColor: emergencyInfoBackgroundColor }]}>
-                            <Text style={[styles.emergencyName, { color: textColor }]}>{user?.contactUrgent?.fullName ?? 'Non renseigné'}</Text>
+                            <Text style={[styles.emergencyName, { color: textColor }]}>{user?.contactUrgent?.firstName ?? 'Non renseigné'} {user?.contactUrgent?.lastName ?? 'Non renseigné'}</Text>
                             <Text style={[styles.emergencyPhone, { color: secondaryTextColor }]}>{user?.contactUrgent?.phone ?? 'Non renseigné'}</Text>
+                            <Text style={[styles.emergencyRelation, { color: secondaryTextColor }]}>Relation : {user?.contactUrgent?.relationship ? user?.contactUrgent?.relationship.charAt(0).toUpperCase() + user?.contactUrgent?.relationship.slice(1).toLowerCase() : 'Non renseigné'}</Text>
                         </View>
                     </View>
                 )}
@@ -497,13 +498,13 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                             </View>
 
                             {/* Boutons d'action */}
-                            {booking.status === 'PAID' && (
+                            {/* {booking.status === 'PAID' && ( */}
                                 <View style={styles.actionButtons}>
                                     <Pressable
                                         style={[
-                                            styles.actionButton, 
-                                            { 
-                                                backgroundColor: activeTabColor, 
+                                            styles.actionButton,
+                                            {
+                                                backgroundColor: activeTabColor,
                                                 borderColor: activeTabColor,
                                                 opacity: isLoadingBooking === booking.id ? 0.7 : 1
                                             }
@@ -516,15 +517,21 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                                         ) : (
                                             <>
                                                 <MaterialCommunityIcons name="eye-outline" size={20} color="#ffffff" />
-                                                <Text style={styles.actionButtonText}>Voir le ticket</Text>
+                                                <Text style={styles.actionButtonText}>Ticket</Text>
                                             </>
                                         )}
                                     </Pressable>
-                                    {/* <Pressable style={[styles.actionButton, { backgroundColor: actionButtonBackgroundColor, borderColor }]}>
-                                    <MaterialCommunityIcons name="download" size={20} color={secondaryTextColor} />
-                                </Pressable> */}
+                                    <Pressable
+                                        style={[styles.actionButton, { backgroundColor: 'transparent', borderColor }]}
+                                        onPress={() => {
+                                            navigation.navigate('trip/route-viewer' as never, { booking: JSON.stringify(booking) } as never);
+                                        }}
+                                    >
+                                        <MaterialCommunityIcons name="map-marker-outline" size={20} color={secondaryTextColor} />
+                                        <Text style={[styles.actionButtonText, { color: secondaryTextColor }]}>Itinéraire</Text>
+                                    </Pressable>
                                 </View>
-                            )}
+                            {/* )} */}
                         </View>
                     ))}
                 </ScrollView>
