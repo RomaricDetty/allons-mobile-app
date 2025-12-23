@@ -2,8 +2,9 @@
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+    ActivityIndicator,
     Dimensions,
     Pressable,
     ScrollView,
@@ -14,6 +15,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 // Note: Vous devrez installer react-native-qrcode-svg ou react-native-qr-code
+import { getBookingQrCode } from '@/api/booking';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import QRCode from 'react-native-qrcode-svg';
 
 /**
@@ -25,12 +28,12 @@ const TicketQR = () => {
     const insets = useSafeAreaInsets();
     const colorScheme = useColorScheme() ?? 'light';
     const screenHeight = Dimensions.get('window').height;
-    
+
     // Couleurs dynamiques basées sur le thème
     const textColor = useThemeColor({}, 'text');
     const iconColor = useThemeColor({}, 'icon');
     const tintColor = useThemeColor({}, 'tint');
-    
+
     // Couleurs spécifiques pour l'écran
     const cardBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
     const borderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
@@ -52,8 +55,32 @@ const TicketQR = () => {
         );
     }
 
+    const [qrCode, setQrCode] = useState<string>('');
+    const [isLoadingQrCode, setIsLoadingQrCode] = useState<boolean>(true);
+
+    const generateQRCodeBase64 = async () => {
+        setIsLoadingQrCode(true);
+        try {
+            const token = await AsyncStorage.getItem('token');
+            const response = await getBookingQrCode(ticketId, token);
+            console.log(response.data);
+            setQrCode(response?.data?.hash || '');
+        } catch (error) {
+            console.error(error);
+            setQrCode('');
+        } finally {
+            setIsLoadingQrCode(false);
+        }
+    };
+
+    useEffect(() => {
+        if (ticketId) {
+            generateQRCodeBase64();
+        }
+    }, [ticketId]);
+
     // URL ou données pour le QR code (à adapter selon votre API)
-    const qrCodeData = `https://allon-frontoffice-ng.onrender.com/verify-ticket/${ticketId}?ref=${ticketCode}`;
+    // const qrCodeData = `https://allon-frontoffice-ng.onrender.com/verify-ticket/${ticketId}?ref=${ticketCode}`;
 
     return (
         <View style={[styles.container, { backgroundColor: headerBackgroundColor }]}>
@@ -82,7 +109,7 @@ const TicketQR = () => {
                 showsVerticalScrollIndicator={false}
             >
                 {/* Card principale */}
-                <View style={[styles.mainCard, ]}> 
+                <View style={[styles.mainCard,]}>
                     {/* { backgroundColor: cardBackgroundColor, borderColor } */}
                     {/* Header avec icône QR */}
                     {/* <View style={styles.qrHeader}>
@@ -92,13 +119,16 @@ const TicketQR = () => {
 
                     {/* Container QR Code */}
                     <View style={[styles.qrContainer, { backgroundColor: qrCodeBackgroundColor, justifyContent: 'center', alignItems: 'center' }]}>
-                        <QRCode
-                            value={qrCodeData}
-                            size={300}
-                            color={primaryBlue}
-                            backgroundColor="transparent"
-                        />
-                        
+                        {isLoadingQrCode || !qrCode ? (
+                            <ActivityIndicator size="large" color={primaryBlue} />
+                        ) : (
+                            <QRCode
+                                value={qrCode}
+                                size={300}
+                                color={primaryBlue}
+                                backgroundColor="transparent"
+                            />
+                        )}
                         {/* Identifiant du ticket */}
                         <Text style={[styles.ticketIdentifier, { color: textColor, marginTop: 16 }]}>
                             {ticketCode}

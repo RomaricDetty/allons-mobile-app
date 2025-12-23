@@ -66,6 +66,7 @@ export interface Booking {
                 latitude: number;
                 longitude: number;
             };
+            name: string;
         };
         stationTo: {
             city: string;
@@ -73,6 +74,7 @@ export interface Booking {
                 latitude: number;
                 longitude: number;
             };
+            name: string;
         };
     };
 }

@@ -3,6 +3,7 @@ import { authLogin } from '@/api/auth_register';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation } from '@react-navigation/native';
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AuthFormField } from './AuthFormField';
@@ -47,7 +48,7 @@ interface SignInScreenProps {
  */
 export const SignInScreen = ({ onSignIn, onSwitchToSignUp, onForgotPassword }: SignInScreenProps) => {
     const colorScheme = useColorScheme() ?? 'light';
-    
+    const navigation = useNavigation();
     // Couleurs dynamiques basées sur le thème
     const backgroundColor = useThemeColor({}, 'background');
     const textColor = useThemeColor({}, 'text');
@@ -149,11 +150,11 @@ export const SignInScreen = ({ onSignIn, onSwitchToSignUp, onForgotPassword }: S
                         placeholder=""
                     />
 
-                    {/* <View style={[styles.optionsRow, { alignSelf: 'flex-end' }]}>
+                    <View style={[styles.optionsRow, { alignSelf: 'flex-end' }]}>
                         <Pressable onPress={onForgotPassword}>
                             <Text style={[styles.forgotPassword, { color: "#1776BA" }]}>Mot de passe oublié ?</Text>
                         </Pressable>
-                    </View> */}
+                    </View>
                 </View>
             </View>
 
@@ -174,6 +175,8 @@ export const SignInScreen = ({ onSignIn, onSwitchToSignUp, onForgotPassword }: S
                     <Text style={[styles.footerLink, { color: "#1776BA" }]}>Inscrivez-vous !</Text>
                 </Pressable>
             </View>
+
+            
         </ScrollView>
     );
 };
@@ -311,6 +314,27 @@ const styles = StyleSheet.create({
         padding: 16,
         marginBottom: 20,
         borderWidth: 1,
+    },
+    forgotPasswordContainer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 24,
+        marginTop: 16,
+        // marginHorizontal: 100,
+        paddingHorizontal: 16,
+    },
+    forgotPasswordLink: {
+        fontSize: 14,
+        fontFamily: 'Ubuntu_Medium',
+        color: "#1776BA",
+        textAlign: 'center',
+    },
+    forgotPasswordText: {
+        fontSize: 14,
+        fontFamily: 'Ubuntu_Medium',
+        color: "#1776BA",
+        textAlign: 'center',
     },
 });
 

@@ -60,3 +60,18 @@ export const createBookingPayment = async (bookingData: any, token?: string): Pr
 export const getBookingByReference = async (referenceCode: string): Promise<AxiosResponse<any>> => {
     return await axios.get(`${baseUrl}/bookings/reference/${referenceCode}`);
 }
+
+
+/**
+ * Récupère le QR code d'une réservation
+ * @param bookingId - L'ID de la réservation
+ * @param token - Le token d'authentification
+ * @returns AxiosResponse<any>
+ */
+export const getBookingQrCode = async (bookingId: string, token: string): Promise<AxiosResponse<any>> => {
+    return await axios.get(`${baseUrl}/bookings/${bookingId}/qrcode`, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+}

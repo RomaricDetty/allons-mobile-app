@@ -4,12 +4,13 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { Booking } from '@/interfaces';
+import { geocodingService } from '@/services/geocodingService';
 import { routingService } from '@/services/routingService';
 import { PassengerLocation } from '@/types/tracking';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -44,10 +45,15 @@ export default function TripRouteViewer({ booking }: TripRouteViewerProps) {
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
     const [isManualMode, setIsManualMode] = useState<boolean>(false);
+    const [routeDuration, setRouteDuration] = useState<number | null>(null); // Durée en minutes calculée à partir du tracé
+    const [busPosition, setBusPosition] = useState<{ latitude: number; longitude: number } | null>(null);
+    const [isBusAnimationActive, setIsBusAnimationActive] = useState<boolean>(false);
+    const [animationStartTime, setAnimationStartTime] = useState<number | null>(null);
 
     const mapRef = useRef<MapView>(null);
     const locationSubscription = useRef<Location.LocationSubscription | null>(null);
     const isManualModeRef = useRef<boolean>(false);
+    const busAnimationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     // Couleurs du thème
     const backgroundColor = useThemeColor({}, 'background');
@@ -80,12 +86,31 @@ export default function TripRouteViewer({ booking }: TripRouteViewerProps) {
 
     /**
      * Centre la carte sur l'itinéraire une fois chargé
+     * Priorise le point de départ pour l'affichage par défaut
+     * Ajuste la position pour que le point de départ soit visible au-dessus du panneau
      */
     useEffect(() => {
-        if (routePath.length > 0 && mapRef.current) {
+        if (startPoint && mapRef.current) {
+            // Centrer sur le point de départ avec un offset vers le haut pour qu'il soit visible au-dessus du panneau
+            // Le panneau prend jusqu'à 45% de l'écran, donc on centre légèrement vers le haut
+            mapRef.current.animateCamera({
+                center: {
+                    latitude: startPoint.latitude,
+                    longitude: startPoint.longitude
+                },
+                zoom: 13, // Zoom légèrement augmenté pour mieux voir le point de départ
+            });
+
+            // Ensuite, ajuster pour voir tout l'itinéraire si disponible
+            if (routePath.length > 0) {
+                setTimeout(() => {
+                    centerMapOnRoute();
+                }, 500);
+            }
+        } else if (routePath.length > 0 && mapRef.current) {
             centerMapOnRoute();
         }
-    }, [routePath]);
+    }, [routePath, startPoint]);
 
     /**
      * Met à jour la ref du mode manuel
@@ -93,6 +118,100 @@ export default function TripRouteViewer({ booking }: TripRouteViewerProps) {
     useEffect(() => {
         isManualModeRef.current = isManualMode;
     }, [isManualMode]);
+
+    /**
+     * Calcule la position du bus le long de l'itinéraire en fonction de la progression
+     * @param progression Progression entre 0 (départ) et 1 (arrivée)
+     * @returns Coordonnées du bus ou null si l'itinéraire n'est pas disponible
+     */
+    const calculateBusPosition = useCallback((progression: number): { latitude: number; longitude: number } | null => {
+        if (routePath.length === 0) return null;
+
+        // Limiter la progression entre 0 et 1
+        const clampedProgression = Math.max(0, Math.min(1, progression));
+
+        // Calculer l'index exact dans le tableau routePath
+        const exactIndex = clampedProgression * (routePath.length - 1);
+        const currentIndex = Math.floor(exactIndex);
+        const nextIndex = Math.min(currentIndex + 1, routePath.length - 1);
+        const fraction = exactIndex - currentIndex;
+
+        // Interpolation linéaire entre les deux points
+        const currentPoint = routePath[currentIndex];
+        const nextPoint = routePath[nextIndex];
+
+        return {
+            latitude: currentPoint.latitude + (nextPoint.latitude - currentPoint.latitude) * fraction,
+            longitude: currentPoint.longitude + (nextPoint.longitude - currentPoint.longitude) * fraction,
+        };
+    }, [routePath]);
+
+    /**
+     * Gère l'animation du bus le long de l'itinéraire
+     */
+    useEffect(() => {
+        if (!isBusAnimationActive || !routeDuration || routePath.length === 0 || animationStartTime === null) {
+            return;
+        }
+
+        // Mettre à jour la position du bus toutes les 100ms pour une animation fluide
+        busAnimationIntervalRef.current = setInterval(() => {
+            const currentTime = Date.now();
+            const elapsedTime = (currentTime - animationStartTime) / 1000; // Temps écoulé en secondes
+            const totalDurationSeconds = routeDuration * 60; // Durée totale en secondes
+
+            // Calculer la progression (0 à 1)
+            const progression = Math.min(elapsedTime / totalDurationSeconds, 1);
+
+            // Calculer la position du bus
+            const position = calculateBusPosition(progression);
+            if (position) {
+                setBusPosition(position);
+
+                // Centrer la carte sur le bus si l'animation est active
+                if (mapRef.current) {
+                    mapRef.current.animateCamera({
+                        center: position,
+                        zoom: 15,
+                    });
+                }
+
+                // Si on a atteint l'arrivée, arrêter l'animation
+                if (progression >= 1) {
+                    setIsBusAnimationActive(false);
+                    setAnimationStartTime(null);
+                }
+            }
+        }, 100); // Mise à jour toutes les 100ms
+
+        return () => {
+            if (busAnimationIntervalRef.current) {
+                clearInterval(busAnimationIntervalRef.current);
+                busAnimationIntervalRef.current = null;
+            }
+        };
+    }, [isBusAnimationActive, routeDuration, routePath.length, animationStartTime, calculateBusPosition]);
+
+    /**
+     * Initialise la position du bus au point de départ quand l'itinéraire est chargé
+     */
+    useEffect(() => {
+        if (startPoint && routePath.length > 0 && !isBusAnimationActive) {
+            // Initialiser au point de départ seulement si l'animation n'est pas active
+            setBusPosition(startPoint);
+        }
+    }, [startPoint, routePath.length, isBusAnimationActive]);
+
+    /**
+     * Nettoie l'intervalle d'animation lors du démontage
+     */
+    useEffect(() => {
+        return () => {
+            if (busAnimationIntervalRef.current) {
+                clearInterval(busAnimationIntervalRef.current);
+            }
+        };
+    }, []);
 
     /**
      * Obtient l'adresse à partir des coordonnées GPS
@@ -261,8 +380,30 @@ export default function TripRouteViewer({ booking }: TripRouteViewerProps) {
     };
 
     /**
+     * Valide si une coordonnée est valide
+     * @param coord Coordonnée à valider
+     * @returns true si la coordonnée est valide, false sinon
+     */
+    const isValidCoordinate = (coord: { latitude: number; longitude: number } | null | undefined): boolean => {
+        return (
+            coord !== null &&
+            coord !== undefined &&
+            typeof coord.latitude === 'number' &&
+            typeof coord.longitude === 'number' &&
+            !isNaN(coord.latitude) &&
+            !isNaN(coord.longitude) &&
+            coord.latitude >= -90 &&
+            coord.latitude <= 90 &&
+            coord.longitude >= -180 &&
+            coord.longitude <= 180
+        );
+    };
+
+    /**
      * Calcule l'itinéraire à partir des données du booking
      * Récupère les coordonnées directement depuis l'objet booking
+     * Utilise les coordonnées par défaut basées sur le nom de la ville si les coordonnées du booking ne sont pas valides
+     * Calcule également la durée du trajet selon le tracé réel
      */
     const calculateRouteFromBooking = async () => {
         try {
@@ -270,39 +411,53 @@ export default function TripRouteViewer({ booking }: TripRouteViewerProps) {
             setError(null);
 
             // Récupérer les coordonnées directement depuis l'objet booking
-            const startCoords = booking.trip?.stationFrom?.coordinate;
-            const endCoords = booking.trip?.stationTo?.coordinate;
+            let startCoords = booking.trip?.stationFrom?.coordinate;
+            let endCoords = booking.trip?.stationTo?.coordinate;
 
             console.log("Start coords =>, ", startCoords);
             console.log("End coords =>, ", endCoords);
 
-            if (!startCoords || !endCoords) {
-                throw new Error('Impossible de trouver les coordonnées des villes dans le booking');
+            // Si les coordonnées de départ ne sont pas valides, utiliser les coordonnées par défaut basées sur le nom de la ville
+            if (!isValidCoordinate(startCoords) && booking.trip?.stationFrom?.city) {
+                console.warn(`Coordonnées de départ invalides, utilisation des coordonnées par défaut pour ${booking.trip.stationFrom.city}`);
+                const defaultStartCoords = geocodingService.getCityCoordinates(booking.trip.stationFrom.city);
+                if (defaultStartCoords) {
+                    startCoords = defaultStartCoords;
+                    console.log(`Coordonnées par défaut pour ${booking.trip.stationFrom.city}:`, startCoords);
+                }
             }
 
-            // Vérifier que les coordonnées sont valides
-            if (
-                typeof startCoords.latitude !== 'number' ||
-                typeof startCoords.longitude !== 'number' ||
-                typeof endCoords.latitude !== 'number' ||
-                typeof endCoords.longitude !== 'number'
-            ) {
-                throw new Error('Les coordonnées du booking ne sont pas valides');
+            // Si les coordonnées d'arrivée ne sont pas valides, utiliser les coordonnées par défaut basées sur le nom de la ville
+            if (!isValidCoordinate(endCoords) && booking.trip?.stationTo?.city) {
+                console.warn(`Coordonnées d'arrivée invalides, utilisation des coordonnées par défaut pour ${booking.trip.stationTo.city}`);
+                const defaultEndCoords = geocodingService.getCityCoordinates(booking.trip.stationTo.city);
+                if (defaultEndCoords) {
+                    endCoords = defaultEndCoords;
+                    console.log(`Coordonnées par défaut pour ${booking.trip.stationTo.city}:`, endCoords);
+                }
+            }
+
+            // Vérifier que nous avons des coordonnées valides après les fallbacks
+            if (!isValidCoordinate(startCoords) || !isValidCoordinate(endCoords)) {
+                throw new Error('Impossible de trouver des coordonnées valides pour les villes');
             }
 
             setStartPoint(startCoords);
             setEndPoint(endCoords);
 
-            // Calculer l'itinéraire
-            const route = await routingService.getRoute(startCoords, endCoords);
-            setRoutePath(route);
-            console.log('Itinéraire calculé avec succès:', route.length, 'points');
+            // Calculer l'itinéraire avec les détails (tracé, distance, durée)
+            const routeDetails = await routingService.getRouteWithDetails(startCoords, endCoords);
+            setRoutePath(routeDetails.coordinates);
+            setRouteDuration(routeDetails.duration);
+            console.log('Itinéraire calculé avec succès:', routeDetails.coordinates.length, 'points');
+            console.log('Durée estimée:', routeDetails.duration, 'minutes');
         } catch (error) {
             console.error('Erreur calcul itinéraire:', error);
             setError('Impossible de calculer l\'itinéraire');
             // En cas d'erreur, utiliser un itinéraire simplifié
             if (startPoint && endPoint) {
                 setRoutePath([startPoint, endPoint]);
+                setRouteDuration(null);
             }
         } finally {
             setIsLoading(false);
@@ -311,22 +466,38 @@ export default function TripRouteViewer({ booking }: TripRouteViewerProps) {
 
     /**
      * Centre la carte sur l'itinéraire
+     * Priorise le point de départ si disponible
+     * Ajuste le padding pour que le point de départ soit visible au-dessus du panneau d'informations
      */
     const centerMapOnRoute = () => {
-        if (!startPoint || !endPoint || !mapRef.current) return;
+        if (!mapRef.current) return;
 
-        const coordinates = [startPoint, endPoint];
-        if (passengerLocation) {
-            coordinates.push({
-                latitude: passengerLocation.latitude,
-                longitude: passengerLocation.longitude,
+        // Si on a un point de départ, centrer d'abord dessus
+        if (startPoint) {
+            const coordinates = [startPoint];
+            if (endPoint) {
+                coordinates.push(endPoint);
+            }
+            if (passengerLocation) {
+                coordinates.push({
+                    latitude: passengerLocation.latitude,
+                    longitude: passengerLocation.longitude,
+                });
+            }
+
+            // Padding augmenté en bas pour tenir compte du panneau d'informations (max 45% de l'écran)
+            // Utiliser un padding bottom plus important pour que le point de départ soit visible
+            mapRef.current.fitToCoordinates(coordinates, {
+                edgePadding: { top: 100, right: 50, bottom: 400, left: 50 },
+                animated: true,
+            });
+        } else if (endPoint) {
+            // Sinon, centrer sur le point d'arrivée
+            mapRef.current.animateCamera({
+                center: { latitude: endPoint.latitude, longitude: endPoint.longitude },
+                zoom: 15,
             });
         }
-
-        mapRef.current.fitToCoordinates(coordinates, {
-            edgePadding: { top: 100, right: 50, bottom: 300, left: 50 },
-            animated: true,
-        });
     };
 
     /**
@@ -343,12 +514,14 @@ export default function TripRouteViewer({ booking }: TripRouteViewerProps) {
 
     /**
      * Centre la carte sur le point de départ
+     * Ajuste la position pour que le point soit visible au-dessus du panneau d'informations
      */
     const centerOnStartPoint = () => {
         if (startPoint && mapRef.current) {
-            mapRef.current.animateCamera({
-                center: { latitude: startPoint.latitude, longitude: startPoint.longitude },
-                zoom: 15,
+            // Utiliser fitToCoordinates avec un seul point pour avoir un padding adapté
+            mapRef.current.fitToCoordinates([startPoint], {
+                edgePadding: { top: 100, right: 50, bottom: 450, left: 50 },
+                animated: true,
             });
         }
     };
@@ -408,10 +581,59 @@ export default function TripRouteViewer({ booking }: TripRouteViewerProps) {
     };
 
     /**
-     * Calcule la durée estimée du trajet à partir des heures de départ et d'arrivée
-     * @returns La durée formatée (ex: "3h 00min") ou null si les heures ne sont pas disponibles
+     * Démarre ou arrête l'animation du bus
+     * Réinitialise la position au point de départ à chaque démarrage
+     */
+    const toggleBusAnimation = () => {
+        if (isBusAnimationActive) {
+            // Arrêter l'animation
+            setIsBusAnimationActive(false);
+            setAnimationStartTime(null);
+        } else {
+            // Démarrer l'animation depuis le début
+            if (startPoint && routePath.length > 0) {
+                setBusPosition(startPoint);
+                setAnimationStartTime(Date.now());
+                setIsBusAnimationActive(true);
+            }
+        }
+    };
+
+    /**
+     * Centre la carte sur la position du bus
+     */
+    const centerOnBus = () => {
+        if (busPosition && mapRef.current) {
+            mapRef.current.animateCamera({
+                center: busPosition,
+                zoom: 15,
+            });
+        }
+    };
+
+    /**
+     * Calcule la durée estimée du trajet selon le tracé réel et les éventuels embouteillages
+     * Priorise la durée calculée à partir du tracé du trajet
+     * Si non disponible, utilise les heures de départ et d'arrivée du booking
+     * @returns La durée formatée (ex: "3h 00min") ou null si les données ne sont pas disponibles
      */
     const calculateDuration = (): string | null => {
+        // Prioriser la durée calculée à partir du tracé du trajet
+        if (routeDuration !== null && routeDuration > 0) {
+            const hours = Math.floor(routeDuration / 60);
+            const minutes = Math.round(routeDuration % 60);
+
+            // Formater la durée
+            if (hours > 0 && minutes > 0) {
+                return `${hours}h ${minutes}min`;
+            } else if (hours > 0) {
+                return `${hours}h`;
+            } else {
+                return `${minutes}min`;
+            }
+        }
+
+        // Fallback : utiliser les heures de départ et d'arrivée du booking
         if (!booking.departureTime || !booking.arrivalTime) {
             return null;
         }
@@ -532,8 +754,9 @@ export default function TripRouteViewer({ booking }: TripRouteViewerProps) {
                 provider={PROVIDER_DEFAULT}
                 style={styles.map}
                 initialRegion={{
-                    latitude: passengerLocation.latitude,
-                    longitude: passengerLocation.longitude,
+                    // Prioriser le point de départ, sinon utiliser la position du passager
+                    latitude: startPoint?.latitude ?? passengerLocation.latitude,
+                    longitude: startPoint?.longitude ?? passengerLocation.longitude,
                     latitudeDelta: 0.05,
                     longitudeDelta: 0.05,
                 }}
@@ -552,8 +775,8 @@ export default function TripRouteViewer({ booking }: TripRouteViewerProps) {
                 {routePath.length > 0 && (
                     <Polyline
                         coordinates={routePath}
-                        strokeColor={accentColor}
-                        strokeWidth={6}
+                        strokeColor={"#1776BA"}
+                        strokeWidth={5}
                     />
                 )}
 
@@ -563,18 +786,18 @@ export default function TripRouteViewer({ booking }: TripRouteViewerProps) {
                         coordinate={startPoint}
                         title="Point de départ"
                         identifier="start-point"
-                        description={booking.trip.stationFrom.city}
+                        description={booking.trip.stationFrom.name + " - " + booking.trip.stationFrom.city}
                     >
                         <View style={styles.startMarker}>
                             <View style={
-                                { 
+                                {
                                     backgroundColor: '#4CAF50',
                                     display: 'flex',
                                     alignSelf: 'center',
                                     borderRadius: 100,
                                 }
                             }>
-                                <Ionicons name="bus-outline" size={22} color="#fff" />
+                                <Ionicons name="location-outline" size={22} color="#fff" />
                             </View>
                         </View>
                     </Marker>
@@ -586,18 +809,18 @@ export default function TripRouteViewer({ booking }: TripRouteViewerProps) {
                         coordinate={endPoint}
                         title="Point d'arrivée"
                         identifier="end-point"
-                        description={booking.trip.stationTo.city}
+                        description={booking.trip.stationTo.name + " - " + booking.trip.stationTo.city}
                     >
                         <View style={styles.endMarker}>
                             <View style={
-                                { 
+                                {
                                     backgroundColor: '#F44336',
                                     display: 'flex',
                                     alignSelf: 'center',
                                     borderRadius: 100,
                                 }
                             }>
-                                <Ionicons name="stop-outline" size={22} color="#fff" />
+                                <Ionicons name="flag-outline" size={22} color="#fff" />
                             </View>
                         </View>
                     </Marker>
@@ -613,7 +836,7 @@ export default function TripRouteViewer({ booking }: TripRouteViewerProps) {
                 >
                     <View style={styles.userMarker}>
                         <View style={
-                            { 
+                            {
                                 backgroundColor: "#1776BA",
                                 display: 'flex',
                                 alignSelf: 'center',
@@ -624,6 +847,29 @@ export default function TripRouteViewer({ booking }: TripRouteViewerProps) {
                         </View>
                     </View>
                 </Marker>
+
+                {/* Position du bus */}
+                {busPosition && (
+                    <Marker
+                        coordinate={busPosition}
+                        title="Bus"
+                        identifier="bus-marker"
+                        anchor={{ x: 0.5, y: 0.5 }}
+                    >
+                        <View style={
+                            {
+                                // backgroundColor: "#1776BA",
+                                display: 'flex',
+                                alignSelf: 'center',
+                                borderRadius: 100,
+                            }
+                        }>
+                            <View style={styles.busMarkerInner}>
+                                <Ionicons name="bus-sharp" size={20} color="#fff" />
+                            </View>
+                        </View>
+                    </Marker>
+                )}
             </MapView>
 
             {/* En-tête de navigation */}
@@ -653,6 +899,31 @@ export default function TripRouteViewer({ booking }: TripRouteViewerProps) {
                         color={isManualMode ? accentColor : textColor} 
                     />
                 </TouchableOpacity> */}
+                {busPosition && (
+                    <TouchableOpacity
+                        style={[styles.controlButton, { backgroundColor: iconCircleBackgroundColor }]}
+                        onPress={centerOnBus}
+                    >
+                        <Ionicons name="bus" size={20} color={textColor} />
+                    </TouchableOpacity>
+                )}
+                {busPosition && routeDuration && (
+                    <TouchableOpacity
+                        style={[
+                            styles.controlButton,
+                            {
+                                backgroundColor: isBusAnimationActive ? "#1776BA" : iconCircleBackgroundColor
+                            }
+                        ]}
+                        onPress={toggleBusAnimation}
+                    >
+                        <Ionicons
+                            name={isBusAnimationActive ? "pause" : "play"}
+                            size={20}
+                            color={isBusAnimationActive ? "#fff" : textColor}
+                        />
+                    </TouchableOpacity>
+                )}
                 <TouchableOpacity
                     style={[styles.controlButton, { backgroundColor: iconCircleBackgroundColor }]}
                     onPress={centerOnMe}
@@ -670,25 +941,32 @@ export default function TripRouteViewer({ booking }: TripRouteViewerProps) {
             {/* Panneau d'informations */}
             <View style={[styles.infoPanel, { backgroundColor: panelBackgroundColor }]}>
                 <View style={
-                    { 
-                        width: 50, height: 6, 
-                        backgroundColor: borderColor, 
+                    {
+                        width: 30, height: 6,
+                        backgroundColor: borderColor,
                         alignSelf: 'center', borderRadius: 15,
-                        marginBottom: 30, borderWidth: 1.5, 
-                        borderColor: borderColor,
+                        marginBottom: 30, borderWidth: 1.5,
+                        borderColor: borderColor, marginTop: 0,
                     }
-                }/>
+                } />
                 <ScrollView
                     style={styles.scrollView}
-                    contentContainerStyle={[styles.scrollViewContent, { paddingBottom: Math.max(20, insets.bottom) }]}
+                    contentContainerStyle={
+                        [
+                            styles.scrollViewContent,
+                            {
+                                paddingBottom: Math.max(20, insets.bottom)
+                            }
+                        ]
+                    }
                     showsVerticalScrollIndicator={true}
                 >
                     {/* En-tête avec destination et durée */}
                     <View style={[styles.panelHeader, { backgroundColor: cardBackgroundColor }]}>
                         <View style={[
-                            styles.headerContent, 
-                            { 
-                                borderWidth: 1.5, 
+                            styles.headerContent,
+                            {
+                                borderWidth: 1.5,
                                 borderColor: borderColor,
                                 borderRadius: 20,
                                 paddingHorizontal: 16,
@@ -712,9 +990,10 @@ export default function TripRouteViewer({ booking }: TripRouteViewerProps) {
                                     {booking.trip.stationFrom.city}
                                 </Text>
                                 <View style={styles.timezoneContainer}>
-                                    <Ionicons name="time-outline" size={12} color={secondaryTextColor} />
+                                    {/* <Ionicons name="location-outline" size={12} color={secondaryTextColor} /> */}
                                     <Text style={[styles.headerTimezone, { color: secondaryTextColor }]}>
-                                        {getTimezone(booking.trip.stationFrom.coordinate.longitude)}
+                                        {/* {getTimezone(booking.trip.stationFrom.coordinate.longitude)} */}
+                                        {booking.trip.stationFrom.name}
                                     </Text>
                                 </View>
                             </View>
@@ -738,9 +1017,10 @@ export default function TripRouteViewer({ booking }: TripRouteViewerProps) {
                                     {booking.trip.stationTo.city}
                                 </Text>
                                 <View style={styles.timezoneContainer}>
-                                    <Ionicons name="time-outline" size={12} color={secondaryTextColor} />
+                                    {/* <Ionicons name="location-outline" size={12} color={secondaryTextColor} /> */}
                                     <Text style={[styles.headerTimezone, { color: secondaryTextColor }]}>
-                                        {getTimezone(booking.trip.stationTo.coordinate.longitude)}
+                                        {/* {getTimezone(booking.trip.stationTo.coordinate.longitude)} */}
+                                        {booking.trip.stationTo.name}
                                     </Text>
                                 </View>
                             </View>
@@ -788,20 +1068,29 @@ export default function TripRouteViewer({ booking }: TripRouteViewerProps) {
                                 </TouchableOpacity>
                                 <View style={[styles.stepLine, { backgroundColor: borderColor }]} />
                             </View>
-                            <TouchableOpacity 
-                                style={[styles.stepCard, { backgroundColor: listItemBackgroundColor }]}
+                            <TouchableOpacity
+                                style={[
+                                    styles.stepCard, { backgroundColor: listItemBackgroundColor },
+                                    {
+                                        flexDirection: 'row',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                    }
+                                ]}
                                 activeOpacity={0.7}
                                 onPress={centerOnMe}
                             >
-                                <View style={styles.stepCardHeader}>
-                                    <Text style={[styles.stepMainText, { color: textColor }]} numberOfLines={2}>
-                                        Position actuelle
+                                <View style={{ width: '90%' }}>
+                                    <View style={styles.stepCardHeader}>
+                                        <Text style={[styles.stepMainText, { color: textColor }]} numberOfLines={2}>
+                                            Position actuelle
+                                        </Text>
+                                    </View>
+                                    <Text style={[styles.stepSubText, { color: secondaryTextColor }]} numberOfLines={2}>
+                                        {currentAddress}
                                     </Text>
-                                    <Ionicons name="chevron-forward" size={16} color={secondaryTextColor} />
                                 </View>
-                                <Text style={[styles.stepSubText, { color: secondaryTextColor }]} numberOfLines={2}>
-                                    {currentAddress}
-                                </Text>
+                                <Ionicons name="chevron-forward" size={16} color={secondaryTextColor} />
                             </TouchableOpacity>
                         </View>
 
@@ -818,29 +1107,39 @@ export default function TripRouteViewer({ booking }: TripRouteViewerProps) {
                                 </TouchableOpacity>
                                 <View style={[styles.stepLine, { backgroundColor: borderColor }]} />
                             </View>
-                            <TouchableOpacity 
-                                style={[styles.stepCard, { backgroundColor: listItemBackgroundColor }]}
+                            <TouchableOpacity
+                                style={[
+                                    styles.stepCard,
+                                    {
+                                        backgroundColor: listItemBackgroundColor,
+                                        flexDirection: 'row',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                    }
+                                ]}
                                 activeOpacity={0.7}
                                 onPress={centerOnStartPoint}
                             >
-                                <View style={styles.stepCardHeader}>
-                                    <Text style={[styles.stepMainText, { color: textColor }]} numberOfLines={1}>
-                                        Ville de départ
-                                    </Text>
-                                    <Ionicons name="chevron-forward" size={16} color={secondaryTextColor} />
+                                <View style={{ width: '90%' }}>
+                                    <View style={styles.stepCardHeader}>
+                                        <Text style={[styles.stepMainText, { color: textColor }]} numberOfLines={1}>
+                                            Ville de départ
+                                        </Text>
+                                    </View>
+                                    <View style={styles.stepCardDetails}>
+                                        <Ionicons name="location" size={12} color={secondaryTextColor} />
+                                        <Text style={[styles.stepSubText, { color: secondaryTextColor }]} numberOfLines={1}>
+                                            {booking.trip.stationFrom.city}
+                                        </Text>
+                                    </View>
+                                    <View style={styles.stepCardDetails}>
+                                        <Ionicons name="time-outline" size={12} color={secondaryTextColor} />
+                                        <Text style={[styles.stepSubText, { color: secondaryTextColor }]}>
+                                            Départ prévu à {booking.departureTime}
+                                        </Text>
+                                    </View>
                                 </View>
-                                <View style={styles.stepCardDetails}>
-                                    <Ionicons name="location" size={12} color={secondaryTextColor} />
-                                    <Text style={[styles.stepSubText, { color: secondaryTextColor }]} numberOfLines={1}>
-                                        {booking.trip.stationFrom.city}
-                                    </Text>
-                                </View>
-                                <View style={styles.stepCardDetails}>
-                                    <Ionicons name="time-outline" size={12} color={secondaryTextColor} />
-                                    <Text style={[styles.stepSubText, { color: secondaryTextColor }]}>
-                                        Départ prévu à {booking.departureTime}
-                                    </Text>
-                                </View>
+                                <Ionicons name="chevron-forward" size={16} color={secondaryTextColor} />
                             </TouchableOpacity>
                         </View>
 
@@ -856,29 +1155,39 @@ export default function TripRouteViewer({ booking }: TripRouteViewerProps) {
                                     </View>
                                 </TouchableOpacity>
                             </View>
-                            <TouchableOpacity 
-                                style={[styles.stepCard, { backgroundColor: listItemBackgroundColor }]}
+                            <TouchableOpacity
+                                style={[
+                                    styles.stepCard,
+                                    {
+                                        backgroundColor: listItemBackgroundColor,
+                                        flexDirection: 'row',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                    }
+                                ]}
                                 activeOpacity={0.7}
                                 onPress={centerOnEndPoint}
                             >
-                                <View style={styles.stepCardHeader}>
-                                    <Text style={[styles.stepMainText, { color: textColor }]} numberOfLines={1}>
-                                        Ville d'arrivée
-                                    </Text>
-                                    <Ionicons name="chevron-forward" size={16} color={secondaryTextColor} />
+                                <View style={{ width: '90%' }}>
+                                    <View style={styles.stepCardHeader}>
+                                        <Text style={[styles.stepMainText, { color: textColor }]} numberOfLines={1}>
+                                            Ville d'arrivée
+                                        </Text>
+                                    </View>
+                                    <View style={styles.stepCardDetails}>
+                                        <Ionicons name="location" size={12} color={secondaryTextColor} />
+                                        <Text style={[styles.stepSubText, { color: secondaryTextColor }]} numberOfLines={1}>
+                                            {booking.trip.stationTo.city}
+                                        </Text>
+                                    </View>
+                                    <View style={styles.stepCardDetails}>
+                                        <Ionicons name="time-outline" size={12} color={secondaryTextColor} />
+                                        <Text style={[styles.stepSubText, { color: secondaryTextColor }]}>
+                                            Arrivée prévue à {booking.arrivalTime}
+                                        </Text>
+                                    </View>
                                 </View>
-                                <View style={styles.stepCardDetails}>
-                                    <Ionicons name="location" size={12} color={secondaryTextColor} />
-                                    <Text style={[styles.stepSubText, { color: secondaryTextColor }]} numberOfLines={1}>
-                                        {booking.trip.stationTo.city}
-                                    </Text>
-                                </View>
-                                <View style={styles.stepCardDetails}>
-                                    <Ionicons name="time-outline" size={12} color={secondaryTextColor} />
-                                    <Text style={[styles.stepSubText, { color: secondaryTextColor }]}>
-                                        Arrivée prévue à {booking.arrivalTime}
-                                    </Text>
-                                </View>
+                                <Ionicons name="chevron-forward" size={16} color={secondaryTextColor} />
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -1056,6 +1365,28 @@ const styles = StyleSheet.create({
         // shadowRadius: 3,
         // elevation: 5,
         // overflow: 'hidden',
+    },
+    busMarker: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(23, 118, 186, 0.2)',
+        overflow: 'hidden',
+    },
+    busMarkerInner: {
+        width: 48,
+        height: 48,
+        // borderRadius: 24,
+        justifyContent: 'center',
+        alignItems: 'center',
+        // backgroundColor: '#1776BA',
+        // shadowColor: '#000',
+        // shadowOffset: { width: 0, height: 2 },
+        // shadowOpacity: 0.3,
+        // shadowRadius: 4,
+        // elevation: 6,
     },
     infoPanel: {
         position: 'absolute',
@@ -1251,6 +1582,8 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: 8,
+        // borderWidth: 1,
+        // borderColor: 'red',
     },
     stepMainText: {
         fontSize: 15,

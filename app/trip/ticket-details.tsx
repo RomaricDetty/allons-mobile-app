@@ -1,13 +1,15 @@
 // @ts-nocheck
+import { getBookingQrCode } from '@/api/booking';
 import { formatFullDate, formatStatus, getStatusColor } from '@/constants/functions';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as FileSystemLegacy from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -98,6 +100,8 @@ const TicketDetails = () => {
     const scrollBackgroundColor = colorScheme === 'dark' ? '#000000' : '#F5F5F5';
     const primaryBlue = tintColor === '#fff' ? '#1776BA' : tintColor;
     const statusColor = getStatusColor('PAID');
+    const [qrCode, setQrCode] = useState<string>('');
+    const [isLoadingQrCode, setIsLoadingQrCode] = useState<boolean>(true);
 
     // Référence pour capturer la section QR code
     const ticketViewRef = useRef<View>(null);
@@ -143,9 +147,22 @@ const TicketDetails = () => {
     };
 
     /**
-     * Génère le QR code en base64
+     * Génère le QR code en récupérant le hash depuis l'API
      */
-    const generateQRCodeBase64 = (): Promise<string> => {
+    const generateQRCodeBase64 = async () => {
+        setIsLoadingQrCode(true);
+        try {
+            const token = await AsyncStorage.getItem('token');
+            const response = await getBookingQrCode(ticket.id, token);
+            console.log(response.data);
+            setQrCode(response?.data?.hash || '');
+        } catch (error) {
+            console.error(error);
+            setQrCode('');
+        } finally {
+            setIsLoadingQrCode(false);
+        }
+        /*
         return new Promise((resolve, reject) => {
             const qrCodeData = `https://allon-frontoffice-ng.onrender.com/verify-ticket/${ticket.id}?ref=${ticket.code}`;
             const svgRef = React.createRef();
@@ -160,11 +177,16 @@ const TicketDetails = () => {
                 />
             );
 
-            // Pour obtenir le base64, on peut utiliser react-native-view-shot
-            // Mais une solution plus simple est de générer le QR code dans le HTML directement
-            resolve(''); // On générera le QR code dans le HTML
+            resolve(''); 
         });
+        */
     };
+
+    useEffect(() => {
+        if (ticket?.id) {
+            generateQRCodeBase64();
+        }
+    }, [ticket?.id]);
 
     /**
      * Génère le HTML pour le PDF
@@ -651,17 +673,23 @@ const TicketDetails = () => {
                             <Text style={[styles.sectionTitle, { color: textColor }]}>Code QR de vérification</Text>
                         </View>
                         <View style={styles.qrCodeContainer}>
-                            <QRCode
-                                value={`https://allon-frontoffice-ng.onrender.com/verify-ticket/${ticket.id}?ref=${ticket.code}`}
-                                size={150}
-                                color={primaryBlue}
-                                backgroundColor="transparent"
-                            />
-                            <TouchableOpacity
-                                onPress={handleViewQRCode}
-                                activeOpacity={1}
-                                style={styles.qrCodeOverlay}
-                            />
+                            {isLoadingQrCode || !qrCode ? (
+                                <ActivityIndicator size="large" color={primaryBlue} />
+                            ) : (
+                                <>
+                                    <QRCode
+                                        value={qrCode}
+                                        size={150}
+                                        color={primaryBlue}
+                                        backgroundColor="transparent"
+                                    />
+                                    <TouchableOpacity
+                                        onPress={handleViewQRCode}
+                                        activeOpacity={1}
+                                        style={styles.qrCodeOverlay}
+                                    />
+                                </>
+                            )}
                         </View>
                     </View>
                 </View>

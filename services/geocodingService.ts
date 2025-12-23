@@ -4,46 +4,48 @@ import { Coordinate } from '@/types/tracking';
 
 /**
  * Service de géocodage pour obtenir les coordonnées des villes
- * Utilise une base de données locale des principales villes de Côte d'Ivoire
+ * Utilise les coordonnées des gares UTB par défaut, ou d'autres gares routières si pas de gare UTB
+ * Base de données locale des principales villes et communes de Côte d'Ivoire
  */
 class GeocodingService {
     /**
-     * Base de données des coordonnées des principales villes de Côte d'Ivoire
+     * Base de données des coordonnées des gares UTB par défaut
+     * Si pas de gare UTB, utilise les coordonnées d'autres gares routières
      */
     private cityCoordinates: { [key: string]: Coordinate } = {
-        // Abidjan et ses communes
-        'abidjan': { latitude: 5.3599517, longitude: -4.0082563 },
-        'cocody': { latitude: 5.33542, longitude: -4.00351 },
-        'yopougon': { latitude: 5.317666, longitude: -4.089991 },
-        'marcory': { latitude: 5.2500, longitude: -4.0167 },
-        'plateau': { latitude: 5.3197, longitude: -4.0281 },
-        'adjame': { latitude: 5.3594, longitude: -4.0256 },
-        'koumassi': { latitude: 5.3000, longitude: -4.0167 },
-        'treichville': { latitude: 5.3000, longitude: -4.0167 },
-        'abobo': { latitude: 5.4167, longitude: -4.0167 },
-        'anyama': { latitude: 5.4833, longitude: -4.0500 },
-        'bassam': { latitude: 5.2167, longitude: -4.0167 },
-        'grand-bassam': { latitude: 5.2167, longitude: -4.0167 },
+        // Abidjan et ses communes - Gares UTB
+        'abidjan': { latitude: 5.3518225, longitude: -4.0221293 }, // Gare UTB Adjamé (par défaut)
+        'adjame': { latitude: 5.3537, longitude: -4.0083 }, // Gare UTB Adjamé
+        'koumassi': { latitude: 5.3097, longitude: -3.9764 }, // Gare UTB Koumassi
+        'abobo': { latitude: 5.4167, longitude: -4.0333 }, // Gare UTB Abobo
+        'yopougon': { latitude: 5.3167, longitude: -4.0667 }, // Gare UTB Yopougon
+        'cocody': { latitude: 5.33542, longitude: -4.00351 }, // Autre gare
+        'marcory': { latitude: 5.2500, longitude: -4.0167 }, // Autre gare
+        'plateau': { latitude: 5.3197, longitude: -4.0281 }, // Autre gare
+        'treichville': { latitude: 5.3000, longitude: -4.0167 }, // Autre gare
+        'anyama': { latitude: 5.4833, longitude: -4.0500 }, // Autre gare
+        'bassam': { latitude: 5.2167, longitude: -4.0167 }, // Autre gare
+        'grand-bassam': { latitude: 5.2167, longitude: -4.0167 }, // Autre gare
         
-        // Autres villes principales
-        'bouake': { latitude: 7.6944, longitude: -5.0303 },
-        'daloa': { latitude: 6.8778, longitude: -6.4500 },
-        'korhogo': { latitude: 9.4581, longitude: -5.6296 },
-        'san-pedro': { latitude: 4.7489, longitude: -6.6364 },
-        'man': { latitude: 7.4125, longitude: -7.5536 },
-        'gagnoa': { latitude: 6.1333, longitude: -5.9500 },
-        'abengourou': { latitude: 6.7333, longitude: -3.4833 },
-        'divo': { latitude: 5.7833, longitude: -5.3667 },
-        'katiola': { latitude: 8.1333, longitude: -5.1000 },
-        'odienne': { latitude: 9.5000, longitude: -7.5667 },
-        'boundiali': { latitude: 9.5167, longitude: -6.4833 },
-        'dabou': { latitude: 5.3167, longitude: -4.3833 },
-        'agboville': { latitude: 5.9333, longitude: -4.2167 },
-        'bongouanou': { latitude: 6.6500, longitude: -4.2000 },
-        'ferkessedougou': { latitude: 9.6000, longitude: -5.2000 },
-        'seguela': { latitude: 7.9667, longitude: -6.6667 },
-        'toumodi': { latitude: 6.5667, longitude: -5.0167 },
-        'yamoussoukro': { latitude: 6.8276, longitude: -5.2893 },
+        // Autres villes principales - Gares UTB ou autres gares routières
+        'bouake': { latitude: 7.6833, longitude: -5.0167 }, // Gare UTB Bouaké
+        'yamoussoukro': { latitude: 6.8161, longitude: -5.2742 }, // Gare UTB Yamoussoukro
+        'daloa': { latitude: 6.8774, longitude: -6.4502 }, // Gare routière Daloa
+        'korhogo': { latitude: 9.4580, longitude: -5.6296 }, // Gare routière Korhogo
+        'san-pedro': { latitude: 4.7485, longitude: -6.6363 }, // Gare routière San-Pédro
+        'man': { latitude: 7.4125, longitude: -7.5538 }, // Gare routière Man
+        'gagnoa': { latitude: 6.1319, longitude: -5.9506 }, // Gare routière Gagnoa
+        'abengourou': { latitude: 6.7297, longitude: -3.4963 }, // Gare routière Abengourou
+        'divo': { latitude: 5.8372, longitude: -5.3570 }, // Gare routière Divo
+        'katiola': { latitude: 8.1378, longitude: -5.1000 }, // Gare routière Katiola
+        'odienne': { latitude: 9.5000, longitude: -7.5667 }, // Gare routière Odienné
+        'boundiali': { latitude: 9.5200, longitude: -6.4800 }, // Gare routière Boundiali
+        'dabou': { latitude: 5.3250, longitude: -4.3764 }, // Gare routière Dabou
+        'agboville': { latitude: 5.9280, longitude: -4.2132 }, // Gare routière Agboville
+        'bongouanou': { latitude: 6.6500, longitude: -4.2000 }, // Gare routière Bongouanou
+        'ferkessedougou': { latitude: 9.5920, longitude: -5.1940 }, // Gare routière Ferkessédougou
+        'seguela': { latitude: 7.9611, longitude: -6.6731 }, // Gare routière Séguéla
+        'toumodi': { latitude: 6.5570, longitude: -5.0170 }, // Gare routière Toumodi
     };
 
     /**

@@ -9,13 +9,13 @@ class RoutingService {
 
     // Coordonnées par défaut : Gare UTB Adjamé et Gare UTB Bouaké
     private readonly defaultStart: Coordinate = {
-        latitude: 5.3518158,
-        longitude: -4.0221585,
+        latitude: 5.3518225,
+        longitude: -4.0221293,
     };
 
     private readonly defaultEnd: Coordinate = {
-        latitude: 7.6876236,
-        longitude: -5.0265749,
+        latitude: 7.6874596,
+        longitude: -5.0269802,
     };
 
     /**
@@ -80,6 +80,76 @@ class RoutingService {
             );
             try {
                 return await this.getRoute(this.defaultStart, this.defaultEnd);
+            } catch (fallbackError) {
+                throw new Error(
+                    'Impossible de calculer l\'itinéraire même avec les coordonnées par défaut'
+                );
+            }
+        }
+    }
+
+    /**
+     * Calcule l'itinéraire avec les détails (tracé, distance, durée)
+     * Prend en compte le tracé réel du trajet pour calculer la durée
+     * Note: Pour prendre en compte les embouteillages en temps réel, il faudrait
+     * utiliser une API qui supporte le trafic (ex: Google Maps API avec traffic_model)
+     * @param start Point de départ
+     * @param end Point d'arrivée
+     * @returns Objet contenant le tracé, la distance (en km) et la durée (en minutes)
+     */
+    async getRouteWithDetails(
+        start: Coordinate,
+        end: Coordinate
+    ): Promise<{
+        coordinates: Coordinate[];
+        distance: number; // en km
+        duration: number; // en minutes
+    }> {
+        try {
+            // Utiliser les coordonnées par défaut si les paramètres sont invalides
+            const validStart = this.isValidCoordinate(start)
+                ? start
+                : this.defaultStart;
+            const validEnd = this.isValidCoordinate(end)
+                ? end
+                : this.defaultEnd;
+
+            const url = `${this.baseUrl}/route/v1/driving/${validStart.longitude},${validStart.latitude};${validEnd.longitude},${validEnd.latitude}?overview=full&geometries=geojson`;
+
+            const response = await fetch(url);
+            const data = await response.json();
+
+            if (data.code !== 'Ok' || !data.routes || data.routes.length === 0) {
+                // En cas d'erreur, utiliser les coordonnées par défaut
+                console.warn(
+                    'Erreur calcul itinéraire, utilisation des coordonnées par défaut'
+                );
+                return this.getRouteWithDetails(this.defaultStart, this.defaultEnd);
+            }
+
+            const route = data.routes[0];
+
+            // Convertir les coordonnées [lng, lat] en {latitude, longitude}
+            const coordinates = route.geometry.coordinates.map(
+                ([lng, lat]: [number, number]) => ({
+                    latitude: lat,
+                    longitude: lng,
+                })
+            );
+
+            return {
+                coordinates,
+                distance: route.distance / 1000, // Conversion en km
+                duration: route.duration / 60, // Conversion en minutes
+            };
+        } catch (error) {
+            console.error('Erreur calcul itinéraire avec détails:', error);
+            // En cas d'erreur, utiliser les coordonnées par défaut
+            console.warn(
+                'Utilisation des coordonnées par défaut suite à l\'erreur'
+            );
+            try {
+                return await this.getRouteWithDetails(this.defaultStart, this.defaultEnd);
             } catch (fallbackError) {
                 throw new Error(
                     'Impossible de calculer l\'itinéraire même avec les coordonnées par défaut'
