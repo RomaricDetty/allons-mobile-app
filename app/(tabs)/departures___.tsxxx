@@ -1,0 +1,586 @@
+// @ts-nocheck
+import { bookingListInfo } from '@/api/auth_register';
+import { getBookingByReference } from '@/api/booking';
+import { formatBookingDate } from '@/constants/functions';
+import { useTheme } from "@/contexts/ThemeContext";
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useThemeColor } from "@/hooks/use-theme-color";
+import { Booking } from '@/interfaces';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+
+/**
+ * Écran des départs
+ * Affiche la liste des départs de l'utilisateur
+ */
+const Departures = () => {
+
+    const insets = useSafeAreaInsets();
+    const colorScheme = useColorScheme() ?? 'light';
+    const { isDarkMode } = useTheme();
+    const navigation = useNavigation();
+
+    // Couleurs dynamiques basées sur le thème
+    const backgroundColor = useThemeColor({}, 'background');
+    const textColor = useThemeColor({}, 'text');
+    const iconColor = useThemeColor({}, 'icon');
+    const tintColor = useThemeColor({}, 'tint');
+    const secondaryTextColor = colorScheme === 'dark' ? '#9BA1A6' : '#666';
+
+    // Couleurs spécifiques pour l'écran
+    const cardBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
+    const borderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
+    const headerBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
+    const headerBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
+    const scrollBackgroundColor = colorScheme === 'dark' ? '#000000' : '#F3F3F7';
+    const activeTabColor = tintColor === '#fff' ? '#1776BA' : tintColor;
+    const inputBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#F3F3F7';
+    const placeholderColor = colorScheme === 'dark' ? '#9BA1A6' : '#A6A6AA';
+    const disabledInputBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#F5F5F5';
+    const disabledInputTextColor = colorScheme === 'dark' ? '#9BA1A6' : '#666';
+    const sectionBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#F3F3F7';
+    const modalBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
+    const modalBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
+    const datePickerBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
+    const loadingIndicatorColor = tintColor === '#fff' ? '#1776BA' : tintColor;
+
+    const [bookingList, setBookingList] = useState<Booking[] | any>([]);
+    const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [isLoadingBooking, setIsLoadingBooking] = useState<string | null>(null);
+    const [searchQuery, setSearchQuery] = useState<string>('');
+    const [filteredBookingList, setFilteredBookingList] = useState<Booking[] | any>([]);
+    const [isUserLoggedIn, setIsUserLoggedIn] = useState<boolean>(false);
+    const [searchedBooking, setSearchedBooking] = useState<Booking | null>(null);
+    const [isSearching, setIsSearching] = useState<boolean>(false);
+    /**
+     * Vérifie si l'utilisateur est connecté
+     */
+    const checkUserLoggedIn = async () => {
+        try {
+            const token = await AsyncStorage.getItem('token');
+            setIsUserLoggedIn(!!token);
+            return !!token;
+        } catch (error) {
+            console.error('Erreur lors de la vérification de la connexion:', error);
+            setIsUserLoggedIn(false);
+            return false;
+        }
+    };
+
+    /**
+     * Récupère la liste des réservations de l'utilisateur
+     */
+    const getBookingList = async () => {
+        try {
+            const token = await AsyncStorage.getItem('token');
+            const userId = await AsyncStorage.getItem('user_id');
+            const response = await bookingListInfo(userId as string, token as string);
+            if (response.status === 200 && response.data?.items) {
+                setBookingList(response.data.items.filter((booking: Booking) => booking.status === 'PAID'));
+                setFilteredBookingList(response.data.items.filter((booking: Booking) => booking.status === 'PAID'));
+                console.log("filteredBookingList: ", filteredBookingList);
+            } else {
+                Alert.alert('Erreur', 'Une erreur est survenue lors de la récupération de la liste des réservations');
+            }
+        } catch (error) {
+            console.error('Erreur lors de la récupération de la liste des réservations:', error);
+            Alert.alert('Erreur', 'Une erreur est survenue lors de la récupération de la liste des réservations');
+        }
+    };
+
+    /**
+     * Recherche un ticket par référence
+     */
+    const searchBookingByReference = async (referenceCode: string) => {
+        if (!referenceCode.trim()) {
+            Alert.alert('Attention', 'Veuillez saisir une référence de ticket');
+            return;
+        }
+
+        setIsSearching(true);
+        setSearchedBooking(null);
+        try {
+            const response = await getBookingByReference(referenceCode.trim());
+            if (response.status === 200 && response.data) {
+                setSearchedBooking(response.data);
+            } else {
+                Alert.alert('Erreur', 'Aucun ticket trouvé avec cette référence');
+            }
+        } catch (error: any) {
+            console.error('Erreur lors de la recherche du ticket:', error);
+            if (error.response?.status === 404) {
+                Alert.alert('Erreur', 'Aucun ticket trouvé avec cette référence');
+            } else {
+                Alert.alert('Erreur', 'Une erreur est survenue lors de la recherche du ticket');
+            }
+        } finally {
+            setIsSearching(false);
+        }
+    };
+
+    /**
+     * Affiche les détails d'une réservation
+     */
+    const handleViewBooking = async (searchedBooking: Object | any) => {
+
+        console.log('searchedBooking in handleViewBooking ===>, ', JSON.stringify(searchedBooking, null, 2));
+        navigation.navigate('trip/live-tracking' as never, { bookingDetails: JSON.stringify(searchedBooking), tripId: searchedBooking.id as string } as never);
+        return true;
+        /*try {
+            setIsLoadingBooking(bookingId);
+            
+            // Si l'utilisateur n'est pas connecté et qu'on a déjà les données du ticket recherché
+            if (!isUserLoggedIn && searchedBooking && searchedBooking.id === bookingId) {
+                navigation.navigate('trip/ticket-details' as never, { ticketDetails: searchedBooking } as never);
+                setIsLoadingBooking(null);
+                return;
+            }
+            
+            // Sinon, récupérer les détails via l'API
+            const token = await AsyncStorage.getItem('token');
+            if (!token) {
+                Alert.alert('Erreur', 'Vous devez être connecté pour voir les détails du ticket');
+                setIsLoadingBooking(null);
+                return;
+            }
+            
+            const response = await getBookingDetails(bookingId, token as string);
+            if (response.status === 200) {
+                navigation.navigate('trip/ticket-details' as never, { ticketDetails: response.data } as never);
+            } else {
+                Alert.alert('Erreur', 'Une erreur est survenue lors de la récupération des détails de la réservation');
+            }
+        } catch (error) {
+            console.error('Erreur lors de la récupération des détails:', error);
+            Alert.alert('Erreur', 'Une erreur est survenue lors de la récupération des détails de la réservation');
+        } finally {
+            setIsLoadingBooking(null);
+        }*/
+    };
+
+    /**
+     * Récupère les réservations au montage de l'écran
+     * et chaque fois que l'écran redevient actif
+     */
+    useFocusEffect(
+        useCallback(() => {
+            const fetchData = async () => {
+                setIsLoading(true);
+                try {
+                    const isLoggedIn = await checkUserLoggedIn();
+                    if (isLoggedIn) {
+                        await getBookingList();
+                    }
+                } catch (error) {
+                    console.error('Erreur lors du chargement des données:', error);
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+            fetchData();
+        }, [])
+    );
+
+    useEffect(() => {
+        if (isUserLoggedIn) {
+            setFilteredBookingList(bookingList.filter((booking: Booking) => booking.code.toLowerCase().includes(searchQuery.toLowerCase())));
+        }
+    }, [searchQuery, bookingList, isUserLoggedIn]);
+
+    return (
+        <View style={[styles.container, { backgroundColor: scrollBackgroundColor }]}>
+            {/* Header */}
+            <View style={[
+                styles.header,
+                {
+                    paddingTop: insets.top,
+                    backgroundColor: headerBackgroundColor,
+                    borderBottomColor: headerBorderColor
+                }
+            ]}>
+                <Text style={[styles.headerTitle, { color: textColor }]}>Mes départs</Text>
+            </View>
+
+            {/* Rechercher un départ - Section fixe */}
+            <View style={[styles.titleContainer, { backgroundColor: headerBackgroundColor, borderBottomColor: headerBorderColor }]}>
+                <Text style={[styles.title, { color: textColor }]}>
+                    {isUserLoggedIn ? 'Rechercher un départ' : 'Rechercher votre ticket'}
+                </Text>
+                <TextInput
+                    style={[styles.searchInput, { color: textColor, borderColor: inputBackgroundColor }]}
+                    placeholder={isUserLoggedIn ? "Rechercher un départ" : "Entrez la référence de votre ticket"}
+                    placeholderTextColor={placeholderColor}
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                    onSubmitEditing={() => {
+                        if (!isUserLoggedIn && searchQuery.trim()) {
+                            searchBookingByReference(searchQuery);
+                        }
+                    }}
+                />
+                {!isUserLoggedIn && (
+                    <Pressable
+                        style={[
+                            styles.searchButton,
+                            {
+                                backgroundColor: activeTabColor,
+                                opacity: isSearching ? 0.7 : 1
+                            }
+                        ]}
+                        onPress={() => searchBookingByReference(searchQuery)}
+                        disabled={isSearching}
+                    >
+                        {isSearching ? (
+                            <ActivityIndicator size="small" color="#ffffff" />
+                        ) : (
+                            <Text style={styles.searchButtonText}>Rechercher</Text>
+                        )}
+                    </Pressable>
+                )}
+            </View>
+
+            {/* Contenu scrollable */}
+            {isLoading ? (
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color={activeTabColor} />
+                </View>
+            ) : !isUserLoggedIn ? (
+                // Mode non connecté : afficher le résultat de la recherche
+                <ScrollView
+                    style={styles.scrollView}
+                    contentContainerStyle={styles.scrollContent}
+                    showsVerticalScrollIndicator={false}
+                >
+                    {searchedBooking ? (
+                        <View style={[styles.bookingCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
+                            {/* Route et date */}
+                            <View style={styles.bookingHeader}>
+                                <Text style={[styles.routeText, { color: textColor }]}>
+                                    {searchedBooking.trip.stationFrom.city} → {searchedBooking.trip.stationTo.city}
+                                </Text>
+                                <Text style={[styles.dateText, { color: secondaryTextColor }]}>
+                                    {formatBookingDate(searchedBooking.departureDateTime)}
+                                </Text>
+                                <Text style={[styles.timeText, { color: secondaryTextColor }]}>
+                                    {searchedBooking.departureTime} - {searchedBooking.arrivalTime}
+                                </Text>
+                                <Text style={[styles.timeText, { color: secondaryTextColor }]}>
+                                    Durée du trajet : {searchedBooking.duration}
+                                </Text>
+                            </View>
+
+                            {/* Compagnie et passagers */}
+                            <View style={styles.bookingInfo}>
+                                <Text style={[styles.companyText, { color: textColor }]}>{searchedBooking.companyName}</Text>
+                                <Text style={[styles.passengersText, { color: secondaryTextColor }]}>
+                                    {searchedBooking.passengers.length} passager(s)
+                                </Text>
+                            </View>
+
+                            {/* Référence, prix et statut */}
+                            <View style={styles.bookingFooter}>
+                                <Text style={[styles.referenceText, { color: secondaryTextColor }]}>Réf: {searchedBooking.code}</Text>
+                                <View style={styles.priceStatusContainer}>
+                                    <Text style={[styles.priceText, { color: activeTabColor }]}>
+                                        {parseFloat(searchedBooking.totalAmount).toLocaleString('fr-FR')} {searchedBooking.currency}
+                                    </Text>
+                                </View>
+                            </View>
+
+                            {/* Boutons d'action */}
+                            {searchedBooking.status === 'PAID' && (
+                                <View style={styles.actionButtons}>
+                                    <Pressable
+                                        style={[
+                                            styles.actionButton, 
+                                            { 
+                                                backgroundColor: activeTabColor, 
+                                                borderColor: activeTabColor,
+                                                opacity: isLoadingBooking === searchedBooking.id ? 0.7 : 1
+                                            }
+                                        ]}
+                                        onPress={() => handleViewBooking(searchedBooking)}
+                                        disabled={isLoadingBooking === searchedBooking.id}
+                                    >
+                                        {isLoadingBooking === searchedBooking.id ? (
+                                            <ActivityIndicator size="small" color="#ffffff" />
+                                        ) : (
+                                            <>
+                                                <MaterialCommunityIcons name="map-marker-outline" size={20} color="#ffffff" />
+                                                <Text style={styles.actionButtonText}>Voir l'itinéraire du trajet</Text>
+                                            </>
+                                        )}
+                                    </Pressable>
+                                </View>
+                            )}
+                        </View>
+                    ) : (
+                        <View style={styles.emptyStateContainer}>
+                            <MaterialCommunityIcons name="ticket-outline" size={64} color={secondaryTextColor} />
+                            <Text style={[styles.emptyStateText, { color: textColor }]}>Recherchez votre ticket</Text>
+                            <Text style={[styles.emptyStateSubtext, { color: secondaryTextColor, textAlign: 'center' }]}>Entrez la référence de votre ticket ci-dessus pour voir les détails</Text>
+                        </View>
+                    )}
+                </ScrollView>
+            ) : bookingList.length === 0 ? (
+                <View style={styles.emptyStateContainer}>
+                    <MaterialCommunityIcons name="ticket-outline" size={64} color={secondaryTextColor} />
+                    <Text style={[styles.emptyStateText, { color: textColor }]}>Aucun ticket disponible</Text>
+                    <Text style={[styles.emptyStateSubtext, { color: secondaryTextColor }]}>Vos tickets de voyage apparaîtront ici</Text>
+                </View>
+            ) : (
+                <ScrollView
+                    style={styles.scrollView}
+                    contentContainerStyle={styles.scrollContent}
+                    showsVerticalScrollIndicator={false}
+                >
+                    {filteredBookingList.map((booking: Booking) => (
+                        <View key={booking.id} style={[styles.bookingCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
+                            {/* Route et date */}
+                            <View style={styles.bookingHeader}>
+                                <Text style={[styles.routeText, { color: textColor }]}>
+                                    {booking.trip.stationFrom.city} → {booking.trip.stationTo.city}
+                                </Text>
+                                <Text style={[styles.dateText, { color: secondaryTextColor }]}>
+                                    {formatBookingDate(booking.departureDateTime)}
+                                </Text>
+                                <Text style={[styles.timeText, { color: secondaryTextColor }]}>
+                                    {booking.departureTime} - {booking.arrivalTime}
+                                </Text>
+                                <Text style={[styles.timeText, { color: secondaryTextColor }]}>
+                                    Durée du trajet : {booking.duration}
+                                </Text>
+                            </View>
+
+                            {/* Compagnie et passagers */}
+                            <View style={styles.bookingInfo}>
+                                <Text style={[styles.companyText, { color: textColor }]}>{booking.companyName}</Text>
+                                <Text style={[styles.passengersText, { color: secondaryTextColor }]}>
+                                    {booking.passengers.length} passager(s)
+                                </Text>
+                            </View>
+
+                            {/* Référence, prix et statut */}
+                            <View style={styles.bookingFooter}>
+                                <Text style={[styles.referenceText, { color: secondaryTextColor }]}>Réf: {booking.code}</Text>
+                                <View style={styles.priceStatusContainer}>
+                                    <Text style={[styles.priceText, { color: activeTabColor }]}>
+                                        {parseFloat(booking.totalAmount).toLocaleString('fr-FR')} {booking.currency}
+                                    </Text>
+                                    {/* <View style={[styles.statusBadge, { backgroundColor: getStatusColor(booking.status), justifyContent: 'center', alignItems: 'center' }]}>
+                                        <Text style={styles.statusBadgeText}>
+                                            {formatStatus(booking.status)}
+                                        </Text>
+                                    </View> */}
+                                </View>
+                            </View>
+
+                            {/* Boutons d'action */}
+                            {booking.status === 'PAID' && (
+                                <View style={styles.actionButtons}>
+                                    <Pressable
+                                        style={[
+                                            styles.actionButton, 
+                                            { 
+                                                backgroundColor: activeTabColor, 
+                                                borderColor: activeTabColor,
+                                                opacity: isLoadingBooking === booking.id ? 0.7 : 1
+                                            }
+                                        ]}
+                                        onPress={() => handleViewBooking(booking)}
+                                        disabled={isLoadingBooking === booking.id}
+                                    >
+                                        {isLoadingBooking === booking.id ? (
+                                            <ActivityIndicator size="small" color="#ffffff" />
+                                        ) : (
+                                            <>
+                                                <MaterialCommunityIcons name="map-marker-outline" size={20} color="#ffffff" />
+                                                <Text style={styles.actionButtonText}>Voir l'itinéraire du trajet</Text>
+                                            </>
+                                        )}
+                                    </Pressable>
+                                </View>
+                            )}
+                        </View>
+                    ))}
+                </ScrollView>
+            )}
+        </View>
+    )
+}
+
+const styles = StyleSheet.create({
+    titleContainer: {
+        padding: 16,
+        gap: 8,
+        borderBottomWidth: 1,
+    },
+    title: {
+        fontSize: 18,
+        fontFamily: 'Ubuntu_Bold',
+    },
+    container: {
+        flex: 1,
+    },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 24,
+        paddingBottom: 12,
+        borderBottomWidth: 1,
+    },
+    headerTitle: {
+        fontSize: 18,
+        fontFamily: 'Ubuntu_Bold',
+    },
+    scrollView: {
+        flex: 1,
+    },
+    scrollContent: {
+        padding: 16,
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    emptyStateContainer: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 64,
+    },
+    emptyStateText: {
+        fontSize: 18,
+        fontFamily: 'Ubuntu_Bold',
+        marginTop: 16,
+        marginBottom: 8,
+    },
+    emptyStateSubtext: {
+        fontSize: 14,
+        fontFamily: 'Ubuntu_Regular',
+    },
+    bookingCard: {
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 16,
+        borderWidth: 1,
+    },
+    bookingHeader: {
+        marginBottom: 12,
+    },
+    routeText: {
+        fontSize: 18,
+        fontFamily: 'Ubuntu_Bold',
+        marginBottom: 4,
+    },
+    dateText: {
+        fontSize: 14,
+        fontFamily: 'Ubuntu_Regular',
+        marginBottom: 4,
+    },
+    timeText: {
+        fontSize: 14,
+        fontFamily: 'Ubuntu_Regular',
+        marginBottom: 4,
+        // marginTop: 4,
+    },
+    bookingInfo: {
+        marginBottom: 12,
+    },
+    companyText: {
+        fontSize: 14,
+        fontFamily: 'Ubuntu_Bold',
+        marginBottom: 4,
+    },
+    passengersText: {
+        fontSize: 14,
+        fontFamily: 'Ubuntu_Regular',
+    },
+    bookingFooter: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: 12,
+    },
+    referenceText: {
+        fontSize: 14,
+        fontFamily: 'Ubuntu_Regular',
+        flex: 1,
+    },
+    priceStatusContainer: {
+        alignItems: 'flex-end',
+        gap: 8,
+    },
+    priceText: {
+        fontSize: 16,
+        fontFamily: 'Ubuntu_Bold',
+    },
+    statusBadge: {
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        borderRadius: 12,
+    },
+    statusBadgeText: {
+        fontSize: 12,
+        fontFamily: 'Ubuntu_Medium',
+        color: '#FFFFFF',
+    },
+    actionButtons: {
+        flexDirection: 'row',
+        gap: 12,
+        marginTop: 12,
+    },
+    actionButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderRadius: 8,
+        borderWidth: 1,
+        gap: 8,
+        minHeight: 44,
+    },
+    actionButtonText: {
+        fontSize: 14,
+        fontFamily: 'Ubuntu_Medium',
+        color: '#FFFFFF',
+    },
+    searchInput: {
+        borderWidth: 1,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        fontSize: 14,
+        fontFamily: 'Ubuntu_Regular',
+        borderRadius: 15,
+        height: 55,
+        width: '100%',
+    },
+    searchInputPlaceholder: {
+        fontSize: 14,
+        fontFamily: 'Ubuntu_Regular',
+    },
+    searchButton: {
+        marginTop: 12,
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: 44,
+    },
+    searchButtonText: {
+        fontSize: 14,
+        fontFamily: 'Ubuntu_Medium',
+        color: '#FFFFFF',
+    },
+});
+
+export default Departures;

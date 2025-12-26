@@ -1,13 +1,18 @@
 // @ts-nocheck
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useThemeColor } from '@/hooks/use-theme-color';
 import React from 'react';
 import {
     ActivityIndicator,
     Dimensions,
+    KeyboardAvoidingView,
     Modal,
+    Platform,
     Pressable,
     ScrollView,
     StyleSheet,
     Text,
+    TextInput,
     TouchableOpacity,
     View
 } from "react-native";
@@ -23,7 +28,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const MAX_TRANSLATE_Y = SCREEN_HEIGHT * 0.20;
+const MAX_TRANSLATE_Y = SCREEN_HEIGHT * 0.15;
 const MIN_TRANSLATE_Y = 0;
 
 interface BottomSheetProps<T> {
@@ -35,6 +40,9 @@ interface BottomSheetProps<T> {
     renderItem: (item: T, onSelect: () => void) => React.ReactNode;
     keyExtractor: (item: T) => string;
     emptyText?: string;
+    searchable?: boolean;
+    searchPlaceholder?: string;
+    filterFunction?: (item: T, searchTerm: string) => boolean;
 }
 
 /**
@@ -51,13 +59,33 @@ export function BottomSheet<T>({
     loading = false,
     renderItem,
     keyExtractor,
-    emptyText = "Aucun élément disponible"
+    emptyText = "Aucun élément disponible",
+    searchable = false,
+    searchPlaceholder = "Rechercher...",
+    filterFunction
 }: BottomSheetProps<T>) {
     const insets = useSafeAreaInsets();
+    const colorScheme = useColorScheme() ?? 'light';
+    
+    // Couleurs dynamiques basées sur le thème
+    const backgroundColor = useThemeColor({}, 'background');
+    const textColor = useThemeColor({}, 'text');
+    const iconColor = useThemeColor({}, 'icon');
+    const tintColor = useThemeColor({}, 'tint');
+    
+    // Couleurs spécifiques pour le BottomSheet
+    const containerBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
+    const borderColor = colorScheme === 'dark' ? '#3A3A3C' : '#F3F3F7';
+    const searchBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#F3F3F7';
+    const placeholderColor = colorScheme === 'dark' ? '#9BA1A6' : '#A6A6AA';
+    const handleColor = colorScheme === 'dark' ? '#48484A' : '#CCCCCC';
+    const emptyTextColor = colorScheme === 'dark' ? '#9BA1A6' : '#666666';
+    
     // Initialiser translateY à SCREEN_HEIGHT pour que le bottom sheet commence hors écran
     const translateY = useSharedValue(SCREEN_HEIGHT);
     const context = useSharedValue({ y: 0 });
     const opacity = useSharedValue(0);
+    const [searchTerm, setSearchTerm] = React.useState('');
 
     /**
      * Ferme le BottomSheet avec animation
@@ -71,8 +99,35 @@ export function BottomSheet<T>({
         opacity.value = withTiming(0, { duration: 200 }); 
         setTimeout(() => {
             runOnJS(onClose)();
+            // Réinitialiser le terme de recherche à la fermeture
+            setSearchTerm('');
         }, 250); 
     };
+
+    /**
+     * Filtre les données en fonction du terme de recherche
+     * @returns Array<T> - Liste filtrée
+     */
+    const filteredData = React.useMemo(() => {
+        if (!searchable || !searchTerm.trim()) {
+            return data;
+        }
+
+        if (filterFunction) {
+            return data.filter(item => filterFunction(item, searchTerm));
+        }
+
+        // Filtrage par défaut : recherche dans les propriétés string de l'objet
+        const lowerSearchTerm = searchTerm.toLowerCase();
+        return data.filter(item => {
+            return Object.values(item as any).some(value => {
+                if (typeof value === 'string') {
+                    return value.toLowerCase().includes(lowerSearchTerm);
+                }
+                return false;
+            });
+        });
+    }, [data, searchTerm, searchable, filterFunction]);
 
     /**
      * Gère les gestes de glissement avec la nouvelle API
@@ -116,6 +171,8 @@ export function BottomSheet<T>({
                 stiffness: 120,           
                 mass: 0.3                  
             });
+            // Réinitialiser le terme de recherche à l'ouverture
+            setSearchTerm('');
         } else {
             translateY.value = withSpring(SCREEN_HEIGHT, {
                 damping: 15,              
@@ -163,30 +220,65 @@ export function BottomSheet<T>({
                     />
                 </TouchableOpacity>
 
-                <Animated.View style={[styles.bottomSheetContainer, bottomSheetStyle]}>
+                <Animated.View style={[
+                    styles.bottomSheetContainer, 
+                    bottomSheetStyle,
+                    { backgroundColor: containerBackgroundColor }
+                ]}>
                     <GestureDetector gesture={panGesture}>
                         <View>
                             {/* Handle bar */}
-                            <View style={styles.bottomSheetHandle} />
+                            <View style={[styles.bottomSheetHandle, { backgroundColor: handleColor }]} />
 
                             {/* Header */}
-                            <View style={styles.bottomSheetHeader}>
-                                <Text style={styles.bottomSheetTitle}>{title}</Text>
+                            <View style={[styles.bottomSheetHeader, { borderBottomColor: borderColor }]}>
+                                <Text style={[styles.bottomSheetTitle, { color: textColor }]}>{title}</Text>
                                 <Pressable onPress={closeBottomSheet} style={styles.bottomSheetCloseButton}>
-                                    <Icon name="close" size={24} color="#000" />
+                                    <Icon name="close" size={24} color={iconColor} />
                                 </Pressable>
                             </View>
                         </View>
                     </GestureDetector>
 
+                    {/* Champ de recherche */}
+                    {searchable && (
+                        <KeyboardAvoidingView
+                            behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+                            keyboardVerticalOffset={0}
+                        >
+                            <View style={[styles.searchContainer, { backgroundColor: searchBackgroundColor }]}>
+                                <Icon name="magnify" size={20} color={placeholderColor} style={styles.searchIcon} />
+                                <TextInput
+                                    style={[styles.searchInput, { color: textColor }]}
+                                    placeholder={searchPlaceholder}
+                                    placeholderTextColor={placeholderColor}
+                                    value={searchTerm}
+                                    onChangeText={setSearchTerm}
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
+                                />
+                                {searchTerm.length > 0 && (
+                                    <Pressable
+                                        onPress={() => setSearchTerm('')}
+                                        style={styles.searchClearButton}
+                                    >
+                                        <Icon name="close-circle" size={20} color={placeholderColor} />
+                                    </Pressable>
+                                )}
+                            </View>
+                        </KeyboardAvoidingView>
+                    )}
+
                     {/* Content */}
                     {loading ? (
                         <View style={styles.loadingContainer}>
-                            <ActivityIndicator size="large" color="#1776ba" />
+                            <ActivityIndicator size="large" color={tintColor} />
                         </View>
-                    ) : data.length === 0 ? (
+                    ) : filteredData.length === 0 ? (
                         <View style={styles.emptyContainer}>
-                            <Text style={styles.emptyText}>{emptyText}</Text>
+                            <Text style={[styles.emptyText, { color: emptyTextColor }]}>
+                                {searchTerm.trim() ? "Aucun résultat trouvé" : emptyText}
+                            </Text>
                         </View>
                     ) : (
                         <ScrollView
@@ -195,12 +287,12 @@ export function BottomSheet<T>({
                                 styles.bottomSheetListContent,
                                 { paddingBottom: Math.max(insets.bottom, 20) }
                             ]}
-                            showsVerticalScrollIndicator={true}
+                            showsVerticalScrollIndicator={false}
                             nestedScrollEnabled={true}
                             bounces={true}
                             scrollEventThrottle={16}
                         >
-                            {data.map((item) => (
+                            {filteredData.map((item) => (
                                 <View key={keyExtractor(item)}>
                                     {renderItem(item, closeBottomSheet)}
                                 </View>
@@ -235,7 +327,6 @@ const styles = StyleSheet.create({
         bottom: 0,
         maxHeight: SCREEN_HEIGHT * 0.9,
         height: SCREEN_HEIGHT * 0.8,
-        backgroundColor: '#FFFFFF',
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
         shadowColor: '#000',
@@ -251,7 +342,6 @@ const styles = StyleSheet.create({
     bottomSheetHandle: {
         width: 40,
         height: 4,
-        backgroundColor: '#CCCCCC',
         borderRadius: 2,
         alignSelf: 'center',
         marginTop: 10,
@@ -264,18 +354,40 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         paddingBottom: 15,
         borderBottomWidth: 1,
-        borderBottomColor: '#F3F3F7',
+    },
+    searchContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderRadius: 12,
+        marginHorizontal: 20,
+        marginTop: 10,
+        marginBottom: 10,
+        paddingHorizontal: 12,
+        height: 48,
+    },
+    searchIcon: {
+        marginRight: 8,
+    },
+    searchInput: {
+        flex: 1,
+        fontSize: 15,
+        fontFamily: 'Ubuntu_Regular',
+        paddingVertical: 0,
+    },
+    searchClearButton: {
+        marginLeft: 8,
+        padding: 4,
     },
     bottomSheetTitle: {
         fontSize: 18,
         fontFamily: 'Ubuntu_Bold',
-        color: '#000',
     },
     bottomSheetCloseButton: {
         padding: 5,
     },
     bottomSheetList: {
         flex: 1,
+        marginBottom: 100,
     },
     bottomSheetListContent: {
         paddingHorizontal: 20,
@@ -292,7 +404,6 @@ const styles = StyleSheet.create({
     },
     emptyText: {
         fontSize: 14,
-        color: '#666666',
         fontFamily: 'Ubuntu_Regular',
     },
 });

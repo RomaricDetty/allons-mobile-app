@@ -1,0 +1,274 @@
+// @ts-nocheck
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useThemeColor } from '@/hooks/use-theme-color';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import React, { useEffect, useState } from 'react';
+import {
+    ActivityIndicator,
+    Dimensions,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+// Note: Vous devrez installer react-native-qrcode-svg ou react-native-qr-code
+import { getBookingQrCode } from '@/api/booking';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import QRCode from 'react-native-qrcode-svg';
+
+/**
+ * Écran d'affichage du QR code de vérification du ticket
+ */
+const TicketQR = () => {
+    const route = useRoute();
+    const navigation = useNavigation();
+    const insets = useSafeAreaInsets();
+    const colorScheme = useColorScheme() ?? 'light';
+    const screenHeight = Dimensions.get('window').height;
+
+    // Couleurs dynamiques basées sur le thème
+    const textColor = useThemeColor({}, 'text');
+    const iconColor = useThemeColor({}, 'icon');
+    const tintColor = useThemeColor({}, 'tint');
+
+    // Couleurs spécifiques pour l'écran
+    const cardBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
+    const borderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
+    const secondaryTextColor = colorScheme === 'dark' ? '#9BA1A6' : '#666';
+    const headerBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
+    const headerBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
+    const scrollBackgroundColor = colorScheme === 'dark' ? '#000000' : '#F5F5F5';
+    const primaryBlue = tintColor === '#fff' ? '#1776BA' : tintColor;
+    const qrCodeBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#FFFFFF';
+
+    // Récupération du code du ticket
+    const ticketCode = route.params?.ticketCode as string | undefined;
+    const ticketId = route.params?.ticketId as string | undefined;
+    if (!ticketCode || !ticketId) {
+        return (
+            <View style={[styles.container, { backgroundColor: scrollBackgroundColor }]}>
+                <Text style={{ color: textColor }}>Erreur : Aucun code de ticket trouvé</Text>
+            </View>
+        );
+    }
+
+    const [qrCode, setQrCode] = useState<string>('');
+    const [isLoadingQrCode, setIsLoadingQrCode] = useState<boolean>(true);
+
+    const generateQRCodeBase64 = async () => {
+        setIsLoadingQrCode(true);
+        try {
+            const token = await AsyncStorage.getItem('token');
+            const response = await getBookingQrCode(ticketId, token);
+            console.log(response.data);
+            setQrCode(response?.data?.hash || '');
+        } catch (error) {
+            console.error(error);
+            setQrCode('');
+        } finally {
+            setIsLoadingQrCode(false);
+        }
+    };
+
+    useEffect(() => {
+        if (ticketId) {
+            generateQRCodeBase64();
+        }
+    }, [ticketId]);
+
+    // URL ou données pour le QR code (à adapter selon votre API)
+    // const qrCodeData = `https://allon-frontoffice-ng.onrender.com/verify-ticket/${ticketId}?ref=${ticketCode}`;
+
+    return (
+        <View style={[styles.container, { backgroundColor: headerBackgroundColor }]}>
+            {/* Header avec bouton retour */}
+            <View style={[
+                styles.header,
+                {
+                    paddingTop: insets.top,
+                    backgroundColor: headerBackgroundColor,
+                    borderBottomColor: headerBorderColor,
+                    alignItems: 'center',
+                }
+            ]}>
+                <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
+                    <Icon name="arrow-left" size={25} color={iconColor} />
+                </Pressable>
+                <Text style={[styles.qrTitle, { color: textColor, fontSize: 16, flex: 1, textAlign: 'center' }]}>Code QR de vérification</Text>
+            </View>
+
+            <ScrollView
+                style={styles.scrollView}
+                contentContainerStyle={[
+                    styles.scrollContent,
+                    { minHeight: screenHeight - insets.top - 60 }
+                ]}
+                showsVerticalScrollIndicator={false}
+            >
+                {/* Card principale */}
+                <View style={[styles.mainCard,]}>
+                    {/* { backgroundColor: cardBackgroundColor, borderColor } */}
+                    {/* Header avec icône QR */}
+                    {/* <View style={styles.qrHeader}>
+                        <Icon name="qrcode" size={24} color={primaryBlue} />
+                        <Text style={[styles.qrTitle, { color: textColor }]}>Code QR de vérification</Text>
+                    </View> */}
+
+                    {/* Container QR Code */}
+                    <View style={[styles.qrContainer, { backgroundColor: qrCodeBackgroundColor, justifyContent: 'center', alignItems: 'center' }]}>
+                        {isLoadingQrCode || !qrCode ? (
+                            <ActivityIndicator size="large" color={primaryBlue} />
+                        ) : (
+                            <QRCode
+                                value={qrCode}
+                                size={300}
+                                color={primaryBlue}
+                                backgroundColor="transparent"
+                            />
+                        )}
+                        {/* Identifiant du ticket */}
+                        <Text style={[styles.ticketIdentifier, { color: textColor, marginTop: 16 }]}>
+                            {ticketCode}
+                        </Text>
+                    </View>
+
+                    {/* Instructions */}
+                    {/* <View style={styles.instructionsContainer}>
+                        <View style={styles.instructionRow}>
+                            <View style={[styles.checkIcon]}>
+                                <Icon name="check" size={16} color="#FFFFFF" />
+                                <Image source={require('@/assets/images/allon-logo-transparent.png')} style={styles.checkIconImage} />
+                            </View>
+                            <Text style={[styles.instructionText, { color: textColor }]}>
+                                Votre partenaire de voyage
+                            </Text>
+                        </View>
+                        <Text style={[styles.instructionSubtext, { color: secondaryTextColor }]}>
+                            Ce code QR contient un lien de vérification sécurisé vers votre ticket.
+                        </Text>
+                    </View> */}
+                </View>
+            </ScrollView>
+        </View>
+    );
+};
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+    },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingBottom: 12,
+        borderBottomWidth: 1,
+    },
+    backButton: {
+        padding: 8,
+    },
+    scrollView: {
+        flex: 1,
+    },
+    scrollContent: {
+        // padding: 16,
+        // paddingTop: 32,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexGrow: 1,
+    },
+    mainCard: {
+        borderRadius: 12,
+        padding: 25,
+        width: '100%',
+        maxWidth: 400,
+        // borderWidth: 1,
+        // justifyContent: 'center',
+        // alignItems: 'center',
+    },
+    qrHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 24,
+        gap: 8,
+    },
+    qrTitle: {
+        fontSize: 20,
+        fontFamily: 'Ubuntu_Bold',
+    },
+    qrContainer: {
+        alignItems: 'center',
+        padding: 30,
+        borderRadius: 12,
+        // marginBottom: 24,
+        // borderWidth: 1,
+        // borderColor: "red",
+        // shadowColor: '#000',
+        // shadowOffset: {
+        //     width: 0,
+        //     height: 2,
+        // },
+        // shadowOpacity: 0.1,
+        // shadowRadius: 4,
+        // borderWidth: 1,
+        // elevation: 3,
+    },
+    qrPlaceholder: {
+        width: 300,
+        height: 300,
+        borderRadius: 8,
+        borderWidth: 2,
+        borderStyle: 'dashed',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    ticketIdentifier: {
+        fontSize: 16,
+        fontFamily: 'Ubuntu_Medium',
+        textAlign: 'center',
+        marginTop: 16,
+    },
+    instructionsContainer: {
+        marginTop: 8,
+    },
+    instructionRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        // marginBottom: 12,
+        gap: 12,
+        // borderWidth: 1,
+        // borderColor: 'red',
+        textAlign: 'center',
+        // marginTop: 24,
+    },
+    checkIcon: {
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    instructionText: {
+        flex: 1,
+        fontSize: 14,
+        fontFamily: 'Ubuntu_Regular',
+        lineHeight: 20,
+    },
+    instructionSubtext: {
+        fontSize: 12,
+        fontFamily: 'Ubuntu_Regular',
+        lineHeight: 18,
+        marginLeft: 36,
+    },
+
+    checkIconImage: {
+        width: 40,
+        height: 40,
+        marginTop: 2,
+        resizeMode: 'cover',
+    },
+});
+
+export default TicketQR;

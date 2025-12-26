@@ -1,4 +1,6 @@
 // @ts-nocheck
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useThemeColor } from '@/hooks/use-theme-color';
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -33,6 +35,17 @@ export const SelectField = ({
     onSelect,
     onOpenBottomSheet
 }: SelectFieldProps) => {
+    const colorScheme = useColorScheme() ?? 'light';
+    
+    // Couleurs dynamiques basées sur le thème
+    const textColor = useThemeColor({}, 'text');
+    const iconColor = useThemeColor({}, 'icon');
+    
+    // Couleurs spécifiques pour le champ select
+    const inputBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#F3F3F7';
+    const inputBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
+    const placeholderColor = colorScheme === 'dark' ? '#9BA1A6' : '#A6A6AA';
+
     const handlePress = () => {
         onOpenBottomSheet(selectionType, label, options, value, onSelect);
     };
@@ -40,14 +53,26 @@ export const SelectField = ({
     const selectedOption = options.find(option => option.value === value);
     return (
         <View style={styles.formField}>
-            <Text style={styles.formLabel}>
+            <Text style={[styles.formLabel, { color: textColor }]}>
                 {label} {required && <Text style={styles.required}>*</Text>}
             </Text>
-            <Pressable style={styles.selectInput} onPress={handlePress}>
-                <Text style={[styles.selectText, !value && styles.selectPlaceholder]}>
+            <Pressable 
+                style={[
+                    styles.selectInput,
+                    {
+                        backgroundColor: inputBackgroundColor,
+                        borderColor: inputBorderColor
+                    }
+                ]} 
+                onPress={handlePress}
+            >
+                <Text style={[
+                    styles.selectText,
+                    { color: value ? textColor : placeholderColor }
+                ]}>
                     {selectedOption ? selectedOption.label : placeholder}
                 </Text>
-                <Icon name="chevron-down" size={20} color="#666" />
+                <Icon name="chevron-down" size={20} color={iconColor} />
             </Pressable>
         </View>
     );
@@ -60,14 +85,12 @@ const styles = StyleSheet.create({
     formLabel: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Medium',
-        color: '#000',
         marginBottom: 8,
     },
     required: {
         color: '#FF0000',
     },
     selectInput: {
-        backgroundColor: '#F3F3F7',
         borderRadius: 8,
         paddingHorizontal: 16,
         paddingVertical: 12,
@@ -75,15 +98,13 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#E0E0E0',
     },
     selectText: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        color: '#000',
     },
     selectPlaceholder: {
-        color: '#A6A6AA',
+        // Couleur gérée dynamiquement
     },
 });
 

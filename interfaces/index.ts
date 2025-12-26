@@ -1,8 +1,15 @@
+import { Civility, PhoneType } from "@/types";
+
 export interface ContactUrgent {
-    fullName: string;
+    firstName: string;
+    lastName: string;
     phone: string;
+    relationship?: string;
 }
 
+/**
+ * Type pour l'utilisateur
+ */
 export interface User {
     id: string;
     firstName: string;
@@ -27,6 +34,9 @@ export interface User {
     allonCoins?: number;
 }
 
+/**
+ * Type pour les props de l'écran de profil
+ */
 export interface ProfileScreenProps {
     onLogout: () => void;
 }
@@ -52,9 +62,88 @@ export interface Booking {
         label: string;
         stationFrom: {
             city: string;
+            coordinate: {
+                latitude: number;
+                longitude: number;
+            };
+            name: string;
         };
         stationTo: {
             city: string;
+            coordinate: {
+                latitude: number;
+                longitude: number;
+            };
+            name: string;
         };
     };
 }
+
+/**
+ * Type pour les props de l'écran d'inscription
+ */
+export interface SignUpScreenProps {
+    onSignUp: (data: { name: string; email: string; password: string }) => void;
+    onSwitchToSignIn: () => void;
+}
+
+/**
+ * Type pour les données de l'écran d'inscription
+ */
+export interface SignUpFormData {
+    firstName: string;
+    lastName: string;
+    username: string;
+    dateOfBirth: Date | null;
+    civility: string;
+    email: string;
+    phone: string;
+    password: string;
+    confirmPassword: string;
+    emergencyContactFirstName: string;
+    emergencyContactLastName: string;
+    emergencyContactPhone: string;
+    emergencyContactRelation: string;
+    agreeToTerms: boolean;
+}
+
+/**
+ * Type pour les erreurs de validation
+ */
+export interface FormErrors {
+    firstName?: string;
+    lastName?: string;
+    username?: string;
+    dateOfBirth?: string;
+    civility?: string;
+    email?: string;
+    phone?: string;
+    password?: string;
+    confirmPassword?: string;
+}
+
+/**
+ * Type pour les données de l'inscription
+ */
+export interface RegisterData {
+    firstName: string;
+    lastName: string;
+    username: string;
+    middleName?: string;
+    email: string;
+    password: string;
+    roleID?: string;
+    civility: Civility;
+    address?: any;
+    phones: PhoneNumber[];
+    dateOfBirth: string;
+    contactUrgent?: ContactUrgent;
+}
+
+/**
+ * Type pour le numéro de téléphone
+ */
+export interface PhoneNumber {
+    type: PhoneType;
+    digits: string;
+}   

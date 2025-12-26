@@ -1,15 +1,51 @@
 // @ts-nocheck
 import { authGetUserInfo, bookingListInfo } from '@/api/auth_register';
+import { getBookingDetails } from '@/api/booking';
 import { formatBookingDate, formatStatus, getStatusColor } from '@/constants/functions';
+import { useTheme } from '@/contexts/ThemeContext';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useThemeColor } from '@/hooks/use-theme-color';
 import { Booking, ProfileScreenProps, User } from '@/interfaces';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { router } from 'expo-router';
+import React, { useCallback, useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
     const insets = useSafeAreaInsets();
+    const colorScheme = useColorScheme() ?? 'light';
+    const { isDarkMode, toggleTheme } = useTheme();
+
+    // Couleurs dynamiques basées sur le thème
+    const backgroundColor = useThemeColor({}, 'background');
+    const textColor = useThemeColor({}, 'text');
+    const iconColor = useThemeColor({}, 'icon');
+    const tintColor = useThemeColor({}, 'tint');
+
+    // Couleurs spécifiques pour l'écran
+    const cardBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
+    const borderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
+    const secondaryTextColor = colorScheme === 'dark' ? '#9BA1A6' : '#666';
+    const headerBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
+    const headerBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
+    const scrollBackgroundColor = colorScheme === 'dark' ? '#000000' : '#F3F3F7';
+    const inputBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#F3F3F7';
+    const placeholderColor = colorScheme === 'dark' ? '#9BA1A6' : '#A6A6AA';
+    const inactiveIconColor = colorScheme === 'dark' ? '#9BA1A6' : '#9E9E9E';
+    const inactiveTabTextColor = colorScheme === 'dark' ? '#9BA1A6' : '#9E9E9E';
+    const activeTabColor = tintColor === '#fff' ? '#1776BA' : tintColor;
+    const modalBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
+    const modalBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#F0F0F0';
+    const emergencyInfoBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#F5F5F5';
+    const profileImagePlaceholderBackgroundColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
+    const tripsIconContainerBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#E3F2FD';
+    const clientTypeCardBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#E8F5E9';
+    const coinsCardBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#FFF3E0';
+    const actionButtonBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
+
     const [user, setUser] = useState<User | null>(null);
     const [bookingList, setBookingList] = useState<Booking[] | any>([]);
     const [activeTab, setActiveTab] = useState<'info' | 'tickets'>('info');
@@ -17,7 +53,11 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
     const [selectedStatus, setSelectedStatus] = useState<string | any>('');
     const [showStatusModal, setShowStatusModal] = useState<boolean>(false);
     const [isLoading, setIsLoading] = useState<boolean>(true);
-    
+    const [isLoadingBooking, setIsLoadingBooking] = useState<string | null>(null);
+    // Ajouter un état pour le modal de confirmation
+    const [showLogoutModal, setShowLogoutModal] = useState(false);
+    const navigation = useNavigation();
+
     /**
      * Formate le nom complet de l'utilisateur
      */
@@ -49,49 +89,32 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
 
     /**
      * Gère la déconnexion de l'utilisateur
-     * Supprime tous les éléments d'AsyncStorage sauf 'onboarding'
      */
     const handleLogout = async () => {
-        Alert.alert(
-            'Déconnexion',
-            'Êtes-vous sûr de vouloir vous déconnecter ?',
-            [
-                {
-                    text: 'Annuler',
-                    style: 'cancel',
-                    color: '#000',
-                },
-                {
-                    text: 'Déconnexion',
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            // Récupérer la valeur d'onboarding avant de tout supprimer
-                            const onboardingValue = await AsyncStorage.getItem('onboarding');
+        setShowLogoutModal(true);
+    };
 
-                            // Supprimer toutes les clés
-                            await AsyncStorage.multiRemove([
-                                'token',
-                                'refresh_token',
-                                'expires_at',
-                                'token_type',
-                            ]);
-
-                            // Remettre la valeur d'onboarding si elle existait
-                            if (onboardingValue) {
-                                await AsyncStorage.setItem('onboarding', onboardingValue);
-                            }
-
-                            // Appeler le callback de déconnexion
-                            onLogout();
-                        } catch (error) {
-                            console.error('Erreur lors de la déconnexion:', error);
-                            Alert.alert('Erreur', 'Une erreur est survenue lors de la déconnexion');
-                        }
-                    },
-                },
-            ]
-        );
+    /**
+     * Confirme et exécute la déconnexion
+     */
+    const confirmLogout = async () => {
+        setShowLogoutModal(false);
+        try {
+            const onboardingValue = await AsyncStorage.getItem('onboarding');
+            await AsyncStorage.multiRemove([
+                'token',
+                'refresh_token',
+                'expires_at',
+                'token_type',
+            ]);
+            if (onboardingValue) {
+                await AsyncStorage.setItem('onboarding', onboardingValue);
+            }
+            onLogout();
+        } catch (error) {
+            console.error('Erreur lors de la déconnexion:', error);
+            Alert.alert('Erreur', 'Une erreur est survenue lors de la déconnexion');
+        }
     };
 
     /**
@@ -101,7 +124,7 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
         const token = await AsyncStorage.getItem('token');
         const userId = await AsyncStorage.getItem('user_id');
         const response = await authGetUserInfo(userId, token);
-        // console.log('response user info: ', response);
+        console.log('response user info ======> ', response.data);
         if (response.status === 200) {
             return response.data;
         } else {
@@ -117,10 +140,10 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
         try {
             const token = await AsyncStorage.getItem('token');
             const userId = await AsyncStorage.getItem('user_id');
-            console.log('userId getBookingList : ', userId);
-            console.log('token getBookingList : ', token);
+            // console.log('userId getBookingList : ', userId);
+            // console.log('token getBookingList : ', token);
             const response = await bookingListInfo(userId as string, token as string);
-            console.log('response booking list: ', response);
+            // console.log('response booking list: ', response);
             if (response.status === 200 && response.data?.items) {
                 setBookingList(response.data.items);
             } else {
@@ -133,28 +156,67 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
     };
 
     /**
-     * Récupère les informations de l'utilisateur au montage de l'écran
+     * Affiche les détails d'une réservation
      */
-    useEffect(() => {
-        const fetchData = async () => {
-            setIsLoading(true);
-            try {
-                const userInfo = await getUserInfo();
-                setUser(userInfo);
-                getFullName();
-                formatDateOfBirth();
-                formatCivility();
-                await getBookingList();
-            } catch (error) {
-                console.error('Erreur lors du chargement des données:', error);
-            } finally {
-                setIsLoading(false);
+    const handleViewBooking = async (bookingId: string) => {
+        try {
+            setIsLoadingBooking(bookingId);
+            const token = await AsyncStorage.getItem('token');
+            const response = await getBookingDetails(bookingId, token as string);
+            // console.log('response booking details: ', response.data);
+            if (response.status === 200) {
+                // Utiliser navigation.navigate au lieu de router.push
+                navigation.navigate('trip/ticket-details' as never, { ticketDetails: response.data } as never);
+            } else {
+                Alert.alert('Erreur', 'Une erreur est survenue lors de la récupération des détails de la réservation');
             }
-        };
-        fetchData();
-    }, []);
+        } catch (error) {
+            console.error('Erreur lors de la récupération des détails:', error);
+            Alert.alert('Erreur', 'Une erreur est survenue lors de la récupération des détails de la réservation');
+        } finally {
+            setIsLoadingBooking(null);
+        }
+    }
 
-    
+    /**
+     * Récupère les informations de l'utilisateur au montage de l'écran
+     * et chaque fois que l'écran redevient actif (par exemple après modification du profil)
+     */
+    useFocusEffect(
+        useCallback(() => {
+            const fetchData = async () => {
+                setIsLoading(true);
+                try {
+                    const userInfo = await getUserInfo();
+                    setUser(userInfo);
+                    console.log('user info address: ', userInfo?.address);
+                    getFullName();
+                    formatDateOfBirth();
+                    formatCivility();
+                    await getBookingList();
+                } catch (error) {
+                    console.error('Erreur lors du chargement des données:', error);
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+            fetchData();
+        }, [])
+    );
+
+    /**
+     * Navigue vers l'écran de modification du profil
+     */
+    const handleUpdateUserInfo = () => {
+        router.push('/profile/edit');
+    };
+
+    /**
+     * Capitalise la première lettre d'une chaîne
+     */
+    const capitalizeFirstLetter = (string: string) => {
+        return string ? string.charAt(0).toUpperCase() + string.slice(1) : '';
+    };
 
     /**
      * Options de statut pour le filtre
@@ -173,16 +235,16 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
     const filteredBookings = useMemo(() => {
         return bookingList.filter((booking) => {
             // Filtre par recherche
-            const matchesSearch = 
+            const matchesSearch =
                 !searchQuery ||
                 booking.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 booking.trip.stationFrom.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 booking.trip.stationTo.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 booking.companyName.toLowerCase().includes(searchQuery.toLowerCase());
-            
+
             // Filtre par statut
             const matchesStatus = !selectedStatus || booking.status === selectedStatus;
-            
+
             return matchesSearch && matchesStatus;
         });
     }, [bookingList, searchQuery, selectedStatus]);
@@ -196,116 +258,150 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
         >
-                {/* Main Profile Card */}
-                <View style={styles.profileCard}>
-                    <View style={styles.profileCardHeader}>
-                        <Text style={styles.businessLabel}>Profil Utilisateur</Text>
-                        <View style={[styles.statusBadge, { flexDirection: 'row', alignItems: 'center', gap: 6,justifyContent: 'space-between', alignItems: 'center' }]}>
-                            <View style={[styles.statusDot, { backgroundColor: user?.active ? '#4CAF50' : '#9E9E9E' }]} />
-                            <Text style={styles.statusLabel}>{user?.active ? 'Actif' : 'Inactif'}</Text>
-                        </View>
+            {/* Main Profile Card */}
+            <View style={[styles.profileCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
+                <View style={styles.profileCardHeader}>
+                    <Text style={[styles.businessLabel, { color: secondaryTextColor }]}>Profil Utilisateur</Text>
+                    <View style={[styles.statusBadge, { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'space-between', alignItems: 'center' }]}>
+                        <View style={[styles.statusDot, { backgroundColor: user?.active ? '#4CAF50' : '#9E9E9E' }]} />
+                        <Text style={[styles.statusLabel, { color: secondaryTextColor }]}>{user?.active ? 'Actif' : 'Inactif'}</Text>
                     </View>
+                </View>
 
-                    <View style={styles.profileInfo}>
-                        <View style={styles.profileImageContainer}>
-                            {user?.picture ? (
-                                <Image
-                                    source={{ uri: user?.picture }}
-                                    style={styles.profileImage}
-                                />
-                            ) : (
-                                <View style={styles.profileImagePlaceholder}>
-                                    <MaterialCommunityIcons name="account" size={40} color="#666" />
-                                </View>
-                            )}
-                        </View>
-                        <Text style={styles.userName}>{getFullName() || 'Non renseigné'}</Text>
-                        <Text style={styles.userRole}>{formatCivility()}</Text>
-                        {user?.company && (
-                            <Text style={styles.userCompany}>{user?.company}</Text>
+                <View style={styles.profileInfo}>
+                    <View style={[styles.profileImageContainer, { backgroundColor: profileImagePlaceholderBackgroundColor }]}>
+                        {user?.picture ? (
+                            <Image
+                                source={{ uri: user?.picture }}
+                                style={styles.profileImage}
+                            />
+                        ) : (
+                            <View style={[styles.profileImagePlaceholder, { backgroundColor: profileImagePlaceholderBackgroundColor }]}>
+                                <MaterialCommunityIcons name="account" size={40} color={secondaryTextColor} />
+                            </View>
                         )}
                     </View>
+                    <Text style={[styles.userName, { color: textColor }]}>{getFullName() || 'Non renseigné'}</Text>
+                    <Text style={[styles.userRole, { color: secondaryTextColor }]}>{formatCivility()}</Text>
+                    {user?.company && (
+                        <Text style={[styles.userCompany, { color: activeTabColor }]}>{user?.company}</Text>
+                    )}
+                </View>
 
-                    {/* Informations détaillées */}
-                    <View style={styles.detailsSection}>
+                {/* Informations détaillées */}
+                <View style={[styles.detailsSection, { borderTopColor: borderColor }]}>
+                    <View style={styles.detailRow}>
+                        <MaterialCommunityIcons name="email-outline" size={18} color={secondaryTextColor} />
+                        <Text style={[styles.detailLabel, { color: textColor }]}>Email:</Text>
+                        <Text style={[styles.detailValue, { color: secondaryTextColor }]}>{user?.email ?? 'Non renseigné'}</Text>
+                        {user?.isEmailVerified && (
+                            <MaterialCommunityIcons name="check-circle" size={16} color="#4CAF50" />
+                        )}
+                    </View>
+                    <View style={styles.detailRow}>
+                        <MaterialCommunityIcons name="account-outline" size={18} color={secondaryTextColor} />
+                        <Text style={[styles.detailLabel, { color: textColor }]}>Nom d'utilisateur:</Text>
+                        <Text style={[styles.detailValue, { color: secondaryTextColor }]}>{'@' + user?.username ?? 'Non renseigné'}</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                        <MaterialCommunityIcons name="phone-outline" size={18} color={secondaryTextColor} />
+                        <Text style={[styles.detailLabel, { color: textColor }]}>Téléphone:</Text>
+                        <Text style={[styles.detailValue, { color: secondaryTextColor }]}>+225 {user?.phones?.[0]?.digits}</Text>
+                    </View>
+                    {user?.dateOfBirth && (
                         <View style={styles.detailRow}>
-                            <MaterialCommunityIcons name="email-outline" size={18} color="#666" />
-                            <Text style={styles.detailLabel}>Email:</Text>
-                            <Text style={styles.detailValue}>{user?.email}</Text>
-                            {user?.isEmailVerified && (
-                                <MaterialCommunityIcons name="check-circle" size={16} color="#4CAF50" />
-                            )}
+                            <MaterialCommunityIcons name="calendar-outline" size={18} color={secondaryTextColor} />
+                            <Text style={[styles.detailLabel, { color: textColor }]}>Date de naissance:</Text>
+                            <Text style={[styles.detailValue, { color: secondaryTextColor }]}>{formatDateOfBirth()}</Text>
                         </View>
+                    )}
+                    {user?.address && (
                         <View style={styles.detailRow}>
-                            <MaterialCommunityIcons name="account-outline" size={18} color="#666" />
-                            <Text style={styles.detailLabel}>Nom d'utilisateur:</Text>
-                            <Text style={styles.detailValue}>@{user?.username}</Text>
-                        </View>
-                        {user?.dateOfBirth && (
-                            <View style={styles.detailRow}>
-                                <MaterialCommunityIcons name="calendar-outline" size={18} color="#666" />
-                                <Text style={styles.detailLabel}>Date de naissance:</Text>
-                                <Text style={styles.detailValue}>{formatDateOfBirth()}</Text>
-                            </View>
-                        )}
-                        {user?.address && (
-                            <View style={styles.detailRow}>
-                                <MaterialCommunityIcons name="map-marker-outline" size={18} color="#666" />
-                                <Text style={styles.detailLabel}>Adresse:</Text>
-                                <Text style={styles.detailValue}>{user?.address}</Text>
-                            </View>
-                        )}
-                    </View>
-
-                    {/* Contact d'urgence */}
-                    {user?.contactUrgent && (
-                        <View style={styles.emergencySection}>
-                            <Text style={styles.sectionTitle}>Contact d'urgence</Text>
-                            <View style={styles.emergencyInfo}>
-                                <Text style={styles.emergencyName}>{user?.contactUrgent.fullName}</Text>
-                                <Text style={styles.emergencyPhone}>{user?.contactUrgent.phone}</Text>
-                            </View>
+                            <MaterialCommunityIcons name="map-marker-outline" size={18} color={secondaryTextColor} />
+                            <Text style={[styles.detailLabel, { color: textColor }]}>Adresse:</Text>
+                            <Text style={[styles.detailValue, { color: secondaryTextColor }]}>{user?.address ? user?.address?.city + ' ' + (user?.address?.country?.name ?? '') : ''}</Text>
                         </View>
                     )}
                 </View>
 
-                {/* Statistiques utilisateur */}
-                <View style={styles.statsSection}>
-                    {/* Voyages effectués */}
-                    <View style={styles.tripsCompletedCard}>
-                        <View style={styles.tripsIconContainer}>
-                            <MaterialCommunityIcons name="check-circle" size={24} color="#1776BA" />
-                        </View>
-                        <View style={styles.statsContent}>
-                            <Text style={styles.statsLabel}>Voyages effectués</Text>
-                            <Text style={styles.tripsCount}>{user?.customerProfile?.totalTripsPaid ?? 0}</Text>
+                {/* Contact d'urgence */}
+                {user?.contactUrgent && (
+                    <View style={[styles.emergencySection, { borderTopColor: borderColor }]}>
+                        <Text style={[styles.sectionTitle, { color: textColor }]}>Contact d'urgence</Text>
+                        <View style={[styles.emergencyInfo, { backgroundColor: emergencyInfoBackgroundColor }]}>
+                            <Text style={[styles.emergencyName, { color: textColor }]}>{user?.contactUrgent?.firstName ?? 'Non renseigné'} {user?.contactUrgent?.lastName ?? 'Non renseigné'}</Text>
+                            <Text style={[styles.emergencyPhone, { color: secondaryTextColor }]}>{user?.contactUrgent?.phone ?? 'Non renseigné'}</Text>
+                            <Text style={[styles.emergencyRelation, { color: secondaryTextColor }]}>Relation : {user?.contactUrgent?.relationship ? user?.contactUrgent?.relationship.charAt(0).toUpperCase() + user?.contactUrgent?.relationship.slice(1).toLowerCase() : 'Non renseigné'}</Text>
                         </View>
                     </View>
+                )}
+            </View>
 
-                    {/* Type de clients */}
-                    <View style={styles.clientTypeCard}>
-                        <MaterialCommunityIcons name="wallet" size={24} color="#4CAF50" />
-                        <View style={styles.statsContent}>
-                            <Text style={styles.statsLabel}>Type de client</Text>
-                            <Text style={styles.clientTypeValue}>{user?.customerProfile?.loyaltyTier ?? 'bronze'}</Text>
-                        </View>
+            {/* Statistiques utilisateur */}
+            <View style={styles.statsSection}>
+                {/* Voyages effectués */}
+                <View style={[styles.tripsCompletedCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
+                    <View style={[styles.tripsIconContainer, { backgroundColor: tripsIconContainerBackgroundColor }]}>
+                        <MaterialCommunityIcons name="check-circle" size={24} color={activeTabColor} />
                     </View>
-
-                    {/* AllOn Coin gagnés */}
-                    <View style={styles.coinsCard}>
-                        <MaterialCommunityIcons name="star" size={24} color="#FFA726" />
-                        <View style={styles.statsContent}>
-                            <Text style={styles.statsLabel}>AllOn Coin gagnés</Text>
-                            <Text style={styles.coinsValue}>{user?.customerProfile?.totalCoinsEarned ?? '0.00'}</Text>
-                        </View>
+                    <View style={styles.statsContent}>
+                        <Text style={[styles.statsLabel, { color: secondaryTextColor }]}>Voyages effectués</Text>
+                        <Text style={[styles.tripsCount, { color: activeTabColor }]}>{user?.customerProfile?.totalTripsPaid ?? 0}</Text>
                     </View>
                 </View>
 
-                {/* Modify Button */}
-                <Pressable style={styles.upgradeButton}>
-                    <MaterialCommunityIcons name="pencil" size={20} color="#FFFFFF" />
-                    <Text style={styles.upgradeButtonText}>Modifier mes informations</Text>
-                </Pressable>
+                {/* Type de clients */}
+                <View style={[styles.clientTypeCard, { backgroundColor: clientTypeCardBackgroundColor, borderColor }]}>
+                    <MaterialCommunityIcons name="wallet" size={24} color="#4CAF50" />
+                    <View style={styles.statsContent}>
+                        <Text style={[styles.statsLabel, { color: secondaryTextColor }]}>Type de client</Text>
+                        <Text style={[styles.clientTypeValue, { color: '#4CAF50' }]}>
+                            {user?.customerProfile?.loyaltyTier && user.customerProfile.loyaltyTier.trim()
+                                ? user.customerProfile.loyaltyTier.charAt(0).toUpperCase() + user.customerProfile.loyaltyTier.slice(1).toLowerCase()
+                                : 'Bronze'}
+                        </Text>
+                    </View>
+                </View>
+
+                {/* AllOn Coin gagnés */}
+                <View style={[styles.coinsCard, { backgroundColor: coinsCardBackgroundColor, borderColor }]}>
+                    <MaterialCommunityIcons name="star" size={24} color="#FFA726" />
+                    <View style={styles.statsContent}>
+                        <Text style={[styles.statsLabel, { color: secondaryTextColor }]}>AllOn Coin gagnés</Text>
+                        <Text style={[styles.coinsValue, { color: '#FFA726' }]}>{user?.customerProfile?.totalCoinsEarned ?? '0.00'}</Text>
+                    </View>
+                </View>
+            </View>
+
+            {/* Toggle Mode Dark */}
+            <View style={[styles.themeToggleCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
+                <View style={styles.themeToggleContent}>
+                    <MaterialCommunityIcons
+                        name={isDarkMode ? "weather-night" : "weather-sunny"}
+                        size={24}
+                        color={isDarkMode ? "#FFA726" : "#FFC107"}
+                    />
+                    <View style={styles.themeToggleTextContainer}>
+                        <Text style={[styles.themeToggleLabel, { color: textColor }]}>Mode sombre</Text>
+                        <Text style={[styles.themeToggleDescription, { color: secondaryTextColor }]}>
+                            {isDarkMode ? 'Activé' : 'Désactivé'}
+                        </Text>
+                    </View>
+                </View>
+                <Switch
+                    value={isDarkMode}
+                    onValueChange={toggleTheme}
+                    trackColor={{ false: '#E0E0E0', true: '#1776BA' }}
+                    thumbColor={isDarkMode ? '#FFFFFF' : '#FFFFFF'}
+                    ios_backgroundColor="#E0E0E0"
+                />
+            </View>
+
+            {/* Modify Button */}
+            <Pressable style={styles.upgradeButton} onPress={handleUpdateUserInfo}>
+                <MaterialCommunityIcons name="pencil" size={20} color="#FFFFFF" />
+                <Text style={styles.upgradeButtonText}>Modifier mes informations</Text>
+            </Pressable>
         </ScrollView>
     );
 
@@ -313,33 +409,49 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
      * Rendu du contenu de l'onglet Mes réservations
      */
     const renderTicketsTab = () => (
-        <View style={styles.ticketsContainer}>
+        <View style={[styles.ticketsContainer, { backgroundColor: scrollBackgroundColor }]}>
             {/* Barre de recherche et filtre */}
-            <View style={styles.searchFilterContainer}>
+            <View style={[styles.searchFilterContainer, { backgroundColor: headerBackgroundColor }]}>
                 <TextInput
-                    style={styles.searchInput}
+                    style={[
+                        styles.searchInput,
+                        {
+                            backgroundColor: inputBackgroundColor,
+                            borderColor,
+                            color: textColor
+                        }
+                    ]}
                     placeholder="Rechercher par ville, référence ou compagnie"
-                    placeholderTextColor="#A6A6AA"
+                    placeholderTextColor={placeholderColor}
                     value={searchQuery}
                     onChangeText={setSearchQuery}
                 />
                 <Pressable
-                    style={styles.statusFilter}
+                    style={[
+                        styles.statusFilter,
+                        {
+                            backgroundColor: inputBackgroundColor,
+                            borderColor
+                        }
+                    ]}
                     onPress={() => setShowStatusModal(true)}
                 >
-                    <Text style={[styles.statusFilterText, !selectedStatus && styles.statusFilterPlaceholder]}>
+                    <Text style={[
+                        styles.statusFilterText,
+                        { color: selectedStatus ? textColor : placeholderColor }
+                    ]}>
                         {selectedStatus ? statusOptions.find(opt => opt.value === selectedStatus)?.label : '-- Choisir un statut --'}
                     </Text>
-                    <MaterialCommunityIcons name="chevron-down" size={20} color="#666" />
+                    <MaterialCommunityIcons name="chevron-down" size={20} color={secondaryTextColor} />
                 </Pressable>
             </View>
 
             {/* Liste des réservations */}
             {filteredBookings.length === 0 ? (
                 <View style={styles.emptyStateContainer}>
-                    <MaterialCommunityIcons name="ticket-outline" size={64} color="#9E9E9E" />
-                    <Text style={styles.emptyStateText}>Aucun ticket disponible</Text>
-                    <Text style={styles.emptyStateSubtext}>Vos tickets de voyage apparaîtront ici</Text>
+                    <MaterialCommunityIcons name="ticket-outline" size={64} color={inactiveIconColor} />
+                    <Text style={[styles.emptyStateText, { color: textColor }]}>Aucun ticket disponible</Text>
+                    <Text style={[styles.emptyStateSubtext, { color: secondaryTextColor }]}>Vos tickets de voyage apparaîtront ici</Text>
                 </View>
             ) : (
                 <ScrollView
@@ -348,33 +460,33 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                     showsVerticalScrollIndicator={false}
                 >
                     {filteredBookings.map((booking) => (
-                        <View key={booking.id} style={styles.bookingCard}>
+                        <View key={booking.id} style={[styles.bookingCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
                             {/* Route et date */}
                             <View style={styles.bookingHeader}>
-                                <Text style={styles.routeText}>
+                                <Text style={[styles.routeText, { color: textColor }]}>
                                     {booking.trip.stationFrom.city} → {booking.trip.stationTo.city}
                                 </Text>
-                                <Text style={styles.dateText}>
+                                <Text style={[styles.dateText, { color: secondaryTextColor }]}>
                                     {formatBookingDate(booking.departureDateTime)}
                                 </Text>
-                                <Text style={styles.timeText}>
+                                <Text style={[styles.timeText, { color: secondaryTextColor }]}>
                                     {booking.departureTime} - {booking.arrivalTime}
                                 </Text>
                             </View>
 
                             {/* Compagnie et passagers */}
                             <View style={styles.bookingInfo}>
-                                <Text style={styles.companyText}>{booking.companyName}</Text>
-                                <Text style={styles.passengersText}>
+                                <Text style={[styles.companyText, { color: textColor }]}>{booking.companyName}</Text>
+                                <Text style={[styles.passengersText, { color: secondaryTextColor }]}>
                                     {booking.passengers.length} passager(s)
                                 </Text>
                             </View>
 
                             {/* Référence, prix et statut */}
                             <View style={styles.bookingFooter}>
-                                <Text style={styles.referenceText}>Réf: {booking.code}</Text>
+                                <Text style={[styles.referenceText, { color: secondaryTextColor }]}>Réf: {booking.code}</Text>
                                 <View style={styles.priceStatusContainer}>
-                                    <Text style={styles.priceText}>
+                                    <Text style={[styles.priceText, { color: activeTabColor }]}>
                                         {parseFloat(booking.totalAmount).toLocaleString('fr-FR')} {booking.currency}
                                     </Text>
                                     <View style={[styles.statusBadge, { backgroundColor: getStatusColor(booking.status), justifyContent: 'center', alignItems: 'center' }]}>
@@ -386,14 +498,40 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                             </View>
 
                             {/* Boutons d'action */}
-                            <View style={styles.actionButtons}>
-                                <Pressable style={[styles.actionButton, { backgroundColor: '#1776BA' }]}>
-                                    <MaterialCommunityIcons name="eye-outline" size={20} color="#ffffff" />
-                                </Pressable>
-                                <Pressable style={styles.actionButton}>
-                                    <MaterialCommunityIcons name="download" size={20} color="#666" />
-                                </Pressable>
-                            </View>
+                            {/* {booking.status === 'PAID' && ( */}
+                                <View style={styles.actionButtons}>
+                                    <Pressable
+                                        style={[
+                                            styles.actionButton,
+                                            {
+                                                backgroundColor: activeTabColor,
+                                                borderColor: activeTabColor,
+                                                opacity: isLoadingBooking === booking.id ? 0.7 : 1
+                                            }
+                                        ]}
+                                        onPress={() => handleViewBooking(booking.id)}
+                                        disabled={isLoadingBooking === booking.id}
+                                    >
+                                        {isLoadingBooking === booking.id ? (
+                                            <ActivityIndicator size="small" color="#ffffff" />
+                                        ) : (
+                                            <>
+                                                <MaterialCommunityIcons name="eye-outline" size={20} color="#ffffff" />
+                                                <Text style={styles.actionButtonText}>Ticket</Text>
+                                            </>
+                                        )}
+                                    </Pressable>
+                                    <Pressable
+                                        style={[styles.actionButton, { backgroundColor: 'transparent', borderColor }]}
+                                        onPress={() => {
+                                            navigation.navigate('trip/route-viewer' as never, { booking: JSON.stringify(booking) } as never);
+                                        }}
+                                    >
+                                        <MaterialCommunityIcons name="map-marker-outline" size={20} color={secondaryTextColor} />
+                                        <Text style={[styles.actionButtonText, { color: secondaryTextColor }]}>Itinéraire</Text>
+                                    </Pressable>
+                                </View>
+                            {/* )} */}
                         </View>
                     ))}
                 </ScrollView>
@@ -403,33 +541,33 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
             <Modal
                 visible={showStatusModal}
                 transparent={true}
-                animationType="slide"
+                animationType="fade"
                 onRequestClose={() => setShowStatusModal(false)}
             >
                 <Pressable
                     style={styles.modalOverlay}
                     onPress={() => setShowStatusModal(false)}
                 >
-                    <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Choisir un statut</Text>
+                    <View style={[styles.modalContent, { backgroundColor: modalBackgroundColor }]} onStartShouldSetResponder={() => true}>
+                        <View style={[styles.modalHeader, { borderBottomColor: borderColor }]}>
+                            <Text style={[styles.modalTitle, { color: textColor }]}>Choisir un statut</Text>
                             <Pressable onPress={() => setShowStatusModal(false)}>
-                                <MaterialCommunityIcons name="close" size={24} color="#000" />
+                                <MaterialCommunityIcons name="close" size={24} color={iconColor} />
                             </Pressable>
                         </View>
                         <ScrollView>
                             {statusOptions.map((option) => (
                                 <Pressable
                                     key={option.value}
-                                    style={styles.modalOption}
+                                    style={[styles.modalOption, { borderBottomColor: modalBorderColor }]}
                                     onPress={() => {
                                         setSelectedStatus(option.value);
                                         setShowStatusModal(false);
                                     }}
                                 >
-                                    <Text style={styles.modalOptionText}>{option.label}</Text>
+                                    <Text style={[styles.modalOptionText, { color: textColor }]}>{option.label}</Text>
                                     {selectedStatus === option.value && (
-                                        <MaterialCommunityIcons name="check" size={20} color="#1776BA" />
+                                        <MaterialCommunityIcons name="check" size={20} color={activeTabColor} />
                                     )}
                                 </Pressable>
                             ))}
@@ -444,46 +582,61 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
      * Rendu de l'indicateur de chargement
      */
     const renderLoading = () => (
-        <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#1776BA" />
+        <View style={[styles.loadingContainer, { backgroundColor: scrollBackgroundColor }]}>
+            <ActivityIndicator size="large" color={activeTabColor} />
         </View>
     );
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: scrollBackgroundColor }]}>
             {/* Header */}
-            <View style={[styles.header, { paddingTop: insets.top }]}>
-                <Text style={styles.headerTitle}>Mon profil</Text>
+            <View style={[
+                styles.header,
+                {
+                    paddingTop: insets.top,
+                    backgroundColor: headerBackgroundColor,
+                    borderBottomColor: headerBorderColor
+                }
+            ]}>
+                <Text style={[styles.headerTitle, { color: textColor }]}>Mon profil</Text>
                 <Pressable style={styles.headerButton} onPress={handleLogout}>
-                    <MaterialCommunityIcons name="logout" size={24} color="#000" />
+                    <MaterialCommunityIcons name="logout" size={24} color={iconColor} />
                 </Pressable>
             </View>
 
             {/* Tabs Navigation */}
-            <View style={styles.tabsContainer}>
+            <View style={[styles.tabsContainer, { backgroundColor: headerBackgroundColor, borderBottomColor: headerBorderColor }]}>
                 <Pressable
-                    style={[styles.tab, activeTab === 'info' && styles.tabActive]}
+                    style={[styles.tab, activeTab === 'info' && { borderBottomColor: activeTabColor }]}
                     onPress={() => setActiveTab('info')}
                 >
                     <MaterialCommunityIcons
                         name="account-outline"
                         size={20}
-                        color={activeTab === 'info' ? '#1776BA' : '#9E9E9E'}
+                        color={activeTab === 'info' ? activeTabColor : inactiveIconColor}
                     />
-                    <Text style={[styles.tabText, activeTab === 'info' && styles.tabTextActive]}>
+                    <Text style={[
+                        styles.tabText,
+                        { color: activeTab === 'info' ? activeTabColor : inactiveTabTextColor },
+                        activeTab === 'info' && styles.tabTextActive
+                    ]}>
                         Mes informations
                     </Text>
                 </Pressable>
                 <Pressable
-                    style={[styles.tab, activeTab === 'tickets' && styles.tabActive]}
+                    style={[styles.tab, activeTab === 'tickets' && { borderBottomColor: activeTabColor }]}
                     onPress={() => setActiveTab('tickets')}
                 >
                     <MaterialCommunityIcons
                         name="ticket-outline"
                         size={20}
-                        color={activeTab === 'tickets' ? '#1776BA' : '#9E9E9E'}
+                        color={activeTab === 'tickets' ? activeTabColor : inactiveIconColor}
                     />
-                    <Text style={[styles.tabText, activeTab === 'tickets' && styles.tabTextActive]}>
+                    <Text style={[
+                        styles.tabText,
+                        { color: activeTab === 'tickets' ? activeTabColor : inactiveTabTextColor },
+                        activeTab === 'tickets' && styles.tabTextActive
+                    ]}>
                         Mes tickets
                     </Text>
                 </Pressable>
@@ -491,6 +644,56 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
 
             {/* Tab Content */}
             {isLoading ? renderLoading() : (activeTab === 'info' ? renderPersonalInfoTab() : renderTicketsTab())}
+
+            {/* Modal de confirmation de déconnexion */}
+            <Modal
+                visible={showLogoutModal}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setShowLogoutModal(false)}
+            >
+                <Pressable
+                    style={styles.modalOverlay}
+                    onPress={() => setShowLogoutModal(false)}
+                >
+                    <View
+                        style={[
+                            styles.logoutModalContent,
+                            { backgroundColor: cardBackgroundColor, borderColor }
+                        ]}
+                        onStartShouldSetResponder={() => true}
+                    >
+                        <Text style={[styles.logoutModalTitle, { color: textColor }]}>
+                            Déconnexion
+                        </Text>
+                        <Text style={[styles.logoutModalMessage, { color: secondaryTextColor }]}>
+                            Êtes-vous sûr de vouloir vous déconnecter ?
+                        </Text>
+                        <View style={styles.logoutModalButtons}>
+                            <Pressable
+                                style={[
+                                    styles.logoutModalButton,
+                                    styles.logoutModalButtonCancel,
+                                    { borderColor }
+                                ]}
+                                onPress={() => setShowLogoutModal(false)}
+                            >
+                                <Text style={[styles.logoutModalButtonText, { color: textColor }]}>
+                                    Annuler
+                                </Text>
+                            </Pressable>
+                            <Pressable
+                                style={[styles.logoutModalButton, styles.logoutModalButtonConfirm]}
+                                onPress={confirmLogout}
+                            >
+                                <Text style={styles.logoutModalButtonTextConfirm}>
+                                    Déconnexion
+                                </Text>
+                            </Pressable>
+                        </View>
+                    </View>
+                </Pressable>
+            </Modal>
         </View>
     );
 };
@@ -498,7 +701,6 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F3F3F7',
     },
     header: {
         flexDirection: 'row',
@@ -506,9 +708,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingHorizontal: 24,
         paddingBottom: 12,
-        backgroundColor: '#FFFFFF',
         borderBottomWidth: 1,
-        borderBottomColor: '#E0E0E0',
     },
     headerButton: {
         padding: 8,
@@ -516,8 +716,6 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 18,
         fontFamily: 'Ubuntu_Bold',
-        color: '#000',
-        // paddingTop: 20,
     },
     scrollView: {
         flex: 1,
@@ -526,12 +724,10 @@ const styles = StyleSheet.create({
         padding: 16,
     },
     profileCard: {
-        backgroundColor: '#FFFFFF',
         borderRadius: 12,
         padding: 16,
         marginBottom: 16,
         borderWidth: 1,
-        borderColor: '#E0E0E0',
     },
     profileCardHeader: {
         flexDirection: 'row',
@@ -542,7 +738,6 @@ const styles = StyleSheet.create({
     businessLabel: {
         fontSize: 12,
         fontFamily: 'Ubuntu_Regular',
-        color: '#666',
     },
     statusDot: {
         width: 8,
@@ -552,7 +747,6 @@ const styles = StyleSheet.create({
     statusLabel: {
         fontSize: 12,
         fontFamily: 'Ubuntu_Regular',
-        color: '#666',
     },
     profileInfo: {
         alignItems: 'center',
@@ -564,7 +758,6 @@ const styles = StyleSheet.create({
         borderRadius: 40,
         overflow: 'hidden',
         marginBottom: 12,
-        backgroundColor: '#E0E0E0',
     },
     profileImage: {
         width: '100%',
@@ -573,31 +766,26 @@ const styles = StyleSheet.create({
     userName: {
         fontSize: 20,
         fontFamily: 'Ubuntu_Bold',
-        color: '#000',
         marginBottom: 4,
     },
     userRole: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        color: '#666',
         marginBottom: 4,
     },
     userCompany: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Medium',
-        color: '#1776BA',
     },
     profileImagePlaceholder: {
         width: '100%',
         height: '100%',
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#E0E0E0',
     },
     detailsSection: {
         paddingTop: 16,
         borderTopWidth: 1,
-        borderTopColor: '#E0E0E0',
         gap: 12,
     },
     detailRow: {
@@ -608,42 +796,36 @@ const styles = StyleSheet.create({
     detailLabel: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Medium',
-        color: '#000',
         minWidth: 120,
     },
     detailValue: {
         flex: 1,
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        color: '#666',
+        textAlign: 'right',
     },
     emergencySection: {
         marginTop: 16,
         paddingTop: 16,
         borderTopWidth: 1,
-        borderTopColor: '#E0E0E0',
     },
     sectionTitle: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Bold',
-        color: '#000',
         marginBottom: 8,
     },
     emergencyInfo: {
-        backgroundColor: '#F5F5F5',
         borderRadius: 8,
         padding: 12,
     },
     emergencyName: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Medium',
-        color: '#000',
         marginBottom: 4,
     },
     emergencyPhone: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        color: '#666',
     },
     addNewCard: {
         backgroundColor: '#FFFFFF',
@@ -725,6 +907,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         gap: 8,
         marginBottom: 16,
+        marginTop: 16,
     },
     upgradeButtonText: {
         fontSize: 16,
@@ -790,20 +973,17 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     tripsCompletedCard: {
-        backgroundColor: '#FFFFFF',
         borderRadius: 12,
         padding: 16,
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
         borderWidth: 1,
-        borderColor: '#E0E0E0',
     },
     tripsIconContainer: {
         width: 48,
         height: 48,
         borderRadius: 24,
-        backgroundColor: '#E3F2FD',
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -813,50 +993,39 @@ const styles = StyleSheet.create({
     statsLabel: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        color: '#666',
         marginBottom: 4,
     },
     tripsCount: {
         fontSize: 24,
         fontFamily: 'Ubuntu_Bold',
-        color: '#1776BA',
     },
     clientTypeCard: {
-        backgroundColor: '#E8F5E9',
         borderRadius: 12,
         padding: 16,
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
         borderWidth: 1,
-        borderColor: '#E0E0E0',
     },
     clientTypeValue: {
         fontSize: 24,
         fontFamily: 'Ubuntu_Bold',
-        color: '#4CAF50',
-        textTransform: 'lowercase',
     },
     coinsCard: {
-        backgroundColor: '#FFF3E0',
         borderRadius: 12,
         padding: 16,
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
         borderWidth: 1,
-        borderColor: '#E0E0E0',
     },
     coinsValue: {
         fontSize: 24,
         fontFamily: 'Ubuntu_Bold',
-        color: '#FFA726',
     },
     tabsContainer: {
         flexDirection: 'row',
-        backgroundColor: '#FFFFFF',
         borderBottomWidth: 1,
-        borderBottomColor: '#E0E0E0',
         paddingHorizontal: 30,
     },
     tab: {
@@ -869,17 +1038,12 @@ const styles = StyleSheet.create({
         borderBottomWidth: 2,
         borderBottomColor: 'transparent',
     },
-    tabActive: {
-        borderBottomColor: '#1776BA',
-    },
     tabText: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        color: '#9E9E9E',
     },
     tabTextActive: {
         fontFamily: 'Ubuntu_Medium',
-        color: '#1776BA',
     },
     emptyStateContainer: {
         flex: 1,
@@ -890,37 +1054,29 @@ const styles = StyleSheet.create({
     emptyStateText: {
         fontSize: 18,
         fontFamily: 'Ubuntu_Bold',
-        color: '#000',
         marginTop: 16,
         marginBottom: 8,
     },
     emptyStateSubtext: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        color: '#666',
     },
     ticketsContainer: {
         flex: 1,
-        backgroundColor: '#F3F3F7',
     },
     searchFilterContainer: {
         padding: 16,
-        backgroundColor: '#FFFFFF',
         gap: 12,
     },
     searchInput: {
-        backgroundColor: '#F3F3F7',
         borderRadius: 8,
         paddingHorizontal: 16,
         paddingVertical: 12,
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        color: '#000',
         borderWidth: 1,
-        borderColor: '#E0E0E0',
     },
     statusFilter: {
-        backgroundColor: '#F3F3F7',
         borderRadius: 8,
         paddingHorizontal: 16,
         paddingVertical: 12,
@@ -928,23 +1084,19 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#E0E0E0',
     },
     statusFilterText: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        color: '#000',
     },
     statusFilterPlaceholder: {
-        color: '#A6A6AA',
+        // Couleur gérée dynamiquement
     },
     bookingCard: {
-        backgroundColor: '#FFFFFF',
         borderRadius: 12,
         padding: 16,
         marginBottom: 16,
         borderWidth: 1,
-        borderColor: '#E0E0E0',
     },
     bookingHeader: {
         marginBottom: 12,
@@ -952,19 +1104,16 @@ const styles = StyleSheet.create({
     routeText: {
         fontSize: 18,
         fontFamily: 'Ubuntu_Bold',
-        color: '#000',
         marginBottom: 4,
     },
     dateText: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        color: '#666',
         marginBottom: 4,
     },
     timeText: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        color: '#666',
     },
     bookingInfo: {
         marginBottom: 12,
@@ -972,13 +1121,11 @@ const styles = StyleSheet.create({
     companyText: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Bold',
-        color: '#000',
         marginBottom: 4,
     },
     passengersText: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        color: '#666',
     },
     bookingFooter: {
         flexDirection: 'row',
@@ -989,7 +1136,6 @@ const styles = StyleSheet.create({
     referenceText: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        color: '#666',
         flex: 1,
     },
     priceStatusContainer: {
@@ -999,7 +1145,6 @@ const styles = StyleSheet.create({
     priceText: {
         fontSize: 16,
         fontFamily: 'Ubuntu_Bold',
-        color: '#1776BA',
     },
     statusBadge: {
         paddingHorizontal: 12,
@@ -1014,16 +1159,24 @@ const styles = StyleSheet.create({
     actionButtons: {
         flexDirection: 'row',
         gap: 12,
+        marginTop: 12,
     },
     actionButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 100,
-        borderWidth: 1,
-        borderColor: '#E0E0E0',
-        backgroundColor: '#FFFFFF',
-        justifyContent: 'center',
+        flex: 1,
+        flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderRadius: 8,
+        borderWidth: 1,
+        gap: 8,
+        minHeight: 44,
+    },
+    actionButtonText: {
+        fontSize: 14,
+        fontFamily: 'Ubuntu_Medium',
+        color: '#FFFFFF',
     },
     modalOverlay: {
         flex: 1,
@@ -1031,7 +1184,6 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-end',
     },
     modalContent: {
-        backgroundColor: '#FFFFFF',
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
         maxHeight: '50%',
@@ -1042,12 +1194,10 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         padding: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#E0E0E0',
     },
     modalTitle: {
         fontSize: 18,
         fontFamily: 'Ubuntu_Bold',
-        color: '#000',
     },
     modalOption: {
         flexDirection: 'row',
@@ -1055,24 +1205,92 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         padding: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F0',
     },
     modalOptionText: {
         fontSize: 16,
         fontFamily: 'Ubuntu_Regular',
-        color: '#000',
     },
     loadingContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#F3F3F7',
     },
     loadingText: {
         marginTop: 16,
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
         color: '#666',
+    },
+    logoutModalContent: {
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        padding: 24,
+        maxHeight: '50%',
+    },
+    logoutModalTitle: {
+        fontSize: 20,
+        fontFamily: 'Ubuntu_Bold',
+        marginBottom: 16,
+    },
+    logoutModalMessage: {
+        fontSize: 16,
+        fontFamily: 'Ubuntu_Regular',
+        marginBottom: 24,
+    },
+    logoutModalButtons: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        gap: 24,
+    },
+    logoutModalButton: {
+        flex: 1,
+        paddingVertical: 16,
+        borderRadius: 8,
+        alignItems: 'center',
+    },
+    logoutModalButtonCancel: {
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
+        // backgroundColor: '#FFFFFF',
+    },
+    logoutModalButtonConfirm: {
+        backgroundColor: '#DC3545',
+    },
+    logoutModalButtonText: {
+        fontSize: 14,
+        fontFamily: 'Ubuntu_Bold',
+    },
+    logoutModalButtonTextConfirm: {
+        fontSize: 14,
+        fontFamily: 'Ubuntu_Bold',
+        color: '#FFFFFF',
+    },
+    themeToggleCard: {
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 16,
+        borderWidth: 1,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    themeToggleContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        flex: 1,
+    },
+    themeToggleTextContainer: {
+        flex: 1,
+    },
+    themeToggleLabel: {
+        fontSize: 16,
+        fontFamily: 'Ubuntu_Medium',
+        marginBottom: 4,
+    },
+    themeToggleDescription: {
+        fontSize: 12,
+        fontFamily: 'Ubuntu_Regular',
     },
 });
 

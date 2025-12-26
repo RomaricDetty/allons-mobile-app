@@ -1,5 +1,6 @@
 // @ts-nocheck
-import { formatDuration, formatPrice } from '@/constants/functions';
+import { formatPrice } from '@/constants/functions';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { DepartureCardProps } from '@/types';
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -8,124 +9,71 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 
 /**
  * Composant de carte de départ
- * Affiche une carte avec les informations d'un trajet populaire
+ * Affiche une carte verticale avec image, prix et nom du trajet
  */
 export function DepartureCard({ item, width, height, onPress }: DepartureCardProps) {
     const route = `${item.stationFrom.cityName} → ${item.stationTo.cityName}`;
-    const duration = formatDuration(item.durationMinutes);
-
+    const price = formatPrice(item.basePrice).replace(' F CFA', ' F');
+    const colorScheme = useColorScheme() ?? 'dark';
+    // Largeur de la carte basée sur la largeur de l'écran
+    const cardWidth = (width - 100) / 2.2; // Environ 2.2 cartes visibles avec espacement
+    const imageBackgroundColor = colorScheme === 'dark' ? '#1776BA' : '#2C2C2E';
     return (
         <Pressable
             key={item.id}
-            style={[
-                styles.bannerContainer,
-                {
-                    width: width - 45,
-                    height: height / 6
-                }
-            ]}
+            style={[styles.cardContainer, { width: cardWidth }]}
             onPress={() => onPress?.(item)}
         >
-            {/* Icône en arrière-plan avec opacité réduite */}
-            <View style={styles.bannerBackgroundIcon}>
+            {/* Zone d'image avec fond gris clair */}
+            <View style={[styles.imageContainer, { backgroundColor: '#dfe7f4' }]}>
                 <MaterialCommunityIcons
                     name="bus"
-                    size={120}
-                    color="#FFFFFF"
-                    style={styles.backgroundIconStyle}
+                    size={60}
+                    color={'#1776BA'}
                 />
             </View>
-
+            
+            {/* Zone de contenu avec prix et nom */}
             <View style={styles.contentContainer}>
-                <View style={styles.textContainer}>
-                    {/* Titre de la carte */}
-                    <Text style={styles.bannerTitle}>
-                        {route}
-                    </Text>
-                    {/* Sous-titre de la carte */}
-                    <Text style={styles.bannerSubtitle}>
-                        {item.companyName}
-                    </Text>
-                    {/* Informations de la carte */}
-                    <View style={styles.bannerInfo}>
-                        <View style={styles.bannerInfoItem}>
-                            <MaterialCommunityIcons
-                                name="clock-outline"
-                                size={14}
-                                color="#FFFFFF"
-                            />
-                            <Text style={styles.bannerInfoText}>{duration}</Text>
-                        </View>
-                        <Text style={styles.bannerSeparator}>-</Text>
-                        <View style={styles.bannerInfoItem}>
-                            <Text style={styles.bannerInfoText}>
-                                {formatPrice(item.basePrice)}
-                            </Text>
-                        </View>
-                    </View>
-                </View>
+                {/* Prix en gras */}
+                <Text style={styles.priceText}>{price}</Text>
+                {/* Nom de la route */}
+                <Text style={styles.routeText} numberOfLines={2}>
+                    {route}
+                </Text>
             </View>
         </Pressable>
     );
 }
 
 const styles = StyleSheet.create({
-    bannerContainer: {
+    cardContainer: {
         borderRadius: 15,
-        backgroundColor: '#1776ba',
-        marginRight: 5,
+        backgroundColor: '#FFFFFF',
         overflow: 'hidden',
-        position: 'relative',
+        borderWidth: 1,
+        borderColor: '#bfcfe8',
     },
-    bannerBackgroundIcon: {
-        position: 'absolute',
-        right: -40,
-        top: '50%',
-        transform: [{ translateY: -60 }],
-        opacity: 0.10,
-        zIndex: 0,
-    },
-    backgroundIconStyle: {
-        opacity: 1,
+    imageContainer: {
+        width: '100%',
+        height: 80,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     contentContainer: {
-        flex: 1,
-        padding: 20,
-        justifyContent: 'center',
-        zIndex: 1,
-        position: 'relative',
+        padding: 10,
+        backgroundColor: '#FFFFFF',
     },
-    textContainer: {
-        gap: 5,
-    },
-    bannerTitle: {
-        fontSize: 20,
+    priceText: {
+        fontSize: 14,
         fontFamily: 'Ubuntu_Bold',
-        color: '#ffffff',
+        color: '#11181C',
+        marginBottom: 6,
     },
-    bannerSubtitle: {
-        fontSize: 14,
+    routeText: {
+        fontSize: 12,
         fontFamily: 'Ubuntu_Regular',
-        color: '#ffffff',
-    },
-    bannerInfo: {
-        flexDirection: 'row',
-        gap: 10,
-        marginTop: 8,
-    },
-    bannerInfoItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-    },
-    bannerInfoText: {
-        fontSize: 14,
-        fontFamily: 'Ubuntu_Medium',
-        color: '#ffffff',
-    },
-    bannerSeparator: {
-        color: '#FFFFFF',
-        fontFamily: 'Ubuntu_Medium',
-        fontSize: 14,
+        color: '#11181C',
+        lineHeight: 18,
     },
 });

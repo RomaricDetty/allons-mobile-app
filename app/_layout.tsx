@@ -1,12 +1,15 @@
 // @ts-nocheck
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
+import { Asset } from 'expo-asset';
 import { useFonts } from 'expo-font';
 import { SplashScreen, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Platform } from 'react-native';
 import 'react-native-reanimated';
 
-
+import { ConnectivityGuard } from '@/components/ConnectivityGuard';
+import CustomSplashScreen from '@/components/custom-splashscreen';
+import { ConnectivityProvider } from '@/contexts/ConnectivityContext';
+import { ThemeProvider } from '@/contexts/ThemeContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useEffect, useState } from 'react';
 
@@ -14,20 +17,18 @@ export const unstable_settings = {
     anchor: '(tabs)',
 };
 
-// Empêche le SplashScreen de se cacher automatiquement avant le chargement complet des assets
+// Empêche le SplashScreen par défaut de se cacher automatiquement
 SplashScreen.preventAutoHideAsync();
 
 /**
  * Layout racine de l'application
- * Gère le chargement des fonts avant d'afficher l'interface
+ * Gère le chargement des fonts et des images avant d'afficher l'interface
  */
 export default function RootLayout() {
-
-    const colorScheme = useColorScheme();
-    const [fontsReady, setFontsReady] = useState(false);
+    const [isAppReady, setIsAppReady] = useState(false);
 
     // Charge toutes les fonts Ubuntu nécessaires
-    const [loaded, error] = useFonts({
+    const [fontsLoaded, fontsError] = useFonts({
         Ubuntu_Bold: require("@/assets/fonts/Ubuntu-Bold.ttf"),
         Ubuntu_BoldItalic: require("@/assets/fonts/Ubuntu-BoldItalic.ttf"),
         Ubuntu_Italic: require("@/assets/fonts/Ubuntu-Italic.ttf"),
@@ -39,58 +40,127 @@ export default function RootLayout() {
     });
 
     /**
-     * Cache le SplashScreen et autorise le rendu avec gestion du timeout
-     * Nécessaire car Android peut avoir des problèmes de chargement de fonts
+     * Cache le splash natif uniquement après le chargement des fonts
+     * pour afficher le custom splash avec les fonts disponibles
      */
     useEffect(() => {
-        // Log pour déboguer
-        console.log(`[Fonts] Platform: ${Platform.OS}, loaded: ${loaded}, error:`, error);
+        const hideSplash = async () => {
+            // Attendre que les fonts soient chargées avant de cacher le splash natif
+            if (!fontsLoaded && !fontsError) {
+                return;
+            }
 
-        // Si les fonts sont chargées avec succès
-        if (loaded) {
-            console.log('[Fonts] Toutes les fonts sont chargées');
-            setFontsReady(true);
-            SplashScreen.hideAsync();
-            return;
+            try {
+                // Cache le splash natif une fois les fonts chargées
+                await SplashScreen.hideAsync();
+            } catch (error) {
+                // Ignore les erreurs si le splash est déjà caché
+                console.warn('Splash déjà caché:', error);
+            }
+        };
+        
+        hideSplash();
+    }, [fontsLoaded, fontsError]);
+
+    /**
+     * Précharge tous les assets critiques de l'application
+     * Inclut les fonts et les images de l'onboarding
+     */
+    useEffect(() => {
+        async function prepareApp() {
+            try {
+                // Attendre que les fonts soient chargées
+                if (!fontsLoaded && !fontsError) {
+                    return;
+                }
+
+                // Si erreur de fonts, on log mais on continue
+                if (fontsError) {
+                    console.warn('Erreur de chargement des fonts:', fontsError);
+                }
+
+                // Précharge les images avec timeout global de 10 secondes
+                const loadAssetsWithTimeout = Promise.race([
+                    Promise.all([
+                        Asset.fromModule(require('@/assets/images/onboarding/logo-allon-blanc.png')).downloadAsync(),
+                        Asset.fromModule(require('@/assets/images/onboarding/bg_voyage.png')).downloadAsync(),
+                        Asset.fromModule(require('@/assets/images/onboarding/person_travel_1.png')).downloadAsync(),
+                        Asset.fromModule(require('@/assets/images/onboarding/person_travel_2.png')).downloadAsync(),
+                        Asset.fromModule(require('@/assets/images/onboarding/person_travel_3.png')).downloadAsync(),
+                        Asset.fromModule(require('@/assets/images/onboarding/logo-allon-blanc.png')).downloadAsync(),
+                    ]),
+                    new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('Timeout de chargement des assets')), 10000)
+                    )
+                ]);
+
+                await loadAssetsWithTimeout;
+                console.log('Tous les assets de l\'onboarding sont chargés');
+
+            } catch (error) {
+                console.warn('Erreur lors du préchargement des assets:', error);
+                // Continue quand même pour ne pas bloquer l'app
+            } finally {
+                // Garde le custom splash au minimum 2 secondes pour une bonne UX
+                setTimeout(() => {
+                    setIsAppReady(true);
+                }, 2500);
+            }
         }
 
-        // Si erreur, on continue quand même pour ne pas bloquer l'app
-        if (error) {
-            console.warn('[Fonts] Erreur lors du chargement des fonts:', error);
-            setFontsReady(true);
-            SplashScreen.hideAsync();
-            return;
-        }
+        prepareApp();
+    }, [fontsLoaded, fontsError]);
 
-        // Timeout de sécurité : après 5 secondes, on force le rendu même si les fonts ne sont pas chargées
-        // Particulièrement important pour Android
-        const timeoutId = setTimeout(() => {
-            console.warn('[Fonts] Timeout: on force le rendu après 5 secondes');
-            setFontsReady(true);
-            SplashScreen.hideAsync();
-        }, 5000);
+    // Affiche le SplashScreen personnalisé uniquement après le chargement des fonts
+    // Garde le splash natif visible tant que les fonts ne sont pas chargées
+    if (!fontsLoaded && !fontsError) {
+        return null; // Le splash natif reste visible
+    }
 
-        return () => clearTimeout(timeoutId);
-    }, [loaded, error]);
-
-    // Ne rend rien jusqu'à ce que fontsReady soit true
-    if (!fontsReady) {
-        return null;
+    if (!isAppReady) {
+        return <CustomSplashScreen />;
     }
 
     return (
-        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-            <Stack>
-                <Stack.Screen name="index" options={{ headerShown: false }} />
-                <Stack.Screen name="onboard/index" options={{ headerShown: false }} />
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen name="trip/search" options={{ headerShown: false }} />
-                <Stack.Screen name="trip/trip-list" options={{ headerShown: false }} />
-                <Stack.Screen name="trip/trip-summary" options={{ headerShown: false }} />
-                <Stack.Screen name="trip/passengers-info" options={{ headerShown: false }} />
-                {/* <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} /> */}
-            </Stack>
-            <StatusBar style="auto" />
+        <ThemeProvider>
+            <ConnectivityProvider>
+                <RootContent />
+            </ConnectivityProvider>
         </ThemeProvider>
+    );
+}
+
+/**
+ * Composant interne pour accéder au thème après l'initialisation du ThemeProvider
+ */
+function RootContent() {
+    const colorScheme = useColorScheme();
+    return (
+        <NavigationThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+            <ConnectivityGuard>
+                <Stack>
+                    <Stack.Screen name="index" options={{ headerShown: false }} />
+                    <Stack.Screen name="onboard/index" options={{ headerShown: false }} />
+                    <Stack.Screen name="no-internet" options={{ headerShown: false }} />
+                    <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                    <Stack.Screen name="trip/search" options={{ headerShown: false }} />
+                    <Stack.Screen name="trip/trip-list" options={{ headerShown: false }} />
+                    <Stack.Screen name="trip/trip-return-list" options={{ headerShown: false }} />
+                    <Stack.Screen name="trip/trip-summary" options={{ headerShown: false }} />
+                    <Stack.Screen name="trip/passengers-info" options={{ headerShown: false }} />
+                    <Stack.Screen name="trip/seat-selection" options={{ headerShown: false }} />
+                    <Stack.Screen name="trip/booking-confirmation" options={{ headerShown: false }} />
+                    <Stack.Screen name="profile/edit" options={{ headerShown: false }} />
+                    <Stack.Screen name="trip/ticket-details" options={{ headerShown: false }} />
+                    <Stack.Screen name="trip/ticket-qr" options={{ headerShown: false }} />
+                    <Stack.Screen name="trip/live-tracking" options={{ headerShown: false }} />
+                    <Stack.Screen name="trip/route-viewer" options={{ headerShown: false }} />
+                </Stack>
+                <StatusBar 
+                    style={colorScheme === 'dark' ? 'light' : 'dark'} 
+                    backgroundColor={colorScheme === 'dark' ? '#121212' : '#ffffff'} 
+                />
+            </ConnectivityGuard>
+        </NavigationThemeProvider>
     );
 }

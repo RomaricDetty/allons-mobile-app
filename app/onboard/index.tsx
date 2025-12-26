@@ -8,23 +8,23 @@ import {
     StyleSheet, Text, View
 } from 'react-native';
 
+
 const Onboard = () => {
     /**
-     * Dimensions of the window
-     * Get the width and height of the window
-     * @returns void
+     * Dimensions de la fenêtre
+     * Récupère la largeur et la hauteur
      */
     const { width, height } = Dimensions.get('window');
 
     /**
-     * Images for the onboarding
+     * Images pour l'onboarding
      */
     const imagesOnboarding = [
         {
             id: 1,
             bg: require('@/assets/images/onboarding/bg_voyage.png'),
             person: require('@/assets/images/onboarding/person_travel_1.png'),
-            text_1: 'Voyagez malin,',
+            text_1: 'Voyagez malin',
             text_2: 'Payez moins !',
             color_text: ''
         },
@@ -44,27 +44,20 @@ const Onboard = () => {
             text_2: 'Casser votre tirelire !',
             color_text: ''
         }
-    ]
+    ];
 
     /**
-     * ScrollX value
+     * Valeur du scroll horizontal
      */
     const scrollX = React.useRef(new Animated.Value(0)).current;
-    /**
-     * Current index
-     */
-    const [currentIndex, setCurrentIndex] = React.useState(0);
-    
-    /**
-     * On view change reference
-     */
-    const onViewChangeRef = React.useRef(({ viewableItems }) => {
-        setCurrentIndex(viewableItems[0]?.index ?? 0);
-    });
 
     /**
-     * Configuration pour onViewableItemsChanged
-     * Améliore la détection des items visibles
+     * Index actuel de la slide
+     */
+    const [currentIndex, setCurrentIndex] = React.useState(0);
+
+    /**
+     * Configuration pour la détection des items visibles
      */
     const viewabilityConfig = React.useRef({
         itemVisiblePercentThreshold: 50,
@@ -72,8 +65,7 @@ const Onboard = () => {
     }).current;
 
     /**
-     * Configuration du callback pour onViewableItemsChanged
-     * Utilise useCallback pour éviter les recalculs
+     * Callback lors du changement d'item visible
      */
     const onViewableItemsChanged = React.useCallback(
         ({ viewableItems }: { viewableItems: Array<{ index: number | null }> }) => {
@@ -85,8 +77,7 @@ const Onboard = () => {
     );
 
     /**
-     * Optimisation: getItemLayout pour améliorer les performances du scroll
-     * Indique à React Native la position exacte de chaque item
+     * Optimisation: calcule la position exacte de chaque item
      */
     const getItemLayout = React.useCallback(
         (_: any, index: number) => ({
@@ -98,26 +89,27 @@ const Onboard = () => {
     );
 
     /**
-     * Go to the app
-     * Set the onboarding status to '1' in the AsyncStorage
-     * and redirect to the tabs screen
-     * @returns void
+     * Navigation vers l'application principale
+     * Enregistre que l'onboarding a été complété
      */
     const goToApp = async () => {
         await AsyncStorage.setItem('onboarding', '1');
         router.replace('/(tabs)');
-    }
+    };
 
     /**
-     * Dots component
-     * Display the dots for the onboarding
-     * @returns React.ReactNode
+     * Composant des indicateurs de pagination (dots)
      */
     const Dots = () => {
         const dotPosition = Animated.divide(scrollX, width);
         return (
-            // @ts-ignore
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', position: 'absolute', bottom: Platform.OS === 'android' ? 30 : 35 }}>
+            <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                position: 'absolute',
+                bottom: Platform.OS === 'android' ? 30 : 35
+            }}>
                 {imagesOnboarding.map((_, index) => {
                     const dotColor = dotPosition.interpolate({
                         inputRange: [index - 1, index, index + 1],
@@ -132,7 +124,6 @@ const Onboard = () => {
                     return (
                         <Animated.View
                             key={`dot-${index}`}
-                            // @ts-ignore
                             style={{
                                 borderRadius: 10,
                                 marginHorizontal: 5,
@@ -148,52 +139,49 @@ const Onboard = () => {
     };
 
     return (
-        <View key={`onboard-container`} style={styles.container}>
-            {/* Logo affiché une seule fois pour toutes les slides */}
-            <View
-                key={`logo-container`}
-                style={{
-                    position: 'absolute',
-                    top: Platform.OS === 'android' ? height * 0.05 : height * 0.06,
-                    alignSelf: 'center',
-                    zIndex: 10
-                }}
-            >
-                <Image source={require('@/assets/images/logo-allon-blanc.png')} resizeMode="cover" style={{ width: 75, height: 75 }} />
-                {/* <Text style={{ fontSize: 32, fontFamily: 'Ubuntu_Bold', color: '#ffffff' }}>AllOn</Text> */}
-            </View>
+        <View style={styles.container}>
+            {/* Logo affiché en overlay sur toutes les slides */}
+            <Image
+                source={require('@/assets/images/onboarding/logo-allon-blanc.png')}
+                resizeMode="contain"
+                style={styles.logo}
+            />
 
+            {/* Liste horizontale des slides d'onboarding */}
             <Animated.FlatList
                 horizontal
-                pagingEnabled
+                pagingEnabled={Platform.OS === 'ios'}
+                snapToInterval={Platform.OS === 'android' ? width : undefined}
+                snapToAlignment={Platform.OS === 'ios' ? "center" : "start"}
                 data={imagesOnboarding}
-                scrollEventThrottle={1} // Réduit à 1 pour maximum de fluidité
-                snapToAlignment="center"
-                decelerationRate="fast" // Améliore la sensation de snap
+                scrollEventThrottle={16}
+                decelerationRate="fast"
                 onScroll={Animated.event(
                     [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-                    { 
-                        useNativeDriver: false, // Nécessaire pour contentOffset
-                        listener: undefined, // Évite les callbacks supplémentaires
+                    {
+                        useNativeDriver: false,
+                        listener: undefined,
                     },
                 )}
                 onViewableItemsChanged={onViewableItemsChanged}
                 viewabilityConfig={viewabilityConfig}
                 showsHorizontalScrollIndicator={false}
                 keyExtractor={item => `${item.id}`}
-                getItemLayout={getItemLayout} // Optimisation importante
-                removeClippedSubviews={true} // Améliore les performances (surtout Android)
-                windowSize={3} // Réduit le nombre d'items rendus
-                initialNumToRender={1} // Rend seulement le premier item initialement
-                maxToRenderPerBatch={1} // Réduit le rendu par batch
-                updateCellsBatchingPeriod={50} // Optimise les mises à jour
+                getItemLayout={getItemLayout}
+                removeClippedSubviews={Platform.OS === 'ios'}
+                windowSize={3}
+                initialNumToRender={1}
+                maxToRenderPerBatch={1}
+                updateCellsBatchingPeriod={50}
+                contentContainerStyle={{ paddingHorizontal: 0 }}
                 renderItem={({ item, index }: { item: typeof imagesOnboarding[0]; index: number }) => {
                     return (
                         <View
                             style={{
                                 width: width,
                                 height: height,
-                                alignItems: 'center'
+                                alignItems: 'center',
+                                overflow: 'hidden'
                             }}>
                             <View style={{ flex: 3 }}>
                                 <ImageBackground
@@ -204,7 +192,7 @@ const Onboard = () => {
                                         justifyContent: 'flex-end',
                                         width: '100%'
                                     }}
-                                    imageStyle={{ resizeMode: 'cover' }} // Optimise le rendu de l'image
+                                    imageStyle={{ resizeMode: 'cover' }}
                                 >
                                     <Text style={{
                                         color: item?.color_text ? item?.color_text : '#fff',
@@ -224,13 +212,13 @@ const Onboard = () => {
                                             width: width,
                                             height: height - 100
                                         }}
-                                        // Optimisations pour les images
                                         progressiveRenderingEnabled={Platform.OS === 'android'}
-                                        fadeDuration={0} // Évite le fade qui peut causer des saccades
+                                        fadeDuration={0}
                                     />
                                 </ImageBackground>
                             </View>
 
+                            {/* Bouton "Commencer" sur la dernière slide */}
                             {index === imagesOnboarding.length - 1 &&
                                 <Pressable
                                     onPress={goToApp}
@@ -259,24 +247,28 @@ const Onboard = () => {
                 }}
             />
 
-            <View 
-                key={`dots-container`} 
-                style={{ 
-                    alignItems: 'center', 
-                    justifyContent: 'center' 
-                }}
-            >
+            {/* Indicateurs de pagination */}
+            <View style={{ alignItems: 'center', justifyContent: 'center' }}>
                 <Dots />
             </View>
         </View>
-    )
-}
+    );
+};
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        justifyContent: 'center'
+        justifyContent: 'center',
+        overflow: 'hidden'
     },
-})
+    logo: {
+        width: 80,
+        height: 80,
+        position: 'absolute',
+        top: Platform.OS === 'android' ? 35 : 55,
+        zIndex: 1000,
+        alignSelf: 'center',
+    },
+});
 
-export default Onboard
+export default Onboard;

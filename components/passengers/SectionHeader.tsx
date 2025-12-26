@@ -1,3 +1,4 @@
+import { useThemeColor } from '@/hooks/use-theme-color';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -10,9 +11,12 @@ interface SectionHeaderProps {
  * Composant pour une section avec numéro
  */
 export const SectionHeader = ({ number, title }: SectionHeaderProps) => {
+    // Couleur dynamique basée sur le thème
+    const textColor = useThemeColor({}, 'text');
+
     return (
         <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>{title}</Text>
+            <Text style={[styles.sectionTitle, { color: textColor }]}>{title}</Text>
         </View>
     );
 };
@@ -27,7 +31,6 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 22,
         fontFamily: 'Ubuntu_Bold',
-        color: '#000',
     },
 });
 

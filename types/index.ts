@@ -69,6 +69,7 @@ export type Trip = {
     arrivalStation: string;
     options: string[];
     busType: string;
+    busSeatLayout?: number[]; // Disposition des sièges, ex: [2, 3] = 2 sièges gauche, allée, 3 sièges droite
 };
 
 /**
@@ -85,6 +86,10 @@ export type Departures = {
  */
 export type SearchParams = {
     numberOfPersons: number;
+    tripType?: string; // 'ONE_WAY' ou 'ROUND_TRIP'
+    departureCity?: City;
+    arrivalCity?: City;
+    returnDate?: Date | null;
 };
 
 /**
@@ -96,3 +101,18 @@ export type DepartureCardProps = {
     height: number;
     onPress?: (item: PopularTrip) => void;
 };
+
+/**
+ * Type pour le type de téléphone
+ */
+export enum PhoneType {
+    NONE = 'none',
+    MOBILE = 'mobile',
+    HOME = 'home',
+    WORK = 'work',
+}
+
+/**
+ * Type pour la civilité
+ */
+export type Civility = 'MR' | 'Mrs' | 'Miss';
