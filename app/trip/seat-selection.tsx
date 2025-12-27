@@ -84,6 +84,8 @@ const SeatSelection = () => {
             return;
         }
 
+        console.log('currentTrip => ', currentTrip);
+
         try {
             setIsLoading(true);
             const response = await getDepartureAvailableSeats(currentTrip.id);

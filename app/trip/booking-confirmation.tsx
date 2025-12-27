@@ -1,7 +1,9 @@
 // @ts-nocheck
+import { getBookingQrCode } from '@/api/booking';
 import { formatFullDate, formatFullDateWithTime, formatStatus, getStatusColor } from '@/constants/functions';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRoute } from '@react-navigation/native';
 import * as FileSystemLegacy from 'expo-file-system/legacy';
 import * as Print from 'expo-print';
@@ -32,6 +34,8 @@ const BookingConfirmation = () => {
     const insets = useSafeAreaInsets();
     const colorScheme = useColorScheme() ?? 'light';
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+    const [qrCode, setQrCode] = useState<string>('');
+    const [isLoadingQrCode, setIsLoadingQrCode] = useState<boolean>(true);
 
     // Couleurs dynamiques basées sur le thème
     const textColor = useThemeColor({}, 'text');
@@ -830,6 +834,33 @@ const BookingConfirmation = () => {
         }
     };
 
+    /**
+     * Génère le QR Code en récupérant le hash depuis l'API
+     */
+    const generateQRCodeBase64 = async () => {
+        if (!bookingData?.id) return;
+        
+        setIsLoadingQrCode(true);
+        try {
+            const token = await AsyncStorage.getItem('token');
+            if (token) {
+                const response = await getBookingQrCode(bookingData.id, token);
+                setQrCode(response?.data?.hash || '');
+            }
+        } catch (error) {
+            console.error('Erreur lors de la récupération du QR Code:', error);
+            setQrCode('');
+        } finally {
+            setIsLoadingQrCode(false);
+        }
+    };
+
+    useEffect(() => {
+        if (bookingData?.id) {
+            generateQRCodeBase64();
+        }
+    }, [bookingData?.id]);
+
     return (
         <View style={[styles.container, { backgroundColor: scrollBackgroundColor }]}>
             {/* Header sans bouton retour */}
@@ -909,12 +940,16 @@ const BookingConfirmation = () => {
                         <Text style={[styles.sectionTitle, { color: textColor }]}>Code QR de vérification</Text>
                     </View>
                     <View style={styles.qrCodeContainer}>
-                        <QRCode
-                            value={`https://allon-frontoffice-ng.onrender.com/verify-ticket/${bookingData.id}?ref=${bookingData.code}`}
-                            size={150}
-                            color={primaryBlue}
-                            backgroundColor="transparent"
-                        />
+                        {isLoadingQrCode || !qrCode ? (
+                            <ActivityIndicator size="large" color={primaryBlue} />
+                        ) : (
+                            <QRCode
+                                value={qrCode}
+                                size={150}
+                                color={primaryBlue}
+                                backgroundColor="transparent"
+                            />
+                        )}
                     </View>
                 </View>
 

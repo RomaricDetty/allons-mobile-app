@@ -624,6 +624,7 @@ export default function OSMBusTracker({ tripId, bookingDetails }: OSMBusTrackerP
             {/* Panneau d'informations principal */}
             {showStopsPanel && (
                 <View style={[styles.infoPanel, { backgroundColor: panelBackgroundColor }]}>
+                    
                     {/* Carte de résumé de destination */}
                     {trip && (
                         <View style={[styles.destinationCard, { backgroundColor: listItemBackgroundColor }]}>
