@@ -10,7 +10,7 @@ interface EmergencyContact {
     lastName: string;
     phone: string;
     email: string;
-    relation: string;
+    relationship: string;
 }
 
 interface EmergencyContactBlockProps {
@@ -70,7 +70,7 @@ export const EmergencyContactBlock = ({
 
             <SelectField
                 label="Relation"
-                value={emergencyContact.relation}
+                value={emergencyContact.relationship}
                 placeholder="Sélectionner une relation"
                 required
                 selectionType="relation"
@@ -82,7 +82,7 @@ export const EmergencyContactBlock = ({
                     {value: 'ami', label: 'Ami(e)'},
                     {value: 'autre', label: 'Autre'}
                 ]}
-                onSelect={(value) => onUpdateEmergencyContact('relation', value)}
+                onSelect={(value) => onUpdateEmergencyContact('relationship', value)}
                 onOpenBottomSheet={onOpenBottomSheet}
             />
         </View>

@@ -103,7 +103,7 @@ const PassengersInfo = () => {
         lastName: '',
         phone: '',
         email: '',
-        relation: ''
+        relationship: ''
     });
 
     // État pour la méthode de paiement
@@ -428,7 +428,7 @@ const PassengersInfo = () => {
             errors.push('Le format du téléphone du contact d\'urgence est invalide (Ex: 0123456789)');
         }
 
-        if (!emergencyContact.relation || emergencyContact.relation.trim() === '') {
+        if (!emergencyContact.relationship || emergencyContact.relationship.trim() === '') {
             errors.push('La relation avec le contact d\'urgence est requise');
         }
 
@@ -543,7 +543,7 @@ const PassengersInfo = () => {
                 lastName: emergencyContact.lastName.trim(),
                 phone: emergencyContact.phone.trim(),
                 email: emergencyContact.email.trim() || '',
-                relationship: emergencyContact.relation.trim().toLowerCase() || 'autre'
+                relationship: emergencyContact.relationship.trim().toLowerCase() || 'autre'
             };
 
             // Formatage des passagers selon le type de trajet
@@ -613,8 +613,6 @@ const PassengersInfo = () => {
             console.log('=== ============================================');
             console.log('=== DONNÉES FORMATÉES POUR L\'API ===');
             console.log('=== ============================================');
-            console.log('\n--- DONNÉES BOOKING (JSON) ---');
-            console.log(JSON.stringify(bookingData, null, 2));
 
             const token = await AsyncStorage.getItem('token');
 
@@ -629,7 +627,6 @@ const PassengersInfo = () => {
                 }
 
                 console.log('\n--- RÉPONSE BOOKING ---');
-                console.log('Booking ID:', bookingId);
 
                 // Mapper la méthode de paiement
                 const { method: paymentMethod, provider } = mapPaymentMethod(selectedPaymentMethod);
@@ -655,13 +652,11 @@ const PassengersInfo = () => {
                 };
 
                 console.log('\n--- DONNÉES PAYMENT (JSON) ---');
-                console.log(JSON.stringify(paymentData, null, 2));
 
                 // Création du paiement
                 const paymentResponse = await createBookingPayment(paymentData, token || '');
 
                 console.log('\n--- RÉPONSE PAYMENT ---');
-                console.log(JSON.stringify(paymentResponse.data, null, 2));
 
                 if (paymentResponse.status === 200 || paymentResponse.status === 201) {
                     // Rediriger vers l'écran de confirmation avec les données de réservation
@@ -741,6 +736,9 @@ const PassengersInfo = () => {
         closeSelectionBottomSheet();
     };
 
+    /**
+     * Vérifie la session utilisateur
+     */
     const userCheckSession = async () => {
         const token = await AsyncStorage.getItem('token');
         const userId = await AsyncStorage.getItem('user_id');
@@ -772,11 +770,11 @@ const PassengersInfo = () => {
                     });
                     setContactPhone(removePhonePrefix(response?.data?.phones[0]?.digits) || '');
                     setEmergencyContact({
-                        firstName: response?.data?.contactUrgent?.fullName?.split(' ')[0] || '',
-                        lastName: response?.data?.contactUrgent?.fullName?.split(' ')[1] || '',
+                        firstName: response?.data?.contactUrgent?.firstName || '',
+                        lastName: response?.data?.contactUrgent?.lastName || '',
                         phone: removePhonePrefix(response?.data?.contactUrgent?.phone) || '',
                         email: response?.data?.email || '',
-                        // relation: response?.data?.contactUrgent?.relation || 'Autre'
+                        relationship: response?.data?.contactUrgent?.relationship || 'Autre'
                     });
                     setIsLoading(false);
                     return false;
