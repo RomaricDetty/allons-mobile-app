@@ -287,6 +287,10 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
     /**
      * Rendu du contenu de l'onglet Mes informations
      */
+    /**
+     * Rendu du contenu de l'onglet Mes informations
+     * Amélioré avec une meilleure hiérarchie visuelle et des espacements optimisés
+     */
     const renderPersonalInfoTab = () => (
         <ScrollView
             style={styles.scrollView}
@@ -297,14 +301,29 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
             <View style={[styles.profileCard, { backgroundColor: themeColors.cardBackground, borderColor: themeColors.border }]}>
                 <View style={styles.profileCardHeader}>
                     <Text style={[styles.businessLabel, { color: themeColors.secondaryText }]}>Profil Utilisateur</Text>
-                    <View style={[styles.statusBadge, { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'space-between' }]}>
+                    <View style={[
+                        styles.statusBadgeContainer,
+                        {
+                            backgroundColor: user?.active ? 'rgba(76, 175, 80, 0.1)' : 'rgba(158, 158, 158, 0.1)',
+                            borderColor: user?.active ? 'rgba(76, 175, 80, 0.3)' : 'rgba(158, 158, 158, 0.3)'
+                        }
+                    ]}>
                         <View style={[styles.statusDot, { backgroundColor: user?.active ? '#4CAF50' : '#9E9E9E' }]} />
-                        <Text style={[styles.statusLabel, { color: themeColors.secondaryText }]}>{user?.active ? 'Actif' : 'Inactif'}</Text>
+                        <Text style={[styles.statusLabel, { color: user?.active ? '#4CAF50' : '#9E9E9E' }]}>
+                            {user?.active ? 'Actif' : 'Inactif'}
+                        </Text>
                     </View>
                 </View>
 
                 <View style={styles.profileInfo}>
-                    <View style={[styles.profileImageContainer, { backgroundColor: themeColors.profileImagePlaceholderBackground }]}>
+                    <View style={[
+                        styles.profileImageContainer,
+                        {
+                            backgroundColor: themeColors.profileImagePlaceholderBackground,
+                            borderColor: themeColors.border,
+                            borderWidth: 1,
+                        }
+                    ]}>
                         {user?.picture ? (
                             <Image
                                 source={{ uri: user?.picture }}
@@ -319,44 +338,75 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                     <Text style={[styles.userName, { color: themeColors.text }]}>{fullName}</Text>
                     <Text style={[styles.userRole, { color: themeColors.secondaryText }]}>{formattedCivility}</Text>
                     {user?.company && (
-                        <Text style={[styles.userCompany, { color: themeColors.activeTab }]}>{user?.company}</Text>
+                        <View style={styles.companyBadge}>
+                            <MaterialCommunityIcons name="office-building" size={14} color={themeColors.activeTab} />
+                            <Text style={[styles.userCompany, { color: themeColors.activeTab }]}>{user?.company}</Text>
+                        </View>
                     )}
                 </View>
 
                 {/* Informations détaillées */}
                 <View style={[styles.detailsSection, { borderTopColor: themeColors.border }]}>
-                    <View style={styles.detailRow}>
-                        <MaterialCommunityIcons name="email-outline" size={18} color={themeColors.secondaryText} />
-                        <Text style={[styles.detailLabel, { color: themeColors.text }]}>Email:</Text>
-                        <Text style={[styles.detailValue, { color: themeColors.secondaryText }]}>{user?.email ?? 'Non renseigné'}</Text>
-                        {user?.isEmailVerified && (
-                            <MaterialCommunityIcons name="check-circle" size={16} color="#4CAF50" />
-                        )}
+                    <View style={[styles.detailRow, styles.detailRowSpacing]}>
+                        <View style={styles.detailIconContainer}>
+                            <MaterialCommunityIcons name="email-outline" size={20} color={themeColors.activeTab} />
+                        </View>
+                        <View style={styles.detailContent}>
+                            <Text style={[styles.detailLabel, { color: themeColors.text }]}>Email</Text>
+                            <View style={styles.detailValueContainer}>
+                                <Text style={[styles.detailValue, { color: themeColors.secondaryText }]} numberOfLines={1}>
+                                    {user?.email ?? 'Non renseigné'}
+                                </Text>
+                                {user?.isEmailVerified && (
+                                    <MaterialCommunityIcons name="check-circle" size={18} color="#4CAF50" style={styles.verifiedIcon} />
+                                )}
+                            </View>
+                        </View>
                     </View>
-                    <View style={styles.detailRow}>
-                        <MaterialCommunityIcons name="account-outline" size={18} color={themeColors.secondaryText} />
-                        <Text style={[styles.detailLabel, { color: themeColors.text }]}>Nom d'utilisateur:</Text>
-                        <Text style={[styles.detailValue, { color: themeColors.secondaryText }]}>{user?.username ? `@${user.username}` : 'Non renseigné'}</Text>
+                    <View style={[styles.detailRow, styles.detailRowSpacing]}>
+                        <View style={styles.detailIconContainer}>
+                            <MaterialCommunityIcons name="account-outline" size={20} color={themeColors.activeTab} />
+                        </View>
+                        <View style={styles.detailContent}>
+                            <Text style={[styles.detailLabel, { color: themeColors.text }]}>Nom d'utilisateur</Text>
+                            <Text style={[styles.detailValue, { color: themeColors.secondaryText }]} numberOfLines={1}>
+                                {user?.username ? `@${user.username}` : 'Non renseigné'}
+                            </Text>
+                        </View>
                     </View>
-                    <View style={styles.detailRow}>
-                        <MaterialCommunityIcons name="phone-outline" size={18} color={themeColors.secondaryText} />
-                        <Text style={[styles.detailLabel, { color: themeColors.text }]}>Téléphone:</Text>
-                        <Text style={[styles.detailValue, { color: themeColors.secondaryText }]}>+225 {user?.phones?.[0]?.digits ?? 'Non renseigné'}</Text>
+                    <View style={[styles.detailRow, styles.detailRowSpacing]}>
+                        <View style={styles.detailIconContainer}>
+                            <MaterialCommunityIcons name="phone-outline" size={20} color={themeColors.activeTab} />
+                        </View>
+                        <View style={styles.detailContent}>
+                            <Text style={[styles.detailLabel, { color: themeColors.text }]}>Téléphone</Text>
+                            <Text style={[styles.detailValue, { color: themeColors.secondaryText }]}>
+                                +225 {user?.phones?.[0]?.digits ?? 'Non renseigné'}
+                            </Text>
+                        </View>
                     </View>
                     {user?.dateOfBirth && (
-                        <View style={styles.detailRow}>
-                            <MaterialCommunityIcons name="calendar-outline" size={18} color={themeColors.secondaryText} />
-                            <Text style={[styles.detailLabel, { color: themeColors.text }]}>Date de naissance:</Text>
-                            <Text style={[styles.detailValue, { color: themeColors.secondaryText }]}>{formattedDateOfBirth}</Text>
+                        <View style={[styles.detailRow, styles.detailRowSpacing]}>
+                            <View style={styles.detailIconContainer}>
+                                <MaterialCommunityIcons name="calendar-outline" size={20} color={themeColors.activeTab} />
+                            </View>
+                            <View style={styles.detailContent}>
+                                <Text style={[styles.detailLabel, { color: themeColors.text }]}>Date de naissance</Text>
+                                <Text style={[styles.detailValue, { color: themeColors.secondaryText }]}>{formattedDateOfBirth}</Text>
+                            </View>
                         </View>
                     )}
                     {user?.address && (
-                        <View style={styles.detailRow}>
-                            <MaterialCommunityIcons name="map-marker-outline" size={18} color={themeColors.secondaryText} />
-                            <Text style={[styles.detailLabel, { color: themeColors.text }]}>Adresse:</Text>
-                            <Text style={[styles.detailValue, { color: themeColors.secondaryText }]}>
-                                {user.address.city ? `${user.address.city} ${user.address.country?.name ?? ''}`.trim() : 'Non renseigné'}
-                            </Text>
+                        <View style={[styles.detailRow, styles.detailRowSpacing]}>
+                            <View style={styles.detailIconContainer}>
+                                <MaterialCommunityIcons name="map-marker-outline" size={20} color={themeColors.activeTab} />
+                            </View>
+                            <View style={styles.detailContent}>
+                                <Text style={[styles.detailLabel, { color: themeColors.text }]}>Adresse</Text>
+                                <Text style={[styles.detailValue, { color: themeColors.secondaryText }]} numberOfLines={2}>
+                                    {user.address.city ? `${user.address.city} ${user.address.country?.name ?? ''}`.trim() : 'Non renseigné'}
+                                </Text>
+                            </View>
                         </View>
                     )}
                 </View>
@@ -364,17 +414,30 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                 {/* Contact d'urgence */}
                 {user?.contactUrgent && (
                     <View style={[styles.emergencySection, { borderTopColor: themeColors.border }]}>
-                        <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Contact d'urgence</Text>
+                        <View style={styles.emergencyHeader}>
+                            <MaterialCommunityIcons name="alert-circle-outline" size={18} color={themeColors.activeTab} />
+                            <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Contact d'urgence</Text>
+                        </View>
                         <View style={[styles.emergencyInfo, { backgroundColor: themeColors.emergencyInfoBackground }]}>
                             <Text style={[styles.emergencyName, { color: themeColors.text }]}>
                                 {user.contactUrgent.firstName ?? 'Non renseigné'} {user.contactUrgent.lastName ?? 'Non renseigné'}
                             </Text>
-                            <Text style={[styles.emergencyPhone, { color: themeColors.secondaryText }]}>{user.contactUrgent.phone ?? 'Non renseigné'}</Text>
-                            <Text style={[styles.emergencyRelation, { color: themeColors.secondaryText }]}>
-                                Relation : {user.contactUrgent.relationship 
-                                    ? user.contactUrgent.relationship.charAt(0).toUpperCase() + user.contactUrgent.relationship.slice(1).toLowerCase() 
-                                    : 'Non renseigné'}
-                            </Text>
+                            <View style={styles.emergencyDetails}>
+                                <View style={styles.emergencyDetailItem}>
+                                    <MaterialCommunityIcons name="phone" size={14} color={themeColors.secondaryText} />
+                                    <Text style={[styles.emergencyPhone, { color: themeColors.secondaryText }]}>
+                                        {user.contactUrgent.phone ?? 'Non renseigné'}
+                                    </Text>
+                                </View>
+                                <View style={styles.emergencyDetailItem}>
+                                    <MaterialCommunityIcons name="account-heart" size={14} color={themeColors.secondaryText} />
+                                    <Text style={[styles.emergencyRelation, { color: themeColors.secondaryText }]}>
+                                        {user.contactUrgent.relationship 
+                                            ? user.contactUrgent.relationship.charAt(0).toUpperCase() + user.contactUrgent.relationship.slice(1).toLowerCase() 
+                                            : 'Non renseigné'}
+                                    </Text>
+                                </View>
+                            </View>
                         </View>
                     </View>
                 )}
@@ -395,7 +458,9 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
 
                 {/* Type de clients */}
                 <View style={[styles.clientTypeCard, { backgroundColor: themeColors.clientTypeCardBackground, borderColor: themeColors.border }]}>
-                    <MaterialCommunityIcons name="wallet" size={24} color="#4CAF50" />
+                    <View style={[styles.clientTypeIconContainer, { backgroundColor: 'rgba(76, 175, 80, 0.15)' }]}>
+                        <MaterialCommunityIcons name="wallet" size={24} color="#4CAF50" />
+                    </View>
                     <View style={styles.statsContent}>
                         <Text style={[styles.statsLabel, { color: themeColors.secondaryText }]}>Type de client</Text>
                         <Text style={[styles.clientTypeValue, { color: '#4CAF50' }]}>
@@ -408,7 +473,9 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
 
                 {/* AllOn Coin gagnés */}
                 <View style={[styles.coinsCard, { backgroundColor: themeColors.coinsCardBackground, borderColor: themeColors.border }]}>
-                    <MaterialCommunityIcons name="star" size={24} color="#FFA726" />
+                    <View style={[styles.coinsIconContainer, { backgroundColor: 'rgba(255, 167, 38, 0.15)' }]}>
+                        <MaterialCommunityIcons name="star" size={24} color="#FFA726" />
+                    </View>
                     <View style={styles.statsContent}>
                         <Text style={[styles.statsLabel, { color: themeColors.secondaryText }]}>AllOn Coin gagnés</Text>
                         <Text style={[styles.coinsValue, { color: '#FFA726' }]}>{user?.customerProfile?.totalCoinsEarned ?? '0.00'}</Text>
@@ -419,11 +486,16 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
             {/* Toggle Mode Dark */}
             <View style={[styles.themeToggleCard, { backgroundColor: themeColors.cardBackground, borderColor: themeColors.border }]}>
                 <View style={styles.themeToggleContent}>
-                    <MaterialCommunityIcons
-                        name={isDarkMode ? "weather-night" : "weather-sunny"}
-                        size={24}
-                        color={isDarkMode ? "#FFA726" : "#FFC107"}
-                    />
+                    <View style={[
+                        styles.themeIconContainer,
+                        { backgroundColor: isDarkMode ? 'rgba(255, 167, 38, 0.15)' : 'rgba(255, 193, 7, 0.15)' }
+                    ]}>
+                        <MaterialCommunityIcons
+                            name={isDarkMode ? "weather-night" : "weather-sunny"}
+                            size={24}
+                            color={isDarkMode ? "#FFA726" : "#FFC107"}
+                        />
+                    </View>
                     <View style={styles.themeToggleTextContainer}>
                         <Text style={[styles.themeToggleLabel, { color: themeColors.text }]}>Mode sombre</Text>
                         <Text style={[styles.themeToggleDescription, { color: themeColors.secondaryText }]}>
@@ -441,7 +513,10 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
             </View>
 
             {/* Modify Button */}
-            <Pressable style={styles.upgradeButton} onPress={handleUpdateUserInfo}>
+            <Pressable 
+                style={[styles.upgradeButton, { backgroundColor: themeColors.activeTab }]} 
+                onPress={handleUpdateUserInfo}
+            >
                 <MaterialCommunityIcons name="pencil" size={20} color="#FFFFFF" />
                 <Text style={styles.upgradeButtonText}>Modifier mes informations</Text>
             </Pressable>
@@ -779,23 +854,35 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     scrollContent: {
-        padding: 16,
+        padding: 20,
+        paddingBottom: 32,
     },
     profileCard: {
-        borderRadius: 12,
-        padding: 16,
-        marginBottom: 16,
+        borderRadius: 16,
+        padding: 20,
+        marginBottom: 20,
         borderWidth: 1,
     },
     profileCardHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 16,
+        marginBottom: 20,
     },
     businessLabel: {
         fontSize: 12,
         fontFamily: 'Ubuntu_Regular',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    statusBadgeContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 12,
+        borderWidth: 1,
     },
     statusDot: {
         width: 8,
@@ -804,35 +891,46 @@ const styles = StyleSheet.create({
     },
     statusLabel: {
         fontSize: 12,
-        fontFamily: 'Ubuntu_Regular',
+        fontFamily: 'Ubuntu_Medium',
     },
     profileInfo: {
         alignItems: 'center',
-        marginBottom: 16,
+        marginBottom: 20,
     },
     profileImageContainer: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
+        width: 96,
+        height: 96,
+        borderRadius: 48,
         overflow: 'hidden',
-        marginBottom: 12,
+        marginBottom: 16,
+        borderWidth: 3,
     },
     profileImage: {
         width: '100%',
         height: '100%',
     },
     userName: {
-        fontSize: 20,
+        fontSize: 22,
         fontFamily: 'Ubuntu_Bold',
-        marginBottom: 4,
+        marginBottom: 6,
+        textAlign: 'center',
     },
     userRole: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        marginBottom: 4,
+        marginBottom: 8,
+    },
+    companyBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 16,
+        backgroundColor: 'rgba(23, 118, 186, 0.1)',
     },
     userCompany: {
-        fontSize: 14,
+        fontSize: 13,
         fontFamily: 'Ubuntu_Medium',
     },
     profileImagePlaceholder: {
@@ -842,46 +940,87 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     detailsSection: {
-        paddingTop: 16,
+        paddingTop: 20,
         borderTopWidth: 1,
-        gap: 12,
+        gap: 16,
     },
     detailRow: {
         flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 12,
+    },
+    detailRowSpacing: {
+        marginBottom: 4,
+    },
+    detailIconContainer: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: 'rgba(23, 118, 186, 0.1)',
+        justifyContent: 'center',
         alignItems: 'center',
-        gap: 8,
+        marginTop: 2,
+    },
+    detailContent: {
+        flex: 1,
     },
     detailLabel: {
-        fontSize: 14,
+        fontSize: 12,
         fontFamily: 'Ubuntu_Medium',
-        minWidth: 120,
+        marginBottom: 4,
+        textTransform: 'uppercase',
+        letterSpacing: 0.3,
+    },
+    detailValueContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
     },
     detailValue: {
         flex: 1,
-        fontSize: 14,
+        fontSize: 15,
         fontFamily: 'Ubuntu_Regular',
-        textAlign: 'right',
+    },
+    verifiedIcon: {
+        marginLeft: 4,
     },
     emergencySection: {
-        marginTop: 16,
-        paddingTop: 16,
+        marginTop: 20,
+        paddingTop: 20,
         borderTopWidth: 1,
+    },
+    emergencyHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 12,
     },
     sectionTitle: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Bold',
-        marginBottom: 8,
     },
     emergencyInfo: {
-        borderRadius: 8,
-        padding: 12,
+        borderRadius: 12,
+        padding: 16,
     },
     emergencyName: {
-        fontSize: 14,
-        fontFamily: 'Ubuntu_Medium',
-        marginBottom: 4,
+        fontSize: 16,
+        fontFamily: 'Ubuntu_Bold',
+        marginBottom: 12,
+    },
+    emergencyDetails: {
+        gap: 10,
+    },
+    emergencyDetailItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
     },
     emergencyPhone: {
+        fontSize: 14,
+        fontFamily: 'Ubuntu_Regular',
+    },
+    emergencyRelation: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
     },
@@ -956,16 +1095,16 @@ const styles = StyleSheet.create({
         opacity: 0.1,
     },
     upgradeButton: {
-        backgroundColor: '#1776BA',
-        borderRadius: 8,
-        paddingVertical: 14,
-        paddingHorizontal: 16,
+        borderRadius: 12,
+        paddingVertical: 16,
+        paddingHorizontal: 20,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 8,
-        marginBottom: 16,
-        marginTop: 16,
+        gap: 10,
+        marginBottom: 20,
+        marginTop: 8,
+        borderWidth: 0,
     },
     upgradeButtonText: {
         fontSize: 16,
@@ -1027,21 +1166,21 @@ const styles = StyleSheet.create({
         color: '#666',
     },
     statsSection: {
-        gap: 12,
-        marginBottom: 16,
+        gap: 14,
+        marginBottom: 20,
     },
     tripsCompletedCard: {
-        borderRadius: 12,
-        padding: 16,
+        borderRadius: 16,
+        padding: 18,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
+        gap: 16,
         borderWidth: 1,
     },
     tripsIconContainer: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
+        width: 56,
+        height: 56,
+        borderRadius: 28,
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -1049,36 +1188,52 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     statsLabel: {
-        fontSize: 14,
+        fontSize: 13,
         fontFamily: 'Ubuntu_Regular',
-        marginBottom: 4,
+        marginBottom: 6,
+        textTransform: 'uppercase',
+        letterSpacing: 0.3,
     },
     tripsCount: {
-        fontSize: 24,
+        fontSize: 28,
         fontFamily: 'Ubuntu_Bold',
     },
     clientTypeCard: {
-        borderRadius: 12,
-        padding: 16,
+        borderRadius: 16,
+        padding: 18,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
+        gap: 16,
         borderWidth: 1,
     },
+    clientTypeIconContainer: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
     clientTypeValue: {
-        fontSize: 24,
+        fontSize: 28,
         fontFamily: 'Ubuntu_Bold',
     },
     coinsCard: {
-        borderRadius: 12,
-        padding: 16,
+        borderRadius: 16,
+        padding: 18,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
+        gap: 16,
         borderWidth: 1,
     },
+    coinsIconContainer: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
     coinsValue: {
-        fontSize: 24,
+        fontSize: 28,
         fontFamily: 'Ubuntu_Bold',
     },
     tabsContainer: {
@@ -1324,9 +1479,9 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
     },
     themeToggleCard: {
-        borderRadius: 12,
-        padding: 16,
-        marginBottom: 16,
+        borderRadius: 16,
+        padding: 18,
+        marginBottom: 20,
         borderWidth: 1,
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -1335,8 +1490,15 @@ const styles = StyleSheet.create({
     themeToggleContent: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
+        gap: 14,
         flex: 1,
+    },
+    themeIconContainer: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     themeToggleTextContainer: {
         flex: 1,

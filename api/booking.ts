@@ -80,13 +80,13 @@ export const getBookingQrCode = async (bookingId: string, token: string): Promis
         throw new Error('Token d\'authentification manquant ou invalide');
     }
 
-    console.log('bookingId: ', bookingId);
-    console.log('token: ', token);
-    console.log('baseUrl: ', `${baseUrl}/bookings/${bookingId}/qrcode`);
+    // console.log('bookingId: ', bookingId);
+    // console.log('token: ', token);
+    // console.log('baseUrl: ', `${baseUrl}/bookings/${bookingId}/qrcode`);
     
-    return await axios.get(`${baseUrl}/bookings/${bookingId}/qrcode`, {
-        headers: {
-            Authorization: `Bearer ${token}`,
-        },
+    return await axios.get(`${baseUrl}/customers/${bookingId}/qrcode`, {
+        // headers: {
+        //     Authorization: `Bearer ${token}`,
+        // },
     });
 }
