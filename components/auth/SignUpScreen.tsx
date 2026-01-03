@@ -304,13 +304,45 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
                 const response = await authRegister(userData);
 
                 // L'API retourne un status 201 pour une création réussie
-                if (response.status === 201 || response.status === 200) {
-                    // Stockage des tokens dans AsyncStorage (comme dans SignInScreen)
-                    await AsyncStorage.setItem('token', response.data.access_token);
-                    await AsyncStorage.setItem('refresh_token', response.data.refresh_token);
-                    await AsyncStorage.setItem('expires_at', String(response.data.expires_in));
-                    await AsyncStorage.setItem('token_type', response.data.token_type);
-                    await AsyncStorage.setItem('user_id', response.data.user.id);
+                if (response && (response.status === 201 || response.status === 200) && response.data) {
+                    // Vérifier que tous les champs nécessaires sont présents
+                    const accessToken = response.data.access_token;
+                    const refreshToken = response.data.refresh_token;
+                    const expiresIn = response.data.expires_in;
+                    const tokenType = response.data.token_type;
+                    const user = response.data.user;
+
+                    if (!accessToken || accessToken.trim() === '') {
+                        throw new Error('Token d\'accès manquant dans la réponse');
+                    }
+
+                    if (!user || !user.id) {
+                        throw new Error('Informations utilisateur manquantes dans la réponse');
+                    }
+
+                    // Stockage des tokens dans AsyncStorage de manière sécurisée
+                    try {
+                        await AsyncStorage.setItem('token', accessToken);
+
+                        if (refreshToken && refreshToken.trim() !== '') {
+                            await AsyncStorage.setItem('refresh_token', refreshToken);
+                        }
+
+                        if (expiresIn !== undefined && expiresIn !== null) {
+                            await AsyncStorage.setItem('expires_at', String(expiresIn));
+                        }
+
+                        if (tokenType && tokenType.trim() !== '') {
+                            await AsyncStorage.setItem('token_type', tokenType);
+                        }
+
+                        await AsyncStorage.setItem('user_id', user.id);
+                    } catch (storageError) {
+                        console.error('Erreur lors du stockage des données:', storageError);
+                        Alert.alert('Erreur', 'Impossible de sauvegarder les informations de connexion. Veuillez réessayer.');
+                        setIsLoading(false);
+                        return;
+                    }
 
                     // Affiche le message de succès
                     Alert.alert(
@@ -343,40 +375,44 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
                     );
                 } else {
                     // Gestion des autres codes de statut
-                    const errorMessage = response.data?.message || 'Une erreur est survenue lors de l\'inscription';
+                    const errorMessage = response?.data?.message || 'Une erreur est survenue lors de l\'inscription';
                     Alert.alert('Attention !', errorMessage);
                     setIsLoading(false);
                     return;
                 }
             } catch (error: any) {
-
                 console.error('Erreur lors de l\'inscription : ', error);
 
                 // Gestion des erreurs de validation ou autres erreurs de l'API
                 let errorMessage = 'Une erreur est survenue lors de l\'inscription, veuillez vérifier vos informations et réessayer.';
 
-                if (error.response) {
+                if (error?.response) {
                     // Erreur avec réponse de l'API
-                    const apiError = error.response.data;
-                    if (apiError.message) {
-                        errorMessage = apiError.message;
-                    } else if (apiError.error) {
-                        errorMessage = apiError.error;
-                    } else if (typeof apiError === 'string') {
-                        errorMessage = apiError;
+                    if (error.response.status === 400) {
+                        errorMessage = error.response.data?.message || 'Les informations fournies sont invalides.';
+                    } else if (error.response.status === 409) {
+                        errorMessage = 'Un compte existe déjà avec cet email ou ce nom d\'utilisateur.';
+                    } else if (error.response.data?.message) {
+                        errorMessage = error.response.data.message;
                     }
-                    console.log('Erreur API : ', apiError);
-                } else if (error.request) {
-                    // Requête envoyée mais pas de réponse
-                    errorMessage = 'Impossible de contacter le serveur. Vérifiez votre connexion internet.';
+                } else if (error?.message) {
+                    // Erreur personnalisée
+                    errorMessage = error.message;
                 }
-
-                Alert.alert('Attention !', errorMessage);
-                setIsLoading(false);
-                return;
-            } finally {
-                setIsLoading(false);
+                const apiError = error.response.data;
+                if (apiError.message) {
+                    errorMessage = apiError.message;
+                } else if (apiError.error) {
+                    errorMessage = apiError.error;
+                } else if (typeof apiError === 'string') {
+                    errorMessage = apiError;
+                }
+                console.log('Erreur API : ', apiError);
             }
+
+            Alert.alert('Attention !', errorMessage);
+            setIsLoading(false);
+            return;
         }
     };
 
@@ -524,9 +560,9 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
                                         styles.dateInput,
                                         {
                                             backgroundColor: inputBackgroundColor,
-                                            borderColor: errors.dateOfBirth && touchedFields.has('dateOfBirth') 
-                                            ? '#FF0000' 
-                                            : inputBorderColor
+                                            borderColor: errors.dateOfBirth && touchedFields.has('dateOfBirth')
+                                                ? '#FF0000'
+                                                : inputBorderColor
                                         }
                                     ]}
                                     onPress={() => {
@@ -712,7 +748,7 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
                                         styles.selectText,
                                         { color: formData.emergencyContactRelation ? textColor : placeholderColor }
                                     ]}>
-                                        {formData.emergencyContactRelation 
+                                        {formData.emergencyContactRelation
                                             ? relationOptions.find(opt => opt.value === formData.emergencyContactRelation)?.label || ''
                                             : 'Sélectionner une relation'}
                                     </Text>

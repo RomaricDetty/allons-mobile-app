@@ -7,11 +7,10 @@ import { useThemeColor } from '@/hooks/use-theme-color';
 import { Departures, SearchParams, Trip } from '@/types';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
-    FlatList,
     Modal,
     Pressable,
     ScrollView,
@@ -22,6 +21,29 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+
+/**
+ * Convertit une heure au format HH:MM en minutes pour faciliter la comparaison
+ */
+const timeToMinutes = (time: string): number => {
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours * 60 + minutes;
+};
+
+/**
+ * Vérifie si une heure est dans un créneau horaire
+ */
+const isTimeInSlot = (time: string, startTime: string, endTime: string): boolean => {
+    const tripMinutes = timeToMinutes(time);
+    const startMinutes = timeToMinutes(startTime);
+    const endMinutes = timeToMinutes(endTime);
+    
+    // Gérer le cas où le créneau passe minuit (ex: 18h-24h)
+    if (endMinutes < startMinutes) {
+        return tripMinutes >= startMinutes || tripMinutes <= endMinutes;
+    }
+    return tripMinutes >= startMinutes && tripMinutes <= endMinutes;
+};
 
 /**
  * Convertit un nom d'aménité en nom d'icône MaterialCommunityIcons valide
@@ -197,36 +219,13 @@ const TripList = () => {
     const [selectedAmenities, setSelectedAmenities] = useState<Set<string>>(new Set());
     const [selectedBusTypes, setSelectedBusTypes] = useState<Set<string>>(new Set());
 
-    // Options de tri
-    const sortOptions = [
+    // Options de tri (mémorisées car constantes)
+    const sortOptions = useMemo(() => [
         { id: 'Prix croissant', label: 'Prix croissant' },
         { id: 'Prix décroissant', label: 'Prix décroissant' },
         { id: 'Départ tôt', label: 'Départ tôt' },
         { id: 'Départ tard', label: 'Départ tard' },
-    ];
-
-    /**
-     * Convertit une heure au format HH:MM en minutes pour faciliter la comparaison
-     */
-    const timeToMinutes = (time: string): number => {
-        const [hours, minutes] = time.split(':').map(Number);
-        return hours * 60 + minutes;
-    };
-
-    /**
-     * Vérifie si une heure est dans un créneau horaire
-     */
-    const isTimeInSlot = (time: string, startTime: string, endTime: string): boolean => {
-        const tripMinutes = timeToMinutes(time);
-        const startMinutes = timeToMinutes(startTime);
-        const endMinutes = timeToMinutes(endTime);
-        
-        // Gérer le cas où le créneau passe minuit (ex: 18h-24h)
-        if (endMinutes < startMinutes) {
-            return tripMinutes >= startMinutes || tripMinutes <= endMinutes;
-        }
-        return tripMinutes >= startMinutes && tripMinutes <= endMinutes;
-    };
+    ], []);
 
     /**
      * Filtre et trie la liste des trajets selon les critères sélectionnés
@@ -300,19 +299,19 @@ const TripList = () => {
     /**
      * Réinitialise tous les filtres à leurs valeurs par défaut
      */
-    const resetAllFilters = () => {
+    const resetAllFilters = useCallback(() => {
         setMinPrice(filters?.priceRange?.min?.toString() || '0');
         setMaxPrice(filters?.priceRange?.max?.toString() || '50000');
         setSelectedTimeSlots(new Set());
         setSelectedCompanies(new Set());
         setSelectedAmenities(new Set());
         setSelectedBusTypes(new Set());
-    };
+    }, [filters?.priceRange?.min, filters?.priceRange?.max]);
 
     /**
      * Gère la sélection/désélection d'un créneau horaire
      */
-    const toggleTimeSlot = (id: string) => {
+    const toggleTimeSlot = useCallback((id: string) => {
         setSelectedTimeSlots(prev => {
             const newSet = new Set(prev);
             if (newSet.has(id)) {
@@ -322,12 +321,12 @@ const TripList = () => {
             }
             return newSet;
         });
-    };
+    }, []);
 
     /**
      * Gère la sélection/désélection d'une compagnie
      */
-    const toggleCompany = (id: string) => {
+    const toggleCompany = useCallback((id: string) => {
         setSelectedCompanies(prev => {
             const newSet = new Set(prev);
             if (newSet.has(id)) {
@@ -337,12 +336,12 @@ const TripList = () => {
             }
             return newSet;
         });
-    };
+    }, []);
 
     /**
      * Gère la sélection/désélection d'un équipement
      */
-    const toggleAmenity = (id: string) => {
+    const toggleAmenity = useCallback((id: string) => {
         setSelectedAmenities(prev => {
             const newSet = new Set(prev);
             if (newSet.has(id)) {
@@ -352,12 +351,12 @@ const TripList = () => {
             }
             return newSet;
         });
-    };
+    }, []);
 
     /**
      * Gère la sélection/désélection d'un type de bus
      */
-    const toggleBusType = (id: string) => {
+    const toggleBusType = useCallback((id: string) => {
         setSelectedBusTypes(prev => {
             const newSet = new Set(prev);
             if (newSet.has(id)) {
@@ -367,63 +366,68 @@ const TripList = () => {
             }
             return newSet;
         });
-    };
+    }, []);
 
     /**
      * Incrémente la valeur du prix minimum
      */
-    const incrementMinPrice = () => {
-        const current = parseInt(minPrice) || 0;
-        setMinPrice(String(current + 1));
-    };
+    const incrementMinPrice = useCallback(() => {
+        setMinPrice(prev => String((parseInt(prev) || 0) + 1));
+    }, []);
 
     /**
      * Décrémente la valeur du prix minimum
      */
-    const decrementMinPrice = () => {
-        const current = parseInt(minPrice) || 0;
-        if (current > 0) {
-            setMinPrice(String(current - 1));
-        }
-    };
+    const decrementMinPrice = useCallback(() => {
+        setMinPrice(prev => {
+            const current = parseInt(prev) || 0;
+            return current > 0 ? String(current - 1) : prev;
+        });
+    }, []);
 
     /**
      * Incrémente la valeur du prix maximum
      */
-    const incrementMaxPrice = () => {
-        const current = parseInt(maxPrice) || 50000;
-        setMaxPrice(String(current + 1));
-    };
+    const incrementMaxPrice = useCallback(() => {
+        setMaxPrice(prev => String((parseInt(prev) || 50000) + 1));
+    }, []);
 
     /**
      * Décrémente la valeur du prix maximum
      */
-    const decrementMaxPrice = () => {
-        const current = parseInt(maxPrice) || 50000;
-        if (current > 0) {
-            setMaxPrice(String(current - 1));
-        }
-    };
+    const decrementMaxPrice = useCallback(() => {
+        setMaxPrice(prev => {
+            const current = parseInt(prev) || 50000;
+            return current > 0 ? String(current - 1) : prev;
+        });
+    }, []);
 
-    // Récupération des villes depuis le premier trajet
-    const departureCity = sortedTrips[0]?.departureCity || trips[0]?.departureCity || '';
-    const arrivalCity = sortedTrips[0]?.arrivalCity || trips[0]?.arrivalCity || '';
+    // Récupération des villes depuis le premier trajet (mémorisées)
+    const { departureCity, arrivalCity } = useMemo(() => {
+        const firstTrip = sortedTrips[0] || trips[0];
+        return {
+            departureCity: firstTrip?.departureCity || '',
+            arrivalCity: firstTrip?.arrivalCity || '',
+        };
+    }, [sortedTrips, trips]);
 
-
-    const formatDateToYYYYMMDD = (date: Date | null): string => {
+    /**
+     * Formate une date au format YYYY-MM-DD
+     */
+    const formatDateToYYYYMMDD = useCallback((date: Date | null): string => {
         if (!date) return '';
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const day = String(date.getDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
-    };
+    }, []);
 
     /**
      * Gère la sélection d'un trajet
      * Pour un aller-retour, recherche les voyages retour disponibles
      * Pour un aller simple, navigue directement vers trip-summary
      */
-    const handleSelectTrip = async (trip: Trip) => {
+    const handleSelectTrip = useCallback(async (trip: Trip) => {
         // Si c'est un aller simple, naviguer directement vers trip-summary
         if (searchParams?.tripType !== 'ROUND_TRIP') {
             navigation.navigate('trip/trip-summary', { trip, searchParams });
@@ -464,120 +468,77 @@ const TripList = () => {
             console.error('Erreur dans la récupération des voyages retour : ', error);
             Alert.alert('Attention !', 'Une erreur est survenue lors de la recherche des voyages retour');
         }
-    };
+    }, [searchParams, navigation, formatDateToYYYYMMDD]);
+
+    // Styles dynamiques mémorisés
+    const dynamicStyles = useMemo(() => ({
+        header: {
+            paddingTop: insets.top,
+            backgroundColor: headerBackgroundColor,
+            borderBottomColor: headerBorderColor
+        },
+        modalContent: { backgroundColor: modalBackgroundColor },
+    }), [insets.top, headerBackgroundColor, headerBorderColor, modalBackgroundColor]);
+
+    // Callbacks pour la navigation
+    const handleGoBack = useCallback(() => {
+        navigation.goBack();
+    }, [navigation]);
+
+    const handleOpenFilters = useCallback(() => {
+        setShowFiltersModal(true);
+    }, []);
+
+    const handleCloseFilters = useCallback(() => {
+        setShowFiltersModal(false);
+    }, []);
+
+    const handleOpenSort = useCallback(() => {
+        setShowSortModal(true);
+    }, []);
+
+    const handleCloseSort = useCallback(() => {
+        setShowSortModal(false);
+    }, []);
 
     /**
-     * Composant pour une carte de trajet
+     * Fonction de rendu pour les options de tri dans le BottomSheet
      */
-    const TripCard = ({ item }: { item: Trip }) => {
+    const renderSortItem = useCallback((item: { id: string; label: string }, onClose: () => void) => {
+        const isSelected = selectedSort === item.id;
+        const handleSelect = () => {
+            setSelectedSort(item.id);
+            onClose();
+        };
         return (
-            <View style={[styles.tripCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
-                {/* En-tête de la carte : Logo compagnie et Prix */}
-                <View style={styles.cardHeader}>
-                    <View style={styles.companyInfo}>
-                        <View style={styles.companyLogoContainer}>
-                            <Text style={styles.companyLogoText}>
-                                {item.companyAbbreviation}
-                            </Text>
-                        </View>
-                        <View style={styles.companyDetails}>
-                            <Text style={[styles.companyName, { color: textColor }]}>{item.company}</Text>
-                            <Text style={[styles.licencePlate, { color: secondaryTextColor }]}>{item.licencePlate}</Text>
-                        </View>
-                    </View>
-                    <View style={styles.priceContainer}>
-                        <Text style={[styles.price, { color: tintColor }]}>{item.price}</Text>
-                        <Text style={[styles.currency, { color: secondaryTextColor }]}>{item.currency}</Text>
-                    </View>
-                </View>
-
-                {/* Section Départ */}
-                <View style={styles.timeSection}>
-                    <View style={styles.departureSection}>
-                        <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>DÉPART</Text>
-                        <Text style={[styles.time, { color: textColor }]}>{item.departureTime}</Text>
-                        <Text style={[styles.city, { color: textColor }]}>{item.departureCity}</Text>
-                        <Text style={[styles.station, { color: secondaryTextColor }]}>{item.departureStation}</Text>
-                    </View>
-
-                    {/* Timeline */}
-                    <View style={styles.timelineContainer}>
-                        <View style={[styles.timelineDot, { backgroundColor: tintColor }]} />
-                        <View style={[styles.timelineLine, { backgroundColor: tintColor }]} />
-                        <View style={[styles.timelineDot, { backgroundColor: tintColor }]} />
-                        <Text style={[styles.duration, { color: secondaryTextColor }]}>{item.duration}</Text>
-                    </View>
-
-                    {/* Section Arrivée */}
-                    <View style={styles.arrivalSection}>
-                        <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>ARRIVÉE</Text>
-                        <Text style={[styles.time, { color: textColor }]}>{item.arrivalTime}</Text>
-                        <Text style={[styles.city, { color: textColor }]}>{item.arrivalCity}</Text>
-                        <Text style={[styles.station, { color: secondaryTextColor }]}>{item.arrivalStation}</Text>
-                    </View>
-                </View>
-
-                {/* Options et Disponibilité */}
-                <View style={styles.optionsSection}>
-                    <View style={styles.optionsRow}>
-                        {item.options.map((option, index) => (
-                            <View key={index} style={styles.optionItem}>
-                                <Icon name="check-circle" size={16} color="#4CAF50" />
-                                <Text style={[styles.optionText, { color: textColor }]}>{option}</Text>
-                            </View>
-                        ))}
-                    </View>
-
-                    <View style={
-                        {
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            gap: 5,
-                            justifyContent: 'space-between',
-                            marginTop: 20,
-                        }
-                    }>
-                        <View style={styles.availabilityBadge}>
-                            <Text style={styles.availabilityText}>
-                                {item.availableSeats} places disponibles
-                            </Text>
-                        </View>
-                        <Text style={[styles.busType, { color: tintColor }]}>{capitalizeBusType(item.busType)}</Text>
-                    </View>
-                </View>
-
-                {/* Bouton Réserver */}
-                <Pressable
-                    style={[styles.selectButton, loadingReturnTrips && { opacity: 0.5 }]}
-                    onPress={() => handleSelectTrip(item)}
-                    disabled={loadingReturnTrips}
-                >
-                    {loadingReturnTrips ? (
-                        <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                        <Text style={styles.selectButtonText}>{searchParams?.tripType === 'ROUND_TRIP' ? 'Sélectionner' : 'Réserver'}</Text>
-                    )}
-                </Pressable>
-            </View>
+            <Pressable
+                style={[
+                    styles.sortOption,
+                    { borderBottomColor: colorScheme === 'dark' ? '#3A3A3C' : '#F3F3F7' }
+                ]}
+                onPress={handleSelect}
+            >
+                <Text style={[
+                    styles.sortOptionText,
+                    { color: isSelected ? tintColor : textColor },
+                    isSelected && styles.sortOptionTextSelected
+                ]}>
+                    {item.label}
+                </Text>
+                {isSelected && (
+                    <Icon name="check" size={20} color={tintColor} />
+                )}
+            </Pressable>
         );
-    };
-
-    console.log("Departures filters ===>, ", JSON.stringify(departures?.filters, null, 2));
+    }, [selectedSort, colorScheme, tintColor, textColor]);
 
     return (
         <>
             <View style={[styles.container, { backgroundColor: scrollBackgroundColor }]}>
                 {/* Header avec bouton retour */}
-                <View style={[
-                    styles.header,
-                    {
-                        paddingTop: insets.top,
-                        backgroundColor: headerBackgroundColor,
-                        borderBottomColor: headerBorderColor
-                    }
-                ]}>
+                <View style={[styles.header, dynamicStyles.header]}>
                     <Pressable
-                        onPress={() => navigation.goBack()}
+                        onPress={handleGoBack}
                         style={styles.backButton}
                     >
                         <Icon name="arrow-left" size={25} color={iconColor} />
@@ -586,7 +547,7 @@ const TripList = () => {
                     {/* Bouton Filtres */}
                     <Pressable
                         style={[styles.filterButton, { backgroundColor: cardBackgroundColor, borderColor }]}
-                        onPress={() => setShowFiltersModal(true)}
+                        onPress={handleOpenFilters}
                     >
                         <Icon name="filter-variant" size={20} color={textColor} />
                         <Text style={[styles.filterButtonText, { color: textColor }]}>Filtres</Text>
@@ -628,7 +589,7 @@ const TripList = () => {
                         </Text>
                         <Pressable
                             style={styles.sortButton}
-                            onPress={() => setShowSortModal(true)}
+                            onPress={handleOpenSort}
                         >
                             <Text style={[styles.sortButtonText, { color: textColor }]}>{selectedSort}</Text>
                             <Icon name="chevron-down" size={16} color={iconColor} />
@@ -637,13 +598,22 @@ const TripList = () => {
 
                     {/* Liste des trajets */}
                     {sortedTrips.length > 0 ? (
-                        <FlatList
-                            data={sortedTrips}
-                            renderItem={({ item }) => <TripCard item={item} />}
-                            keyExtractor={(item) => item.id}
-                            scrollEnabled={false}
-                            contentContainerStyle={styles.tripsList}
-                        />
+                        <View style={styles.tripsList}>
+                            {sortedTrips.map((item) => (
+                                <TripCard
+                                    key={item.id}
+                                    item={item}
+                                    cardBackgroundColor={cardBackgroundColor}
+                                    borderColor={borderColor}
+                                    textColor={textColor}
+                                    secondaryTextColor={secondaryTextColor}
+                                    tintColor={tintColor}
+                                    loadingReturnTrips={loadingReturnTrips}
+                                    searchParams={searchParams}
+                                    onSelectTrip={handleSelectTrip}
+                                />
+                            ))}
+                        </View>
                     ) : (
                         <View style={styles.emptyContainer}>
                             <MaterialIcons name="directions-bus" size={40} color={tintColor} />
@@ -657,16 +627,14 @@ const TripList = () => {
                     visible={showFiltersModal}
                     transparent={true}
                     animationType="slide"
-                    onRequestClose={() => setShowFiltersModal(false)}
+                    onRequestClose={handleCloseFilters}
                 >
                     <Pressable
                         style={styles.modalOverlay}
-                        onPress={() => setShowFiltersModal(false)}
+                        onPress={handleCloseFilters}
                     >
                         <View 
-                            style={[styles.modalContent, { 
-                                backgroundColor: modalBackgroundColor 
-                            }]}
+                            style={[styles.modalContent, dynamicStyles.modalContent]}
                             onStartShouldSetResponder={() => true}
                         >
                             {/* En-tête du modal */}
@@ -929,7 +897,7 @@ const TripList = () => {
                             <View style={[styles.modalCloseButtonContainer, { paddingBottom: insets.bottom + 10 }]}>
                                 <Pressable
                                     style={[styles.modalCloseButton, { backgroundColor: "#1776BA" }]}
-                                    onPress={() => setShowFiltersModal(false)}
+                                    onPress={handleCloseFilters}
                                 >
                                     <Text style={[styles.modalCloseButtonText, { color: '#FFFFFF' }]}>Fermer</Text>
                                 </Pressable>
@@ -968,37 +936,12 @@ const TripList = () => {
             {/* BottomSheet de tri */}
             <BottomSheet
                 visible={showSortModal}
-                onClose={() => setShowSortModal(false)}
+                onClose={handleCloseSort}
                 title="Trier par"
                 data={sortOptions}
                 loading={false}
                 keyExtractor={(item) => item.id}
-                renderItem={(item, onClose) => {
-                    const isSelected = selectedSort === item.id;
-                    return (
-                        <Pressable
-                            style={[
-                                styles.sortOption,
-                                { borderBottomColor: colorScheme === 'dark' ? '#3A3A3C' : '#F3F3F7' }
-                            ]}
-                            onPress={() => {
-                                setSelectedSort(item.id);
-                                onClose();
-                            }}
-                        >
-                            <Text style={[
-                                styles.sortOptionText,
-                                { color: isSelected ? tintColor : textColor },
-                                isSelected && styles.sortOptionTextSelected
-                            ]}>
-                                {item.label}
-                            </Text>
-                            {isSelected && (
-                                <Icon name="check" size={20} color={tintColor} />
-                            )}
-                        </Pressable>
-                    );
-                }}
+                renderItem={renderSortItem}
                 emptyText="Aucune option disponible"
             />
         </>
@@ -1225,6 +1168,13 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
     },
+    availabilityRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        justifyContent: 'space-between',
+        marginTop: 20,
+    },
     selectButton: {
         backgroundColor: '#1776BA',
         borderRadius: 8,
@@ -1400,5 +1350,131 @@ const styles = StyleSheet.create({
         fontFamily: 'Ubuntu_Regular',
     },
 });
+
+/**
+ * Composant pour une carte de trajet (mémorisé pour éviter les re-renders inutiles)
+ */
+interface TripCardProps {
+    item: Trip;
+    cardBackgroundColor: string;
+    borderColor: string;
+    textColor: string;
+    secondaryTextColor: string;
+    tintColor: string;
+    loadingReturnTrips: boolean;
+    searchParams?: SearchParams;
+    onSelectTrip: (trip: Trip) => void;
+}
+
+const TripCard = React.memo<TripCardProps>(({
+    item,
+    cardBackgroundColor,
+    borderColor,
+    textColor,
+    secondaryTextColor,
+    tintColor,
+    loadingReturnTrips,
+    searchParams,
+    onSelectTrip,
+}) => {
+    const buttonText = searchParams?.tripType === 'ROUND_TRIP' ? 'Sélectionner' : 'Réserver';
+
+    return (
+        <View style={[styles.tripCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
+            {/* En-tête de la carte : Logo compagnie et Prix */}
+            <View style={styles.cardHeader}>
+                <View style={styles.companyInfo}>
+                    <View style={styles.companyLogoContainer}>
+                        <Text style={styles.companyLogoText}>
+                            {item.companyAbbreviation}
+                        </Text>
+                    </View>
+                    <View style={styles.companyDetails}>
+                        <Text style={[styles.companyName, { color: textColor }]}>{item.company}</Text>
+                        <Text style={[styles.licencePlate, { color: secondaryTextColor }]}>{item.licencePlate}</Text>
+                    </View>
+                </View>
+                <View style={styles.priceContainer}>
+                    <Text style={[styles.price, { color: tintColor }]}>{item.price}</Text>
+                    <Text style={[styles.currency, { color: secondaryTextColor }]}>{item.currency}</Text>
+                </View>
+            </View>
+
+            {/* Section Départ */}
+            <View style={styles.timeSection}>
+                <View style={styles.departureSection}>
+                    <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>DÉPART</Text>
+                    <Text style={[styles.time, { color: textColor }]}>{item.departureTime}</Text>
+                    <Text style={[styles.city, { color: textColor }]}>{item.departureCity}</Text>
+                    <Text style={[styles.station, { color: secondaryTextColor }]}>{item.departureStation}</Text>
+                </View>
+
+                {/* Timeline */}
+                <View style={styles.timelineContainer}>
+                    <View style={[styles.timelineDot, { backgroundColor: tintColor }]} />
+                    <View style={[styles.timelineLine, { backgroundColor: tintColor }]} />
+                    <View style={[styles.timelineDot, { backgroundColor: tintColor }]} />
+                    <Text style={[styles.duration, { color: secondaryTextColor }]}>{item.duration}</Text>
+                </View>
+
+                {/* Section Arrivée */}
+                <View style={styles.arrivalSection}>
+                    <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>ARRIVÉE</Text>
+                    <Text style={[styles.time, { color: textColor }]}>{item.arrivalTime}</Text>
+                    <Text style={[styles.city, { color: textColor }]}>{item.arrivalCity}</Text>
+                    <Text style={[styles.station, { color: secondaryTextColor }]}>{item.arrivalStation}</Text>
+                </View>
+            </View>
+
+            {/* Options et Disponibilité */}
+            <View style={styles.optionsSection}>
+                <View style={styles.optionsRow}>
+                    {item.options.map((option, index) => (
+                        <View key={`${item.id}-option-${index}`} style={styles.optionItem}>
+                            <Icon name="check-circle" size={16} color="#4CAF50" />
+                            <Text style={[styles.optionText, { color: textColor }]}>{option}</Text>
+                        </View>
+                    ))}
+                </View>
+
+                <View style={styles.availabilityRow}>
+                    <View style={styles.availabilityBadge}>
+                        <Text style={styles.availabilityText}>
+                            {item.availableSeats} places disponibles
+                        </Text>
+                    </View>
+                    <Text style={[styles.busType, { color: tintColor }]}>{capitalizeBusType(item.busType)}</Text>
+                </View>
+            </View>
+
+            {/* Bouton Réserver */}
+            <Pressable
+                style={[styles.selectButton, loadingReturnTrips && { opacity: 0.5 }]}
+                onPress={() => onSelectTrip(item)}
+                disabled={loadingReturnTrips}
+            >
+                {loadingReturnTrips ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                    <Text style={styles.selectButtonText}>{buttonText}</Text>
+                )}
+            </Pressable>
+        </View>
+    );
+}, (prevProps, nextProps) => {
+    // Comparaison personnalisée pour éviter les re-renders inutiles
+    return (
+        prevProps.item.id === nextProps.item.id &&
+        prevProps.loadingReturnTrips === nextProps.loadingReturnTrips &&
+        prevProps.cardBackgroundColor === nextProps.cardBackgroundColor &&
+        prevProps.borderColor === nextProps.borderColor &&
+        prevProps.textColor === nextProps.textColor &&
+        prevProps.secondaryTextColor === nextProps.secondaryTextColor &&
+        prevProps.tintColor === nextProps.tintColor &&
+        prevProps.searchParams?.tripType === nextProps.searchParams?.tripType
+    );
+});
+
+TripCard.displayName = 'TripCard';
 
 export default TripList;

@@ -4,9 +4,15 @@ import { baseUrl } from "./config";
 /**
  * Get booking details
  * @param bookingId - The booking ID
+ * @param token - Le token d'authentification
  * @returns AxiosResponse<any>
  */
 export const getBookingDetails = async (bookingId: string, token: string): Promise<AxiosResponse<any>> => {
+    // Vérifier que le token est valide
+    if (!token || token.trim() === '') {
+        throw new Error('Token d\'authentification manquant ou invalide');
+    }
+    
     return await axios.get(`${baseUrl}/customers/bookings/${bookingId}`, {
         headers: {
             Authorization: `Bearer ${token}`,
@@ -69,6 +75,15 @@ export const getBookingByReference = async (referenceCode: string): Promise<Axio
  * @returns AxiosResponse<any>
  */
 export const getBookingQrCode = async (bookingId: string, token: string): Promise<AxiosResponse<any>> => {
+    // Vérifier que le token est valide
+    if (!token || token.trim() === '') {
+        throw new Error('Token d\'authentification manquant ou invalide');
+    }
+
+    console.log('bookingId: ', bookingId);
+    console.log('token: ', token);
+    console.log('baseUrl: ', `${baseUrl}/bookings/${bookingId}/qrcode`);
+    
     return await axios.get(`${baseUrl}/bookings/${bookingId}/qrcode`, {
         headers: {
             Authorization: `Bearer ${token}`,

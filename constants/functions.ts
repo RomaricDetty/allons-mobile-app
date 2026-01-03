@@ -76,26 +76,50 @@ export const formatBookingDate = (dateString: string): string => {
  * Formate le statut pour l'affichage
  */
 export const formatStatus = (status: string): string => {
+    if (!status) return 'Inconnu';
+    
+    const statusUpper = status.toUpperCase();
     const statusMap: { [key: string]: string } = {
         'PAID': 'Payé',
         'PENDING': 'En attente',
         'CANCELLED': 'Annulé',
+        'CANCELED': 'Annulé',
         'REFUNDED': 'Remboursé',
+        'CONFIRMED': 'Confirmé',
+        'EXPIRED': 'Expiré',
+        'FAILED': 'Échoué',
+        'PROCESSING': 'En traitement',
+        'COMPLETED': 'Terminé',
+        'ACTIVE': 'Actif',
+        'INACTIVE': 'Inactif',
+        'USED': 'Utilisé',
     };
-    return statusMap[status] || status;
+    return statusMap[statusUpper] || status;
 };
 
 /**
  * Retourne la couleur du badge de statut
  */
 export const getStatusColor = (status: string): string => {
+    if (!status) return '#9E9E9E';
+    
+    const statusUpper = status.toUpperCase();
     const colorMap: { [key: string]: string } = {
-        'PAID': '#4CAF50',
-        'PENDING': '#FFA726',
-        'CANCELLED': '#F44336',
-        'REFUNDED': '#2196F3',
+        'PAID': '#4CAF50',           // Vert - Payé
+        'CONFIRMED': '#4CAF50',       // Vert - Confirmé
+        'COMPLETED': '#4CAF50',       // Vert - Terminé
+        'ACTIVE': '#4CAF50',          // Vert - Actif
+        'PENDING': '#FFA726',         // Orange - En attente
+        'PROCESSING': '#FFA726',      // Orange - En traitement
+        'CANCELLED': '#F44336',       // Rouge - Annulé
+        'CANCELED': '#F44336',        // Rouge - Annulé
+        'FAILED': '#F44336',          // Rouge - Échoué
+        'EXPIRED': '#9E9E9E',         // Gris - Expiré
+        'REFUNDED': '#2196F3',        // Bleu - Remboursé
+        'INACTIVE': '#9E9E9E',        // Gris - Inactif
+        'USED': '#607D8B',            // Bleu-gris - Utilisé
     };
-    return colorMap[status] || '#9E9E9E';
+    return colorMap[statusUpper] || '#9E9E9E';
 };
 
 /**

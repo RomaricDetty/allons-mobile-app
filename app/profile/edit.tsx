@@ -311,6 +311,17 @@ export default function EditProfileScreen() {
             const token = await AsyncStorage.getItem('token');
             const userId = await AsyncStorage.getItem('user_id');
             
+            // Vérifier que le token et l'ID utilisateur sont disponibles
+            if (!token || token.trim() === '') {
+                Alert.alert('Erreur', 'Token d\'authentification manquant. Veuillez vous reconnecter.');
+                return;
+            }
+            
+            if (!userId || userId.trim() === '') {
+                Alert.alert('Erreur', 'ID utilisateur manquant. Veuillez vous reconnecter.');
+                return;
+            }
+            
             // Construire l'objet utilisateur mis à jour
             const updatedUser: Partial<User> = {
                 firstName: formData.firstName.trim(),
@@ -337,7 +348,7 @@ export default function EditProfileScreen() {
                 },
             };
 
-            const response = await updateUserInfo(userId as string, updatedUser as any, token as string);
+            const response = await updateUserInfo(userId, updatedUser as any, token);
             if (response.status === 200) {
                 Alert.alert('Succès', 'Les informations ont été mises à jour avec succès', [
                     {

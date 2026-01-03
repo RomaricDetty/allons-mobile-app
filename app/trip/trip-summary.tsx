@@ -4,7 +4,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { SearchParams, Trip } from '@/types';
 import { CommonActions, useNavigation, useRoute } from '@react-navigation/native';
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import {
     Pressable,
     ScrollView,
@@ -14,6 +14,113 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+
+/**
+ * Composant pour afficher une carte de voyage
+ */
+interface TripCardProps {
+    trip: Trip;
+    label: string;
+    cardBackgroundColor: string;
+    borderColor: string;
+    textColor: string;
+    secondaryTextColor: string;
+    tintColor: string;
+    separatorColor: string;
+}
+
+const TripCard = React.memo<TripCardProps>(({
+    trip,
+    label,
+    cardBackgroundColor,
+    borderColor,
+    textColor,
+    secondaryTextColor,
+    tintColor,
+    separatorColor,
+}) => {
+    return (
+        <View style={[styles.tripCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
+            <View style={styles.tripCardHeader}>
+                <Text style={[styles.tripCardLabel, { color: textColor }]}>{label}</Text>
+                <Text style={[styles.tripCardCompany, { color: textColor }]}>{trip.company}</Text>
+            </View>
+
+            <View style={styles.tripDetails}>
+                <View style={styles.departureSection}>
+                    <Text style={[styles.time, { textAlign: 'left', color: textColor }]}>{trip.departureTime}</Text>
+                    <Text style={[styles.city, { textAlign: 'left', color: textColor }]}>{trip.departureCity}</Text>
+                    <Text style={[styles.station, { textAlign: 'left', color: secondaryTextColor }]}>{trip.departureStation}</Text>
+                </View>
+
+                <View style={[styles.timelineContainer, { marginTop: 10 }]}>
+                    <Text style={[styles.duration, { color: secondaryTextColor }]}>{trip.duration}</Text>
+                    <View style={[styles.timelineLine, { backgroundColor: separatorColor }]} />
+                    <View style={[styles.timelineDot, { backgroundColor: tintColor }]} />
+                    <Text style={[styles.date, { color: secondaryTextColor }]}>
+                        {formatFullDate(trip.departureDateTime)}
+                    </Text>
+                </View>
+
+                <View style={styles.arrivalSection}>
+                    <Text style={[styles.time, { textAlign: 'right', color: textColor }]}>{trip.arrivalTime}</Text>
+                    <Text style={[styles.city, { textAlign: 'right', color: textColor }]}>{trip.arrivalCity}</Text>
+                    <Text style={[styles.station, { textAlign: 'right', color: secondaryTextColor }]}>{trip.arrivalStation}</Text>
+                </View>
+            </View>
+
+            <View style={[styles.vehicleSection, { borderTopColor: borderColor }]}>
+                <View style={styles.vehicleInfo}>
+                    <Text style={[styles.vehicleLabel, { color: secondaryTextColor }]}>Véhicule : </Text>
+                    <Text style={[styles.vehicleNumber, { color: textColor }]}>{trip.licencePlate}</Text>
+                    <View style={styles.businessBadge}>
+                        <Text style={styles.businessBadgeText}>{capitalizeBusType(trip.busType)}</Text>
+                    </View>
+                </View>
+                <View style={styles.amenitiesContainer}>
+                    {trip.options.map((option, index) => (
+                        <View key={`${trip.id}-option-${index}`} style={styles.amenityItem}>
+                            <Icon name="check-circle" size={16} color="#4CAF50" />
+                            <Text style={[styles.amenityText, { color: textColor }]}>{option}</Text>
+                        </View>
+                    ))}
+                </View>
+            </View>
+        </View>
+    );
+});
+
+TripCard.displayName = 'TripCard';
+
+/**
+ * Composant pour afficher une carte de passager
+ */
+interface PassengerCardProps {
+    index: number;
+    cardBackgroundColor: string;
+    borderColor: string;
+    textColor: string;
+    secondaryTextColor: string;
+}
+
+const PassengerCard = React.memo<PassengerCardProps>(({
+    index,
+    cardBackgroundColor,
+    borderColor,
+    textColor,
+    secondaryTextColor,
+}) => {
+    return (
+        <View key={index} style={[styles.passengerCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
+            <Text style={[styles.passengerCardTitle, { color: textColor }]}>Passager {index}</Text>
+            <Text style={[styles.passengerCardText, { color: secondaryTextColor }]}>
+                Les informations seront complétées à l'étape suivante
+            </Text>
+        </View>
+    );
+});
+
+PassengerCard.displayName = 'PassengerCard';
 
 /**
  * Écran de résumé du voyage (Étape 1 sur 3)
@@ -31,17 +138,19 @@ const TripSummary = () => {
     const iconColor = useThemeColor({}, 'icon');
     const tintColor = useThemeColor({}, 'tint');
     
-    // Couleurs spécifiques pour l'écran
-    const cardBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
-    const borderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
-    const secondaryTextColor = colorScheme === 'dark' ? '#9BA1A6' : '#666';
-    const headerBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
-    const headerBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
-    const scrollBackgroundColor = colorScheme === 'dark' ? '#000000' : '#F5F5F5';
-    const progressBarBackgroundColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
-    const progressDotBackgroundColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
-    const separatorColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
-    const secondaryButtonBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
+    // Mémorisation des couleurs spécifiques pour l'écran
+    const colors = useMemo(() => ({
+        cardBackgroundColor: colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF',
+        borderColor: colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0',
+        secondaryTextColor: colorScheme === 'dark' ? '#9BA1A6' : '#666',
+        headerBackgroundColor: colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF',
+        headerBorderColor: colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0',
+        scrollBackgroundColor: colorScheme === 'dark' ? '#000000' : '#F5F5F5',
+        progressBarBackgroundColor: colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0',
+        progressDotBackgroundColor: colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0',
+        separatorColor: colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0',
+        secondaryButtonBackgroundColor: colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF',
+    }), [colorScheme]);
 
     // Récupération des données passées en paramètre
     const { trip, returnTrip, searchParams } = (route.params as { 
@@ -52,114 +161,123 @@ const TripSummary = () => {
     const numberOfPersons = searchParams?.numberOfPersons || 1;
     const isRoundTrip = !!returnTrip;
 
-    if (!trip) {
-        return (
-            <View style={[styles.container, { backgroundColor: scrollBackgroundColor }]}>
-                <Text style={{ color: textColor }}>Erreur : Aucun trajet sélectionné</Text>
-            </View>
-        );
-    }
-
-    /**
-     * Calcule le prix total pour tous les voyageurs
-     * Inclut le prix du voyage retour si c'est un aller-retour
-     */
-    const totalPrice = useMemo(() => {
+    // Mémorisation des calculs de prix
+    const priceCalculations = useMemo(() => {
+        if (!trip) return { totalPrice: 0, fees: 500, taxes: 0, amountDue: 500 };
+        
         const outboundPrice = trip.price * numberOfPersons;
         const returnPrice = returnTrip ? returnTrip.price * numberOfPersons : 0;
-        return outboundPrice + returnPrice;
-    }, [trip.price, returnTrip?.price, numberOfPersons]);
+        const totalPrice = outboundPrice + returnPrice;
+        const fees = 500;
+        const taxes = 0;
+        const amountDue = totalPrice + fees + taxes;
+        
+        return { totalPrice, fees, taxes, amountDue };
+    }, [trip, returnTrip, numberOfPersons]);
 
-    /**
-     * Calcule les frais (fixe à 500 FCFA pour l'instant)
-     */
-    const fees = 500;
-    const taxes = 0;
-    const amountDue = totalPrice + fees + taxes;
+    // Mémorisation des cartes de passagers
+    const passengerCards = useMemo(() => {
+        return Array.from({ length: numberOfPersons }, (_, i) => (
+            <PassengerCard
+                key={i + 1}
+                index={i + 1}
+                cardBackgroundColor={colors.cardBackgroundColor}
+                borderColor={colors.borderColor}
+                textColor={textColor}
+                secondaryTextColor={colors.secondaryTextColor}
+            />
+        ));
+    }, [numberOfPersons, colors.cardBackgroundColor, colors.borderColor, textColor, colors.secondaryTextColor]);
 
-    /**
-     * Génère les cartes de passagers
-     */
-    const renderPassengerCards = () => {
-        const cards = [];
-        for (let i = 1; i <= numberOfPersons; i++) {
-            cards.push(
-                <View key={i} style={[styles.passengerCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
-                    <Text style={[styles.passengerCardTitle, { color: textColor }]}>Passager {i}</Text>
-                    <Text style={[styles.passengerCardText, { color: secondaryTextColor }]}>
-                        Les informations seront complétées à l'étape suivante
-                    </Text>
-                </View>
-            );
-        }
-        return cards;
-    };
+    // Mémorisation du texte du voyageur
+    const passengerText = useMemo(() => 
+        numberOfPersons > 1 ? 'voyageurs' : 'voyageur',
+        [numberOfPersons]
+    );
 
-    /**
-     * Gère la navigation vers la page d'accueil
-     * tout en supprimant toutes les pages précédentes
-     */
-    const handleNavigateToHome = () => {
+    // Mémorisation des callbacks
+    const handleNavigateToHome = useCallback(() => {
         navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: '(tabs)' }] }));
-        // Autre façon de faire la navigation vers la page d'accueil en supprimant toutes les pages précédentes
-        // router.dismissAll();
-        // router.replace('/(tabs)');
-    }
+    }, [navigation]);
 
-    /**
-     * Gère la navigation vers l'étape suivante
-     */
-    const handleNavigateToNextStep = () => {
+    const handleNavigateToNextStep = useCallback(() => {
+        if (!trip) return;
         navigation.navigate('trip/passengers-info', { 
             trip, 
             returnTrip: returnTrip || undefined,
             searchParams 
         });
+    }, [navigation, trip, returnTrip, searchParams]);
+
+    const handleGoBack = useCallback(() => {
+        navigation.goBack();
+    }, [navigation]);
+
+    // Mémorisation des villes de la route
+    const routeCities = useMemo(() => {
+        if (!trip) return [];
+        const cities = [trip.departureCity, trip.arrivalCity];
+        if (isRoundTrip && returnTrip) {
+            cities.push(returnTrip.arrivalCity);
+        }
+        return cities;
+    }, [trip, returnTrip, isRoundTrip]);
+
+    if (!trip) {
+        return (
+            <View style={[styles.container, { backgroundColor: colors.scrollBackgroundColor }]}>
+                <Text style={{ color: textColor }}>Erreur : Aucun trajet sélectionné</Text>
+            </View>
+        );
     }
 
     return (
-        <View style={[styles.container, { backgroundColor: scrollBackgroundColor }]}>
+        <View style={[styles.container, { backgroundColor: colors.scrollBackgroundColor }]}>
             {/* Header */}
             <View style={[
                 styles.header, 
                 { 
                     paddingTop: insets.top,
-                    backgroundColor: headerBackgroundColor,
-                    borderBottomColor: headerBorderColor
+                    backgroundColor: colors.headerBackgroundColor,
+                    borderBottomColor: colors.headerBorderColor
                 }
             ]}>
                 <Pressable
-                    onPress={() => navigation.goBack()}
+                    onPress={handleGoBack}
                     style={styles.backButton}
                 >
                     <Icon name="arrow-left" size={25} color={iconColor} />
                 </Pressable>
 
-                <View style={[styles.routeBadge, {width: '200'}]}>
+                <View style={styles.routeBadge}>
                     <Text style={[styles.routeBadgeText, { color: tintColor }]}>
-                        {trip.departureCity} <Icon name="chevron-right" size={15} color={tintColor} /> {trip.arrivalCity}
-                        {isRoundTrip && returnTrip && (
-                            <> <Icon name="chevron-right" size={15} color={tintColor} /> {returnTrip.arrivalCity}</>
-                        )} 
+                        {routeCities.map((city, index) => (
+                            <React.Fragment key={`${city}-${index}`}>
+                                {city}
+                                {index < routeCities.length - 1 && (
+                                    <> <Icon name="chevron-right" size={15} color={tintColor} /> </>
+                                )}
+                            </React.Fragment>
+                        ))}
                     </Text>
                 </View>
 
-                <Text style={[styles.stepIndicator, { color: secondaryTextColor}]}>Étape 1 sur 3</Text>
+                <Text style={[styles.stepIndicator, { color: colors.secondaryTextColor }]}>Étape 1 sur 3</Text>
             </View>
 
             {/* Barre de progression */}
-            <View style={[styles.progressContainer, { backgroundColor: headerBackgroundColor }]}>
-                <View style={[styles.progressBar, { backgroundColor: progressBarBackgroundColor }]}>
+            <View style={[styles.progressContainer, { backgroundColor: colors.headerBackgroundColor }]}>
+                <View style={[styles.progressBar, { backgroundColor: colors.progressBarBackgroundColor }]}>
                     <View style={[styles.progressFill, { width: '17%', backgroundColor: tintColor }]} />
                 </View>
-                <Text style={[styles.progressText, { color: secondaryTextColor }]}>17%</Text>
+                <Text style={[styles.progressText, { color: colors.secondaryTextColor }]}>17%</Text>
             </View>
 
             {/* Indicateurs de progression */}
-            <View style={[styles.progressIndicators, { backgroundColor: headerBackgroundColor }]}>
+            <View style={[styles.progressIndicators, { backgroundColor: colors.headerBackgroundColor }]}>
                 <View style={[styles.progressDot, { backgroundColor: tintColor }]} />
-                <View style={[styles.progressDot, { backgroundColor: progressDotBackgroundColor }]} />
-                <View style={[styles.progressDot, { backgroundColor: progressDotBackgroundColor }]} />
+                <View style={[styles.progressDot, { backgroundColor: colors.progressDotBackgroundColor }]} />
+                <View style={[styles.progressDot, { backgroundColor: colors.progressDotBackgroundColor }]} />
             </View>
 
             <ScrollView
@@ -170,123 +288,47 @@ const TripSummary = () => {
                 {/* Titre principal */}
                 <View style={styles.titleSection}>
                     <Text style={[styles.mainTitle, { color: textColor }]}>Résumé du voyage</Text>
-                    <Text style={[styles.subtitle, { color: secondaryTextColor }]}>
+                    <Text style={[styles.subtitle, { color: colors.secondaryTextColor }]}>
                         Vérifiez les détails de votre voyage avant de continuer
                     </Text>
                 </View>
 
                 {/* Carte principale du voyage aller */}
-                <View style={[styles.tripCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
-                    <View style={styles.tripCardHeader}>
-                        <Text style={[styles.tripCardLabel, { color: textColor }]}>Voyage Aller</Text>
-                        <Text style={[styles.tripCardCompany, { color: textColor }]}>{trip.company}</Text>
-                    </View>
-
-                    {/* Section Départ/Arrivée */}
-                    <View style={styles.tripDetails}>
-                        <View style={styles.departureSection}>
-                            <Text style={[styles.time, { textAlign: 'left', color: textColor }]}>{trip.departureTime}</Text>
-                            <Text style={[styles.city, { textAlign: 'left', color: textColor }]}>{trip.departureCity}</Text>
-                            <Text style={[styles.station, { textAlign: 'left', color: secondaryTextColor }]}>{trip.departureStation}</Text>
-                        </View>
-
-                        <View style={[styles.timelineContainer, { marginTop: 10 }]}>
-                            <Text style={[styles.duration, { color: secondaryTextColor }]}>{trip.duration}</Text>
-                            <View style={[styles.timelineLine, { backgroundColor: separatorColor }]} />
-                            <View style={[styles.timelineDot, { backgroundColor: tintColor }]} />
-                            <Text style={[styles.date, { color: secondaryTextColor }]}>
-                                {formatFullDate(trip.departureDateTime)}
-                            </Text>
-                        </View>
-
-                        <View style={[styles.arrivalSection]}>
-                            <Text style={[styles.time, { textAlign: 'right', color: textColor }]}>{trip.arrivalTime}</Text>
-                            <Text style={[styles.city, { textAlign: 'right', color: textColor }]}>{trip.arrivalCity}</Text>
-                            <Text style={[styles.station, { textAlign: 'right', color: secondaryTextColor }]}>{trip.arrivalStation}</Text>
-                        </View>
-                    </View>
-
-                    {/* Véhicule et Équipements */}
-                    <View style={[styles.vehicleSection, { borderTopColor: borderColor }]}>
-                        <View style={styles.vehicleInfo}>
-                            <Text style={[styles.vehicleLabel, { color: secondaryTextColor }]}>Véhicule : </Text>
-                            <Text style={[styles.vehicleNumber, { color: textColor }]}>{trip.licencePlate}</Text>
-                            <View style={styles.businessBadge}>
-                                <Text style={styles.businessBadgeText}>{capitalizeBusType(trip.busType)}</Text>
-                            </View>
-                        </View>
-                        <View style={styles.amenitiesContainer}>
-                            {trip.options.map((option, index) => (
-                                <View key={index} style={[styles.amenityItem]}>
-                                    <Icon name="check-circle" size={16} color="#4CAF50" />
-                                    <Text style={[styles.amenityText, { color: textColor }]}>{option}</Text>
-                                </View>
-                            ))}
-                        </View>
-                    </View>
-                </View>
+                <TripCard
+                    trip={trip}
+                    label="Voyage Aller"
+                    cardBackgroundColor={colors.cardBackgroundColor}
+                    borderColor={colors.borderColor}
+                    textColor={textColor}
+                    secondaryTextColor={colors.secondaryTextColor}
+                    tintColor={tintColor}
+                    separatorColor={colors.separatorColor}
+                />
 
                 {/* Carte du voyage retour (si aller-retour) */}
                 {isRoundTrip && returnTrip && (
-                    <View style={[styles.tripCard, { backgroundColor: cardBackgroundColor, borderColor, marginTop: 20 }]}>
-                        <View style={styles.tripCardHeader}>
-                            <Text style={[styles.tripCardLabel, { color: textColor }]}>Voyage Retour</Text>
-                            <Text style={[styles.tripCardCompany, { color: textColor }]}>{returnTrip.company}</Text>
-                        </View>
-
-                        {/* Section Départ/Arrivée */}
-                        <View style={styles.tripDetails}>
-                            <View style={styles.departureSection}>
-                                <Text style={[styles.time, { textAlign: 'left', color: textColor }]}>{returnTrip.departureTime}</Text>
-                                <Text style={[styles.city, { textAlign: 'left', color: textColor }]}>{returnTrip.departureCity}</Text>
-                                <Text style={[styles.station, { textAlign: 'left', color: secondaryTextColor }]}>{returnTrip.departureStation}</Text>
-                            </View>
-
-                            <View style={[styles.timelineContainer, { marginTop: 10 }]}>
-                                <Text style={[styles.duration, { color: secondaryTextColor }]}>{returnTrip.duration}</Text>
-                                <View style={[styles.timelineLine, { backgroundColor: separatorColor }]} />
-                                <View style={[styles.timelineDot, { backgroundColor: tintColor }]} />
-                                <Text style={[styles.date, { color: secondaryTextColor }]}>
-                                    {formatFullDate(returnTrip.departureDateTime)}
-                                </Text>
-                            </View>
-
-                            <View style={[styles.arrivalSection]}>
-                                <Text style={[styles.time, { textAlign: 'right', color: textColor }]}>{returnTrip.arrivalTime}</Text>
-                                <Text style={[styles.city, { textAlign: 'right', color: textColor }]}>{returnTrip.arrivalCity}</Text>
-                                <Text style={[styles.station, { textAlign: 'right', color: secondaryTextColor }]}>{returnTrip.arrivalStation}</Text>
-                            </View>
-                        </View>
-
-                        {/* Véhicule et Équipements */}
-                        <View style={[styles.vehicleSection, { borderTopColor: borderColor }]}>
-                            <View style={styles.vehicleInfo}>
-                                <Text style={[styles.vehicleLabel, { color: secondaryTextColor }]}>Véhicule : </Text>
-                                <Text style={[styles.vehicleNumber, { color: textColor }]}>{returnTrip.licencePlate}</Text>
-                                <View style={styles.businessBadge}>
-                                    <Text style={styles.businessBadgeText}>{capitalizeBusType(returnTrip.busType)}</Text>
-                                </View>
-                            </View>
-                            <View style={styles.amenitiesContainer}>
-                                {returnTrip.options.map((option, index) => (
-                                    <View key={index} style={[styles.amenityItem]}>
-                                        <Icon name="check-circle" size={16} color="#4CAF50" />
-                                        <Text style={[styles.amenityText, { color: textColor }]}>{option}</Text>
-                                    </View>
-                                ))}
-                            </View>
-                        </View>
+                    <View style={{ marginTop: 20 }}>
+                        <TripCard
+                            trip={returnTrip}
+                            label="Voyage Retour"
+                            cardBackgroundColor={colors.cardBackgroundColor}
+                            borderColor={colors.borderColor}
+                            textColor={textColor}
+                            secondaryTextColor={colors.secondaryTextColor}
+                            tintColor={tintColor}
+                            separatorColor={colors.separatorColor}
+                        />
                     </View>
                 )}
 
                 {/* Section Informations voyageurs */}
                 <View style={styles.passengersSection}>
                     <Text style={[styles.sectionTitle, { color: textColor }]}>Informations voyageurs</Text>
-                    {renderPassengerCards()}
+                    {passengerCards}
                 </View>
 
                 {/* Section Répartition des prix */}
-                <View style={[styles.priceSection, { backgroundColor: cardBackgroundColor, borderColor }]}>
+                <View style={[styles.priceSection, { backgroundColor: colors.cardBackgroundColor, borderColor: colors.borderColor }]}>
                     <Text style={[styles.priceSectionTitle, { color: textColor }]}>Répartition des prix</Text>
 
                     <View style={styles.priceDetails}>
@@ -294,7 +336,7 @@ const TripSummary = () => {
                             <>
                                 <View style={styles.priceRow}>
                                     <Text style={[styles.priceLabel, { color: textColor }]}>
-                                        Aller ({numberOfPersons} {numberOfPersons > 1 ? 'voyageurs' : 'voyageur'})
+                                        Aller ({numberOfPersons} {passengerText})
                                     </Text>
                                     <Text style={[styles.priceValue, { color: textColor }]}>
                                         {formatPrice(trip.price * numberOfPersons)}
@@ -302,7 +344,7 @@ const TripSummary = () => {
                                 </View>
                                 <View style={styles.priceRow}>
                                     <Text style={[styles.priceLabel, { color: textColor }]}>
-                                        Retour ({numberOfPersons} {numberOfPersons > 1 ? 'voyageurs' : 'voyageur'})
+                                        Retour ({numberOfPersons} {passengerText})
                                     </Text>
                                     <Text style={[styles.priceValue, { color: textColor }]}>
                                         {formatPrice(returnTrip.price * numberOfPersons)}
@@ -312,33 +354,33 @@ const TripSummary = () => {
                         ) : (
                             <View style={styles.priceRow}>
                                 <Text style={[styles.priceLabel, { color: textColor }]}>
-                                    {numberOfPersons} {numberOfPersons > 1 ? 'voyageurs' : 'voyageur'}
+                                    {numberOfPersons} {passengerText}
                                 </Text>
                                 <Text style={[styles.priceValue, { color: textColor }]}>
-                                    {formatPrice(totalPrice)}
+                                    {formatPrice(priceCalculations.totalPrice)}
                                 </Text>
                             </View>
                         )}
                         <View style={styles.priceRow}>
                             <Text style={[styles.priceLabel, { color: textColor }]}>Taxes</Text>
                             <Text style={[styles.priceValue, { color: textColor }]}>
-                                {formatPrice(taxes)}
+                                {formatPrice(priceCalculations.taxes)}
                             </Text>
                         </View>
                         <View style={styles.priceRow}>
                             <Text style={[styles.priceLabel, { color: textColor }]}>Frais</Text>
                             <Text style={[styles.priceValue, { color: textColor }]}>
-                                {formatPrice(fees)}
+                                {formatPrice(priceCalculations.fees)}
                             </Text>
                         </View>
                     </View>
 
-                    <View style={[styles.priceSeparator, { backgroundColor: separatorColor }]} />
+                    <View style={[styles.priceSeparator, { backgroundColor: colors.separatorColor }]} />
 
                     <View style={styles.totalRow}>
                         <Text style={[styles.totalLabel, { color: textColor }]}>Montant dû</Text>
                         <Text style={[styles.totalValue, { color: tintColor }]}>
-                            {formatPrice(amountDue)}
+                            {formatPrice(priceCalculations.amountDue)}
                         </Text>
                     </View>
 
@@ -353,8 +395,8 @@ const TripSummary = () => {
                         style={[
                             styles.secondaryButton,
                             { 
-                                backgroundColor: secondaryButtonBackgroundColor,
-                                borderColor 
+                                backgroundColor: colors.secondaryButtonBackgroundColor,
+                                borderColor: colors.borderColor
                             }
                         ]}
                         onPress={handleNavigateToHome}

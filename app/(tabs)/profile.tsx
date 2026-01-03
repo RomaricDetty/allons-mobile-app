@@ -2,6 +2,7 @@ import { refreshTokenApi } from '@/api/auth_register';
 import { ProfileScreen } from '@/components/auth/ProfileScreen';
 import { SignInScreen } from '@/components/auth/SignInScreen';
 import { SignUpScreen } from '@/components/auth/SignUpScreen';
+import { clearAuthData } from '@/utils/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
 import { StyleSheet } from 'react-native';
@@ -31,58 +32,110 @@ export default function TabTwoScreen() {
         setIsLoading(true);
         try {
             const token = await AsyncStorage.getItem('token');
-            // const userData = await AsyncStorage.getItem('user');
-            const expiresAt = await AsyncStorage.getItem('expires_in');
+            // Récupérer expires_at (corrigé depuis expires_in)
+            const expiresAt = await AsyncStorage.getItem('expires_at');
             const refreshToken = await AsyncStorage.getItem('refresh_token');
-            // console.log('expiresAt : ', expiresAt);
-            const expiresAtDate = new Date(Number(expiresAt) * 1000);
             const currentDate = new Date();
-            // console.log('expiresAtDate : ', expiresAtDate);
-            // console.log('currentDate : ', currentDate);
-            // console.log('refreshToken : ', refreshToken);
 
-            if (refreshToken) {
-                const response = await refreshTokenApi(refreshToken as string);
-                // console.log('response refresh token: ', response);
-                // console.log('response.data : ', response.data);
-                // console.log('response.status : ', response.status);
-                if (response.status === 200) {
-                    await AsyncStorage.setItem('token', response.data.access_token);
-                    // await AsyncStorage.setItem('refresh_token', response.data.refresh_token);
-                    await AsyncStorage.setItem('expires_at', String(response.data.expires_in));
-                    await AsyncStorage.setItem('token_type', response.data.token_type);
-                    setIsSignedIn(true);
+            // Si un refresh token existe, essayer de rafraîchir le token
+            if (refreshToken && refreshToken.trim() !== '') {
+                try {
+                    const response = await refreshTokenApi(refreshToken);
+                    
+                    // Vérifier que la réponse est valide
+                    if (response && response.status === 200 && response.data) {
+                        const accessToken = response.data.access_token;
+                        const newRefreshToken = response.data.refresh_token;
+                        const expiresIn = response.data.expires_in;
+                        const tokenType = response.data.token_type;
+                        
+                        // Valider et stocker le nouveau token
+                        if (accessToken && accessToken.trim() !== '') {
+                            await AsyncStorage.setItem('token', accessToken);
+                            
+                            // Mettre à jour le refresh token si fourni
+                            if (newRefreshToken && newRefreshToken.trim() !== '') {
+                                await AsyncStorage.setItem('refresh_token', newRefreshToken);
+                            }
+                            
+                            if (expiresIn !== undefined && expiresIn !== null) {
+                                await AsyncStorage.setItem('expires_at', String(expiresIn));
+                            }
+                            
+                            if (tokenType && tokenType.trim() !== '') {
+                                await AsyncStorage.setItem('token_type', tokenType);
+                            }
+                            
+                            setIsSignedIn(true);
+                            return;
+                        }
+                    }
+                } catch (refreshError: any) {
+                    console.error('Erreur lors du rafraîchissement du token:', refreshError);
+                    // Si le refresh token est invalide, nettoyer les données
+                    await clearAuthData();
+                    setIsSignedIn(false);
+                    setCurrentScreen('signin');
                     return;
                 }
-            } else {
-                await AsyncStorage.multiRemove([
-                    'token',
-                    'refresh_token',
-                    'expires_at',
-                    'token_type',
-                    // 'user',
-                ]);
             }
 
-            if (expiresAtDate < currentDate) {
-                // Alert.alert('Attention !', 'Votre session a expiré, veuillez vous reconnecter');
-                await AsyncStorage.multiRemove([
-                    'token',
-                    'refresh_token',
-                    'expires_at',
-                    'token_type',
-                    // 'user',
-                ]);
-                // setUser(null);
+            // Vérifier si le token a expiré
+            if (expiresAt && expiresAt.trim() !== '') {
+                try {
+                    // expires_at peut être un timestamp en secondes ou une date ISO
+                    const expiresAtValue = Number(expiresAt);
+                    let expiresAtDate: Date;
+                    
+                    if (!isNaN(expiresAtValue) && expiresAtValue > 0) {
+                        // C'est un timestamp en secondes
+                        expiresAtDate = new Date(expiresAtValue * 1000);
+                    } else {
+                        // Essayer de parser comme date ISO
+                        expiresAtDate = new Date(expiresAt);
+                    }
+                    
+                    // Vérifier si la date est valide
+                    if (isNaN(expiresAtDate.getTime())) {
+                        throw new Error('Date d\'expiration invalide');
+                    }
+                    
+                    if (expiresAtDate < currentDate) {
+                        // Le token a expiré, nettoyer les données
+                        await clearAuthData();
+                        setIsSignedIn(false);
+                        setCurrentScreen('signin');
+                        return;
+                    }
+                } catch (dateError) {
+                    console.error('Erreur lors de la vérification de la date d\'expiration:', dateError);
+                    // Si la date est invalide, considérer le token comme expiré
+                    await clearAuthData();
+                    setIsSignedIn(false);
+                    setCurrentScreen('signin');
+                    return;
+                }
+            }
+
+            // Si un token existe et n'a pas expiré, l'utilisateur est connecté
+            if (token && token.trim() !== '') {
+                setIsSignedIn(true);
+            } else {
+                // Pas de token valide, nettoyer les données
+                await clearAuthData();
                 setIsSignedIn(false);
                 setCurrentScreen('signin');
-                return;
-            }
-            if (token) {
-                setIsSignedIn(true);
             }
         } catch (error) {
             console.error('Erreur lors de la vérification de la session:', error);
+            // En cas d'erreur, nettoyer les données et déconnecter
+            try {
+                await clearAuthData();
+            } catch (cleanupError) {
+                console.error('Erreur lors du nettoyage:', cleanupError);
+            }
+            setIsSignedIn(false);
+            setCurrentScreen('signin');
         } finally {
             setIsLoading(false);
         }

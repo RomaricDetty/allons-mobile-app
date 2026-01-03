@@ -68,9 +68,6 @@ export default function OSMBusTracker({ tripId, bookingDetails }: OSMBusTrackerP
     const priceColor = '#4CAF50';
     const priceBackgroundColor = colorScheme === 'dark' ? '#2E7D32' : '#E8F5E9';
 
-    console.log('bookingDetails in OSMBusTracker ===>, ', JSON.parse(bookingDetails));
-    console.log('tripId in OSMBusTracker ===>, ', tripId);
-
     // Animation de pulsation pour le marqueur du bus
     useEffect(() => {
         const pulse = Animated.loop(
@@ -176,7 +173,6 @@ export default function OSMBusTracker({ tripId, bookingDetails }: OSMBusTrackerP
         } catch (error) {
             console.error('Erreur localisation passager:', error);
             // Utiliser les coordonnées par défaut en cas d'erreur
-            console.log('Erreur de localisation, utilisation des coordonnées par défaut');
             setPassengerLocation({
                 latitude: 5.33542,
                 longitude: -4.00351,
@@ -206,7 +202,6 @@ export default function OSMBusTracker({ tripId, bookingDetails }: OSMBusTrackerP
 
             const route = await routingService.getRoute(startPoint, endPoint);
             setRoutePath(route);
-            console.log('Itinéraire calculé avec succès:', route.length, 'points');
         } catch (error) {
             console.error('Erreur calcul itinéraire:', error);
             // En cas d'erreur, utiliser un itinéraire simplifié (ligne droite)
@@ -614,7 +609,6 @@ export default function OSMBusTracker({ tripId, bookingDetails }: OSMBusTrackerP
                     style={[styles.headerButton, { backgroundColor: iconCircleBackgroundColor }]}
                     onPress={() => {
                         // TODO: Implémenter le partage
-                        console.log('Partager');
                     }}
                 >
                     <Ionicons name="share-outline" size={20} color={textColor} />

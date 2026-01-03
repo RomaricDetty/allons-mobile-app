@@ -6,7 +6,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { PopularTrip } from '@/types';
 import { useNavigation } from '@react-navigation/native';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     FlatList,
@@ -18,6 +18,45 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
+// Données de promotion statiques - déplacées en dehors du composant pour éviter les re-créations
+const PROMOTIONS: PopularTrip[] = [
+    {
+        id: 1,
+        route: 'Abidjan → Yamoussoukro',
+        image: require('@/assets/images/basilique.jpg'),
+        compagnie: 'UTB',
+        tarif: '2500 F',
+        duree: '2H',
+        placesDisponibles: 10,
+    },
+    {
+        id: 2,
+        route: 'Abidjan → Bouaké',
+        image: require('@/assets/images/bouake.jpg'),
+        compagnie: 'SBTA',
+        tarif: '3000 F',
+        duree: '3H',
+        placesDisponibles: 20,
+    },
+    {
+        id: 3,
+        route: 'Divo → Bouaké',
+        image: require('@/assets/images/divo.jpg'),
+        compagnie: 'SBTA',
+        tarif: '3500 F',
+        duree: '2H',
+        placesDisponibles: 15,
+    },
+    {
+        id: 4,
+        route: 'Yamoussoukro → Boundiali',
+        image: require('@/assets/images/yakro.jpg'),
+        compagnie: 'SBTA',
+        tarif: '5500 F',
+        duree: '4H',
+        placesDisponibles: 30,
+    },
+];
 
 export default function HomeScreen() {
     const { width, height } = useWindowDimensions();
@@ -29,83 +68,28 @@ export default function HomeScreen() {
     const textColor = useThemeColor({}, 'text');
     const insets = useSafeAreaInsets();
     const navigation = useNavigation();
-    const searchBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#F3F3F7';
-    const searchTextColor = colorScheme === 'dark' ? '#9BA1A6' : '#A6A6AA';
-    const searchIconColor = colorScheme === 'dark' ? '#9BA1A6' : '#A6A6AA';
 
-    const promotions: PopularTrip[] = [
-        {
-            id: 1,
-            route: 'Abidjan → Yamoussoukro',
-            image: require('@/assets/images/basilique.jpg'),
-            compagnie: 'UTB',
-            tarif: '2500 F',
-            duree: '2H',
-            placesDisponibles: 10,
-        },
-        {
-            id: 2,
-            route: 'Abidjan → Bouaké',
-            image: require('@/assets/images/bouake.jpg'),
-            compagnie: 'SBTA',
-            tarif: '3000 F',
-            duree: '3H',
-            placesDisponibles: 20,
-        },
-        {
-            id: 3,
-            route: 'Divo → Bouaké',
-            image: require('@/assets/images/divo.jpg'),
-            compagnie: 'SBTA',
-            tarif: '3500 F',
-            duree: '2H',
-            placesDisponibles: 15,
-        },
-        {
-            id: 4,
-            route: 'Yamoussoukro → Boundiali',
-            image: require('@/assets/images/yakro.jpg'),
-            compagnie: 'SBTA',
-            tarif: '5500 F',
-            duree: '4H',
-            placesDisponibles: 30,
-        },
-    ];
+    // Mémorisation des couleurs de recherche basées sur le colorScheme
+    const searchColors = useMemo(() => ({
+        backgroundColor: colorScheme === 'dark' ? '#2C2C2E' : '#F3F3F7',
+        textColor: colorScheme === 'dark' ? '#9BA1A6' : '#A6A6AA',
+        iconColor: colorScheme === 'dark' ? '#9BA1A6' : '#A6A6AA',
+    }), [colorScheme]);
 
-    /**
-     * Fonction pour rafraîchir la liste des trajets populaires
-     * @returns void
-     */
-    const onRefresh = () => {
-        setRefreshing(true);
-        getPopularTripsFunction();
-        setTimeout(() => setRefreshing(false), 2000);
-    };
-
-    /**
-     * Fonction pour gérer la pression sur une carte d'itinéraire
-     * @param id - L'ID de l'itinéraire
-     * @returns void
-     */
-    const handlePromoCardPress = (id: number) => {
-        console.log('Itinerary pressed:', id);
-    };
-
-    /**
-     * Fonction pour gérer la pression sur un trajet populaire
-     * @param item - L'itinéraire
-     * @returns void
-     */
-    const handlePopularTripPress = (item: PopularTrip) => {
-        // console.log('Popular trip pressed:', item);
-        navigation.navigate('trip/search', { popularTrip: item as PopularTrip });
-    };
+    // Mémorisation des styles dynamiques
+    const dynamicStyles = useMemo(() => ({
+        scrollView: { backgroundColor, paddingTop: insets.top },
+        titleText: { color: textColor },
+        searchContainer: { backgroundColor: searchColors.backgroundColor },
+        searchText: { color: searchColors.textColor },
+        sectionTitle: { color: textColor },
+    }), [backgroundColor, insets.top, textColor, searchColors]);
 
     /**
      * Récupère les trajets populaires
      * @returns void
      */
-    const getPopularTripsFunction = async () => {
+    const getPopularTripsFunction = useCallback(async () => {
         try {
             setLoading(true);
             const response = await getPopularTrips();
@@ -114,48 +98,112 @@ export default function HomeScreen() {
             console.error('Erreur dans la récupération des trajets populaires : ', error);
         } finally {
             setLoading(false);
+            setRefreshing(false);
         }
-    }
+    }, []);
+
+    /**
+     * Fonction pour rafraîchir la liste des trajets populaires
+     * @returns void
+     */
+    const onRefresh = useCallback(() => {
+        setRefreshing(true);
+        getPopularTripsFunction();
+    }, [getPopularTripsFunction]);
+
+    /**
+     * Fonction pour gérer la pression sur une carte d'itinéraire
+     * @param id - L'ID de l'itinéraire
+     * @returns void
+     */
+    const handlePromoCardPress = useCallback((id: number) => {
+        console.log('Itinerary pressed:', id);
+    }, []);
+
+    /**
+     * Fonction pour gérer la pression sur un trajet populaire
+     * @param item - L'itinéraire
+     * @returns void
+     */
+    const handlePopularTripPress = useCallback((item: PopularTrip) => {
+        navigation.navigate('trip/search', { popularTrip: item as PopularTrip });
+    }, [navigation]);
+
+    /**
+     * Fonction pour gérer la navigation vers la recherche
+     * @returns void
+     */
+    const handleSearchPress = useCallback(() => {
+        navigation.navigate('trip/search');
+    }, [navigation]);
+
+    /**
+     * Fonction pour gérer le bouton "Plus"
+     * @returns void
+     */
+    const handleSeeMorePress = useCallback(() => {
+        console.log('Okay');
+    }, []);
+
+    // Mémorisation de la fonction keyExtractor pour FlatList
+    const keyExtractor = useCallback((item: PopularTrip) => String(item.id), []);
+
+    // Mémorisation de la fonction renderItem pour FlatList
+    const renderPopularTrip = useCallback(({ item }: { item: PopularTrip }) => {
+        return (
+            <DepartureCard
+                item={item}
+                width={width}
+                height={height}
+                onPress={handlePopularTripPress}
+            />
+        );
+    }, [width, height, handlePopularTripPress]);
 
     useEffect(() => {
         getPopularTripsFunction();
-    }, []);
+    }, [getPopularTripsFunction]);
+
+    // Mémorisation du composant de chargement
+    const loadingView = useMemo(() => (
+        <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#1776ba" />
+        </View>
+    ), []);
 
     return (
         <>
             {loading ? (
-                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                    <ActivityIndicator size="large" color="#1776ba" />
-                </View>
+                loadingView
             ) : (
                 <ScrollView
-                    style={{ backgroundColor, paddingTop: insets.top }}
-                    contentContainerStyle={{ paddingTop: 0 }}
+                    style={dynamicStyles.scrollView}
+                    contentContainerStyle={styles.scrollContent}
                     refreshControl={
                         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
                     }>
 
                     {/* Rechercher un départ */}
                     <View style={styles.titleContainer}>
-                        <Text style={[styles.title, { color: textColor }]}>
+                        <Text style={[styles.title, dynamicStyles.titleText]}>
                             Où voulez-vous
                         </Text>
-                        <Text style={[styles.title, { color: textColor }]}>
+                        <Text style={[styles.title, dynamicStyles.titleText]}>
                             aller ?
                         </Text>
                     </View>
-                    <View style={[styles.container, { paddingBottom: 30 }]}>
+                    <View style={styles.searchSectionContainer}>
                         <View style={styles.subContainer}>
                             <Pressable
-                                onPress={() => navigation.navigate('trip/search')}
-                                style={[styles.searchContainer, { backgroundColor: searchBackgroundColor }]}>
+                                onPress={handleSearchPress}
+                                style={[styles.searchContainer, dynamicStyles.searchContainer]}>
                                 <View style={styles.searchContent}>
                                     <MaterialCommunityIcons
                                         size={20}
                                         name="bus"
-                                        color={searchIconColor}
+                                        color={searchColors.iconColor}
                                     />
-                                    <Text style={[styles.searchText, { color: searchTextColor }]}>
+                                    <Text style={[styles.searchText, dynamicStyles.searchText]}>
                                         Rechercher un départ
                                     </Text>
                                 </View>
@@ -165,15 +213,15 @@ export default function HomeScreen() {
                     {/* Rechercher un départ */}
 
                     {/* Nos top itinéraires */}
-                    <View style={styles.itinerarySection}>
-                        {popularTrips.length > 0 && (
-                            <View style={[styles.carouselWrapper, { backgroundColor: '#1776BA' }]}>
-                                <View style={[styles.carouselTitleContainer, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' , marginBottom: 10}]}>
-                                    <Text style={[styles.sectionTitle, { color: '#ffffff', marginBottom: 0 }]}>
+                    {popularTrips.length > 0 && (
+                        <View style={styles.itinerarySection}>
+                            <View style={styles.carouselWrapper}>
+                                <View style={styles.carouselTitleContainer}>
+                                    <Text style={styles.carouselTitle}>
                                         Nos top itinéraires
                                     </Text>
-                                    <Pressable style={{ backgroundColor: '#ffffff', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 50 }} onPress={() => console.log('Okay')}>
-                                        <Text style={[styles.seeMoreText, { color: '#1776BA' }]}>
+                                    <Pressable style={styles.seeMoreButton} onPress={handleSeeMorePress}>
+                                        <Text style={styles.seeMoreText}>
                                             Plus
                                         </Text>
                                     </Pressable>
@@ -183,33 +231,28 @@ export default function HomeScreen() {
                                         horizontal
                                         showsHorizontalScrollIndicator={false}
                                         data={popularTrips}
-                                        keyExtractor={(item) => item.id}
+                                        keyExtractor={keyExtractor}
                                         contentContainerStyle={styles.carouselContent}
-                                        renderItem={({ item }) => {
-                                            return (
-                                                <DepartureCard
-                                                    item={item}
-                                                    width={width}
-                                                    height={height}
-                                                    onPress={handlePopularTripPress}
-                                                />
-                                            );
-                                        }}
+                                        renderItem={renderPopularTrip}
+                                        removeClippedSubviews={true}
+                                        maxToRenderPerBatch={5}
+                                        windowSize={5}
+                                        initialNumToRender={3}
                                     />
                                 </View>
                             </View>
-                        )}
-                    </View>
+                        </View>
+                    )}
                     {/* Nos top itinéraires */}
 
                     {/* Nos itinéraires en promotion */}
                     <View style={styles.itinerarySection}>
-                        <Text style={[styles.sectionTitle, { color: textColor }]}>
+                        <Text style={[styles.sectionTitle, dynamicStyles.sectionTitle]}>
                             Nos itinéraires en promotion
                         </Text>
 
                         <View style={styles.cardsContainer}>
-                            {promotions.map(item => (
+                            {PROMOTIONS.map(item => (
                                 <ItineraryCard
                                     key={item.id}
                                     item={item}
@@ -228,6 +271,14 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    scrollContent: {
+        paddingTop: 0,
+    },
     titleContainer: {
         width: '100%',
         paddingHorizontal: 20,
@@ -238,10 +289,11 @@ const styles = StyleSheet.create({
         fontFamily: 'Ubuntu_Bold',
         textAlign: 'left',
     },
-    container: {
+    searchSectionContainer: {
         flex: 1,
         justifyContent: 'flex-start',
         alignItems: 'center',
+        paddingBottom: 30,
     },
     subContainer: {
         alignItems: 'center',
@@ -271,7 +323,13 @@ const styles = StyleSheet.create({
     seeMoreText: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        color: '#ffffff',
+        color: '#1776BA',
+    },
+    seeMoreButton: {
+        backgroundColor: '#ffffff',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 50,
     },
     itinerarySection: {
         width: '100%',
@@ -290,12 +348,12 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         gap: 10,
     },
-
     carouselWrapper: {
         width: '100%',
         borderRadius: 15,
         paddingVertical: 20,
         marginTop: 10,
+        backgroundColor: '#1776BA',
     },
     sliderContainer: {
         width: '100%',
@@ -307,6 +365,16 @@ const styles = StyleSheet.create({
     carouselTitleContainer: {
         paddingHorizontal: 20,
         paddingBottom: 10,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 10,
+    },
+    carouselTitle: {
+        fontSize: 16,
+        fontFamily: 'Ubuntu_Bold',
+        color: '#ffffff',
+        marginBottom: 0,
     },
     bannerContainer: {
         borderRadius: 15,

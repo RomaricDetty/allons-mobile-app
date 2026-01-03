@@ -78,7 +78,19 @@ const Departures = () => {
         try {
             const token = await AsyncStorage.getItem('token');
             const userId = await AsyncStorage.getItem('user_id');
-            const response = await bookingListInfo(userId as string, token as string);
+            
+            // Vérifier que le token et l'ID utilisateur sont disponibles
+            if (!token || token.trim() === '') {
+                Alert.alert('Erreur', 'Token d\'authentification manquant. Veuillez vous reconnecter.');
+                return;
+            }
+            
+            if (!userId || userId.trim() === '') {
+                Alert.alert('Erreur', 'ID utilisateur manquant. Veuillez vous reconnecter.');
+                return;
+            }
+            
+            const response = await bookingListInfo(userId, token);
             if (response.status === 200 && response.data?.items) {
                 setBookingList(response.data.items.filter((booking: Booking) => booking.status === 'PAID'));
                 setFilteredBookingList(response.data.items.filter((booking: Booking) => booking.status === 'PAID'));

@@ -71,32 +71,85 @@ export const SignInScreen = ({ onSignIn, onSwitchToSignUp, onForgotPassword }: S
      * Handle the sign in action
      */
     const handleSignIn = async () => {
-        setIsLoading(true);
+        // Validation des champs
         if (email.trim() === '' || password.trim() === '') {
             Alert.alert('Attention !', 'Veuillez remplir tous les champs');
             return;
         }
 
+        setIsLoading(true);
+
         try {
             const response = await authLogin({ emailOrUsername: email.trim().toLowerCase(), password: password.trim() });
             console.log('Réponse de la connexion : ', response);
-            if (response.status === 200) {
-                AsyncStorage.setItem('token', response.data.access_token);
-                AsyncStorage.setItem('refresh_token', response.data.refresh_token);
-                AsyncStorage.setItem('expires_at', String(response.data.expires_in));
-                AsyncStorage.setItem('token_type', response.data.token_type);
-                AsyncStorage.setItem('user_id', response.data.user.id);
-                console.log('user_id : ', response.data.user.id);
-                onSignIn();
+            
+            // Vérifier que la réponse est valide
+            if (response && response.status === 200 && response.data) {
+                // Vérifier que tous les champs nécessaires sont présents
+                const accessToken = response.data.access_token;
+                const refreshToken = response.data.refresh_token;
+                const expiresIn = response.data.expires_in;
+                const tokenType = response.data.token_type;
+                const user = response.data.user;
+                
+                if (!accessToken || accessToken.trim() === '') {
+                    throw new Error('Token d\'accès manquant dans la réponse');
+                }
+                
+                if (!user || !user.id) {
+                    throw new Error('Informations utilisateur manquantes dans la réponse');
+                }
+                
+                // Stocker les tokens de manière sécurisée
+                try {
+                    await AsyncStorage.setItem('token', accessToken);
+                    
+                    if (refreshToken && refreshToken.trim() !== '') {
+                        await AsyncStorage.setItem('refresh_token', refreshToken);
+                    }
+                    
+                    if (expiresIn !== undefined && expiresIn !== null) {
+                        await AsyncStorage.setItem('expires_at', String(expiresIn));
+                    }
+                    
+                    if (tokenType && tokenType.trim() !== '') {
+                        await AsyncStorage.setItem('token_type', tokenType);
+                    }
+                    
+                    await AsyncStorage.setItem('user_id', user.id);
+                    console.log('user_id : ', user.id);
+                    
+                    onSignIn();
+                } catch (storageError) {
+                    console.error('Erreur lors du stockage des données:', storageError);
+                    Alert.alert('Erreur', 'Impossible de sauvegarder les informations de connexion. Veuillez réessayer.');
+                }
             } else {
-                Alert.alert('Attention !', response.data.message);
-                console.log('Erreur lors de la connexion : ', response.data);
-                return;
+                const errorMessage = response?.data?.message || 'Erreur lors de la connexion';
+                Alert.alert('Attention !', errorMessage);
+                console.log('Erreur lors de la connexion : ', response?.data);
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Erreur lors de la connexion : ', error);
-            Alert.alert('Attention !', 'Une erreur est survenue lors de la connexion, veuillez vérifier vos informations et réessayer.');
-            return;
+            
+            // Afficher un message d'erreur plus spécifique
+            let errorMessage = 'Une erreur est survenue lors de la connexion, veuillez vérifier vos informations et réessayer.';
+            
+            if (error?.response) {
+                // Erreur de l'API
+                if (error.response.status === 401) {
+                    errorMessage = 'Email ou mot de passe incorrect. Veuillez réessayer.';
+                } else if (error.response.status === 404) {
+                    errorMessage = 'Utilisateur non trouvé. Vérifiez vos informations de connexion.';
+                } else if (error.response.data?.message) {
+                    errorMessage = error.response.data.message;
+                }
+            } else if (error?.message) {
+                // Erreur personnalisée
+                errorMessage = error.message;
+            }
+            
+            Alert.alert('Attention !', errorMessage);
         } finally {
             setIsLoading(false);
         }

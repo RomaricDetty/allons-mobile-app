@@ -1,14 +1,12 @@
-// @ts-nocheck
 import { BottomSheet } from '@/components/bottom-sheet';
 import { capitalizeBusType } from '@/constants/functions';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { Departures, SearchParams, Trip } from '@/types';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { useNavigation, useRoute } from '@react-navigation/native';
-import React, { useMemo, useState } from 'react';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
-    FlatList,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -16,7 +14,35 @@ import {
     View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+// @ts-ignore - Pas de types disponibles pour react-native-vector-icons
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+
+/**
+ * Type pour les paramètres de route
+ */
+type TripReturnListRouteParams = {
+    returnDepartures?: Departures;
+    outboundTrip?: Trip;
+    searchParams?: SearchParams;
+};
+
+/**
+ * Type pour les options de tri
+ */
+type SortOption = {
+    id: string;
+    label: string;
+};
+
+/**
+ * Options de tri disponibles
+ */
+const SORT_OPTIONS: SortOption[] = [
+    { id: 'Prix croissant', label: 'Prix croissant' },
+    { id: 'Prix décroissant', label: 'Prix décroissant' },
+    { id: 'Départ tôt', label: 'Départ tôt' },
+    { id: 'Départ tard', label: 'Départ tard' },
+];
 
 /**
  * Écran de liste des trajets retour disponibles
@@ -24,7 +50,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
  * Après sélection d'un voyage aller dans trip-list
  */
 const TripReturnList = () => {
-    const route = useRoute();
+    const route = useRoute<RouteProp<{ params: TripReturnListRouteParams }>>();
     const navigation = useNavigation();
     const insets = useSafeAreaInsets();
     const colorScheme = useColorScheme() ?? 'light';
@@ -35,44 +61,33 @@ const TripReturnList = () => {
     const iconColor = useThemeColor({}, 'icon');
     const tintColor = useThemeColor({}, 'tint');
     
-    // Couleurs spécifiques pour l'écran
-    const cardBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
-    const borderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
-    const secondaryTextColor = colorScheme === 'dark' ? '#9BA1A6' : '#666';
-    const headerBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
-    const headerBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
-    const scrollBackgroundColor = colorScheme === 'dark' ? '#000000' : '#F5F5F5';
+    // Mémorisation des couleurs spécifiques pour l'écran
+    const themeColors = useMemo(() => ({
+        cardBackgroundColor: colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF',
+        borderColor: colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0',
+        secondaryTextColor: colorScheme === 'dark' ? '#9BA1A6' : '#666',
+        headerBackgroundColor: colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF',
+        headerBorderColor: colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0',
+        scrollBackgroundColor: colorScheme === 'dark' ? '#000000' : '#F5F5F5',
+        sortOptionBorderColor: colorScheme === 'dark' ? '#3A3A3C' : '#F3F3F7',
+    }), [colorScheme]);
 
     // Récupération des données passées en paramètre
-    const { returnDepartures, outboundTrip, searchParams } = (route.params as { 
-        returnDepartures?: Departures, 
-        outboundTrip?: Trip,
-        searchParams?: SearchParams 
-    }) || {};
+    const { returnDepartures, outboundTrip, searchParams } = route.params || {};
     const trips = returnDepartures?.items || [];
     const totalTrips = returnDepartures?.total || 0;
 
     // États pour les dropdowns et modals
     const [showSortModal, setShowSortModal] = useState(false);
-
-    // États pour les filtres
-    const [selectedSort, setSelectedSort] = useState('Prix croissant');
-
-    // Options de tri
-    const sortOptions = [
-        { id: 'Prix croissant', label: 'Prix croissant' },
-        { id: 'Prix décroissant', label: 'Prix décroissant' },
-        { id: 'Départ tôt', label: 'Départ tôt' },
-        { id: 'Départ tard', label: 'Départ tard' },
-    ];
+    const [selectedSort, setSelectedSort] = useState<string>('Prix croissant');
 
     /**
      * Convertit une heure au format HH:MM en minutes pour faciliter la comparaison
      */
-    const timeToMinutes = (time: string): number => {
+    const timeToMinutes = useCallback((time: string): number => {
         const [hours, minutes] = time.split(':').map(Number);
         return hours * 60 + minutes;
-    };
+    }, []);
 
     /**
      * Trie la liste des trajets selon le critère sélectionné
@@ -104,131 +119,77 @@ const TripReturnList = () => {
             default:
                 return tripsCopy;
         }
-    }, [trips, selectedSort]);
+    }, [trips, selectedSort, timeToMinutes]);
 
-    // Récupération des villes depuis le premier trajet
-    const departureCity = sortedTrips[0]?.departureCity || trips[0]?.departureCity || '';
-    const arrivalCity = sortedTrips[0]?.arrivalCity || trips[0]?.arrivalCity || '';
+    // Récupération des villes depuis le premier trajet (mémorisé)
+    const routeCities = useMemo(() => {
+        const firstTrip = sortedTrips[0] || trips[0];
+        return {
+            departureCity: firstTrip?.departureCity || '',
+            arrivalCity: firstTrip?.arrivalCity || '',
+        };
+    }, [sortedTrips, trips]);
 
     /**
      * Gère la sélection d'un trajet retour
      * Navigue vers trip-summary avec les deux voyages (aller et retour)
      */
-    const handleSelectReturnTrip = (returnTrip: Trip) => {
+    const handleSelectReturnTrip = useCallback((returnTrip: Trip) => {
         if (!outboundTrip) {
             return;
         }
-        // Naviguer vers trip-summary avec les deux voyages
+        // @ts-ignore - Navigation typée dynamiquement
         navigation.navigate('trip/trip-summary', { 
             trip: outboundTrip, 
             returnTrip: returnTrip,
             searchParams 
         });
-    };
+    }, [navigation, outboundTrip, searchParams]);
 
     /**
-     * Composant pour une carte de trajet
+     * Gère la sélection d'une option de tri
      */
-    const TripCard = ({ item }: { item: Trip }) => {
-        return (
-            <View style={[styles.tripCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
-                {/* En-tête de la carte : Logo compagnie et Prix */}
-                <View style={styles.cardHeader}>
-                    <View style={styles.companyInfo}>
-                        <View style={styles.companyLogoContainer}>
-                            <Text style={styles.companyLogoText}>
-                                {item.companyAbbreviation}
-                            </Text>
-                        </View>
-                        <View style={styles.companyDetails}>
-                            <Text style={[styles.companyName, { color: textColor }]}>{item.company}</Text>
-                            <Text style={[styles.licencePlate, { color: secondaryTextColor }]}>{item.licencePlate}</Text>
-                        </View>
-                    </View>
-                    <View style={styles.priceContainer}>
-                        <Text style={[styles.price, { color: tintColor }]}>{item.price}</Text>
-                        <Text style={[styles.currency, { color: secondaryTextColor }]}>{item.currency}</Text>
-                    </View>
-                </View>
+    const handleSortSelect = useCallback((sortId: string) => {
+        setSelectedSort(sortId);
+        setShowSortModal(false);
+    }, []);
 
-                {/* Section Départ */}
-                <View style={styles.timeSection}>
-                    <View style={styles.departureSection}>
-                        <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>DÉPART</Text>
-                        <Text style={[styles.time, { color: textColor }]}>{item.departureTime}</Text>
-                        <Text style={[styles.city, { color: textColor }]}>{item.departureCity}</Text>
-                        <Text style={[styles.station, { color: secondaryTextColor }]}>{item.departureStation}</Text>
-                    </View>
+    /**
+     * Gère l'ouverture du modal de tri
+     */
+    const handleOpenSortModal = useCallback(() => {
+        setShowSortModal(true);
+    }, []);
 
-                    {/* Timeline */}
-                    <View style={styles.timelineContainer}>
-                        <View style={[styles.timelineDot, { backgroundColor: tintColor }]} />
-                        <View style={[styles.timelineLine, { backgroundColor: tintColor }]} />
-                        <View style={[styles.timelineDot, { backgroundColor: tintColor }]} />
-                        <Text style={[styles.duration, { color: secondaryTextColor }]}>{item.duration}</Text>
-                    </View>
+    /**
+     * Gère la fermeture du modal de tri
+     */
+    const handleCloseSortModal = useCallback(() => {
+        setShowSortModal(false);
+    }, []);
 
-                    {/* Section Arrivée */}
-                    <View style={styles.arrivalSection}>
-                        <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>ARRIVÉE</Text>
-                        <Text style={[styles.time, { color: textColor }]}>{item.arrivalTime}</Text>
-                        <Text style={[styles.city, { color: textColor }]}>{item.arrivalCity}</Text>
-                        <Text style={[styles.station, { color: secondaryTextColor }]}>{item.arrivalStation}</Text>
-                    </View>
-                </View>
+    /**
+     * Gère le retour en arrière
+     */
+    const handleGoBack = useCallback(() => {
+        navigation.goBack();
+    }, [navigation]);
 
-                {/* Options et Disponibilité */}
-                <View style={styles.optionsSection}>
-                    <View style={styles.optionsRow}>
-                        {item.options.map((option, index) => (
-                            <View key={index} style={styles.optionItem}>
-                                <Icon name="check-circle" size={16} color="#4CAF50" />
-                                <Text style={[styles.optionText, { color: textColor }]}>{option}</Text>
-                            </View>
-                        ))}
-                    </View>
-
-                    <View style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 5,
-                        justifyContent: 'space-between',
-                        marginTop: 20,
-                    }}>
-                        <View style={styles.availabilityBadge}>
-                            <Text style={styles.availabilityText}>
-                                {item.availableSeats} places disponibles
-                            </Text>
-                        </View>
-                        <Text style={[styles.busType, { color: tintColor }]}>{capitalizeBusType(item.busType)}</Text>
-                    </View>
-                </View>
-
-                {/* Bouton Réserver */}
-                <Pressable
-                    style={styles.selectButton}
-                    onPress={() => handleSelectReturnTrip(item)}
-                >
-                    <Text style={styles.selectButtonText}>Réserver</Text>
-                </Pressable>
-            </View>
-        );
-    };
 
     return (
         <>
-            <View style={[styles.container, { backgroundColor: scrollBackgroundColor }]}>
+            <View style={[styles.container, { backgroundColor: themeColors.scrollBackgroundColor }]}>
                 {/* Header avec bouton retour */}
                 <View style={[
                     styles.header,
                     {
                         paddingTop: insets.top,
-                        backgroundColor: headerBackgroundColor,
-                        borderBottomColor: headerBorderColor
+                        backgroundColor: themeColors.headerBackgroundColor,
+                        borderBottomColor: themeColors.headerBorderColor
                     }
                 ]}>
                     <Pressable
-                        onPress={() => navigation.goBack()}
+                        onPress={handleGoBack}
                         style={styles.backButton}
                     >
                         <Icon name="arrow-left" size={25} color={iconColor} />
@@ -242,9 +203,9 @@ const TripReturnList = () => {
                 >
                     {/* Route */}
                     <View style={styles.routeContainer}>
-                        <Text style={[styles.routeCity, { color: textColor }]}>{departureCity}</Text>
+                        <Text style={[styles.routeCity, { color: textColor }]}>{routeCities.departureCity}</Text>
                         <Icon name="arrow-right" size={24} color={tintColor} />
-                        <Text style={[styles.routeCity, { color: textColor }]}>{arrivalCity}</Text>
+                        <Text style={[styles.routeCity, { color: textColor }]}>{routeCities.arrivalCity}</Text>
                     </View>
 
                     {/* Titre */}
@@ -254,12 +215,12 @@ const TripReturnList = () => {
 
                     {/* Résumé et Tri */}
                     <View style={styles.summaryContainer}>
-                        <Text style={[styles.summaryText, { color: secondaryTextColor }]}>
+                        <Text style={[styles.summaryText, { color: themeColors.secondaryTextColor }]}>
                             {totalTrips} {totalTrips > 1 ? 'trajets disponibles' : 'trajet disponible'}
                         </Text>
                         <Pressable
                             style={styles.sortButton}
-                            onPress={() => setShowSortModal(true)}
+                            onPress={handleOpenSortModal}
                         >
                             <Text style={[styles.sortButtonText, { color: textColor }]}>{selectedSort}</Text>
                             <Icon name="chevron-down" size={16} color={iconColor} />
@@ -268,27 +229,34 @@ const TripReturnList = () => {
 
                     {/* Liste des trajets */}
                     {sortedTrips.length > 0 ? (
-                        <FlatList
-                            data={sortedTrips}
-                            renderItem={({ item }) => <TripCard item={item} />}
-                            keyExtractor={(item) => item.id}
-                            scrollEnabled={false}
-                            contentContainerStyle={styles.tripsList}
-                        />
+                        <View style={styles.tripsList}>
+                            {sortedTrips.map((item) => (
+                                <TripCard
+                                    key={item.id}
+                                    item={item}
+                                    cardBackgroundColor={themeColors.cardBackgroundColor}
+                                    borderColor={themeColors.borderColor}
+                                    textColor={textColor}
+                                    secondaryTextColor={themeColors.secondaryTextColor}
+                                    tintColor={tintColor}
+                                    onSelectTrip={handleSelectReturnTrip}
+                                />
+                            ))}
+                        </View>
                     ) : (
                         <View style={styles.emptyContainer}>
                             <MaterialIcons name="directions-bus" size={40} color={tintColor} />
-                            <Text style={[styles.emptyText, { color: secondaryTextColor }]}>Aucun trajet disponible</Text>
+                            <Text style={[styles.emptyText, { color: themeColors.secondaryTextColor }]}>Aucun trajet disponible</Text>
                         </View>
                     )}
                 </ScrollView>
             </View>
             {/* BottomSheet de tri */}
-            <BottomSheet
+            <BottomSheet<SortOption>
                 visible={showSortModal}
-                onClose={() => setShowSortModal(false)}
+                onClose={handleCloseSortModal}
                 title="Trier par"
-                data={sortOptions}
+                data={SORT_OPTIONS}
                 loading={false}
                 keyExtractor={(item) => item.id}
                 renderItem={(item, onClose) => {
@@ -297,10 +265,10 @@ const TripReturnList = () => {
                         <Pressable
                             style={[
                                 styles.sortOption,
-                                { borderBottomColor: colorScheme === 'dark' ? '#3A3A3C' : '#F3F3F7' }
+                                { borderBottomColor: themeColors.sortOptionBorderColor }
                             ]}
                             onPress={() => {
-                                setSelectedSort(item.id);
+                                handleSortSelect(item.id);
                                 onClose();
                             }}
                         >
@@ -568,7 +536,130 @@ const styles = StyleSheet.create({
     sortOptionTextSelected: {
         fontFamily: 'Ubuntu_Bold',
     },
+    availabilityRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        justifyContent: 'space-between',
+        marginTop: 20,
+    },
 });
+
+/**
+ * Interface pour les props du composant TripCard
+ */
+interface TripCardProps {
+    item: Trip;
+    cardBackgroundColor: string;
+    borderColor: string;
+    textColor: string;
+    secondaryTextColor: string;
+    tintColor: string;
+    onSelectTrip: (trip: Trip) => void;
+}
+
+/**
+ * Composant pour une carte de trajet (mémorisé pour éviter les re-renders inutiles)
+ */
+const TripCard = React.memo<TripCardProps>(({
+    item,
+    cardBackgroundColor,
+    borderColor,
+    textColor,
+    secondaryTextColor,
+    tintColor,
+    onSelectTrip,
+}) => {
+    return (
+        <View style={[styles.tripCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
+            {/* En-tête de la carte : Logo compagnie et Prix */}
+            <View style={styles.cardHeader}>
+                <View style={styles.companyInfo}>
+                    <View style={styles.companyLogoContainer}>
+                        <Text style={styles.companyLogoText}>
+                            {item.companyAbbreviation}
+                        </Text>
+                    </View>
+                    <View style={styles.companyDetails}>
+                        <Text style={[styles.companyName, { color: textColor }]}>{item.company}</Text>
+                        <Text style={[styles.licencePlate, { color: secondaryTextColor }]}>{item.licencePlate}</Text>
+                    </View>
+                </View>
+                <View style={styles.priceContainer}>
+                    <Text style={[styles.price, { color: tintColor }]}>{item.price}</Text>
+                    <Text style={[styles.currency, { color: secondaryTextColor }]}>{item.currency}</Text>
+                </View>
+            </View>
+
+            {/* Section Départ */}
+            <View style={styles.timeSection}>
+                <View style={styles.departureSection}>
+                    <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>DÉPART</Text>
+                    <Text style={[styles.time, { color: textColor }]}>{item.departureTime}</Text>
+                    <Text style={[styles.city, { color: textColor }]}>{item.departureCity}</Text>
+                    <Text style={[styles.station, { color: secondaryTextColor }]}>{item.departureStation}</Text>
+                </View>
+
+                {/* Timeline */}
+                <View style={styles.timelineContainer}>
+                    <View style={[styles.timelineDot, { backgroundColor: tintColor }]} />
+                    <View style={[styles.timelineLine, { backgroundColor: tintColor }]} />
+                    <View style={[styles.timelineDot, { backgroundColor: tintColor }]} />
+                    <Text style={[styles.duration, { color: secondaryTextColor }]}>{item.duration}</Text>
+                </View>
+
+                {/* Section Arrivée */}
+                <View style={styles.arrivalSection}>
+                    <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>ARRIVÉE</Text>
+                    <Text style={[styles.time, { color: textColor }]}>{item.arrivalTime}</Text>
+                    <Text style={[styles.city, { color: textColor }]}>{item.arrivalCity}</Text>
+                    <Text style={[styles.station, { color: secondaryTextColor }]}>{item.arrivalStation}</Text>
+                </View>
+            </View>
+
+            {/* Options et Disponibilité */}
+            <View style={styles.optionsSection}>
+                <View style={styles.optionsRow}>
+                    {item.options.map((option, index) => (
+                        <View key={`${item.id}-option-${index}`} style={styles.optionItem}>
+                            <Icon name="check-circle" size={16} color="#4CAF50" />
+                            <Text style={[styles.optionText, { color: textColor }]}>{option}</Text>
+                        </View>
+                    ))}
+                </View>
+
+                <View style={styles.availabilityRow}>
+                    <View style={styles.availabilityBadge}>
+                        <Text style={styles.availabilityText}>
+                            {item.availableSeats} places disponibles
+                        </Text>
+                    </View>
+                    <Text style={[styles.busType, { color: tintColor }]}>{capitalizeBusType(item.busType)}</Text>
+                </View>
+            </View>
+
+            {/* Bouton Réserver */}
+            <Pressable
+                style={styles.selectButton}
+                onPress={() => onSelectTrip(item)}
+            >
+                <Text style={styles.selectButtonText}>Réserver</Text>
+            </Pressable>
+        </View>
+    );
+}, (prevProps, nextProps) => {
+    // Comparaison personnalisée pour éviter les re-renders inutiles
+    return (
+        prevProps.item.id === nextProps.item.id &&
+        prevProps.cardBackgroundColor === nextProps.cardBackgroundColor &&
+        prevProps.borderColor === nextProps.borderColor &&
+        prevProps.textColor === nextProps.textColor &&
+        prevProps.secondaryTextColor === nextProps.secondaryTextColor &&
+        prevProps.tintColor === nextProps.tintColor
+    );
+});
+
+TripCard.displayName = 'TripCard';
 
 export default TripReturnList;
 

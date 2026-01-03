@@ -3,9 +3,10 @@ import { authGetUserInfo, bookingListInfo } from '@/api/auth_register';
 import { getBookingDetails } from '@/api/booking';
 import { formatBookingDate, formatStatus, getStatusColor } from '@/constants/functions';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useAppColors } from '@/hooks/use-app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useThemeColor } from '@/hooks/use-theme-color';
 import { Booking, ProfileScreenProps, User } from '@/interfaces';
+import { clearAuthData, getAuthToken } from '@/utils/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { router } from 'expo-router';
@@ -14,37 +15,63 @@ import { ActivityIndicator, Alert, Image, Modal, Pressable, ScrollView, StyleShe
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
+/**
+ * Options de statut pour le filtre des réservations
+ * Défini en dehors du composant pour éviter la recréation à chaque render
+ */
+const STATUS_OPTIONS = [
+    { value: '', label: 'Tous les statuts' },
+    { value: 'PAID', label: 'Payé' },
+    { value: 'CONFIRMED', label: 'Confirmé' },
+    { value: 'PENDING', label: 'En attente' },
+    { value: 'PROCESSING', label: 'En traitement' },
+    { value: 'COMPLETED', label: 'Terminé' },
+    { value: 'USED', label: 'Utilisé' },
+    { value: 'CANCELLED', label: 'Annulé' },
+    { value: 'REFUNDED', label: 'Remboursé' },
+    { value: 'EXPIRED', label: 'Expiré' },
+    { value: 'FAILED', label: 'Échoué' },
+] as const;
+
+/**
+ * Map de civilité pour le formatage
+ */
+const CIVILITY_MAP: { [key: string]: string } = {
+    'MR': 'Monsieur',
+    'MRS': 'Madame',
+    'MISS': 'Mademoiselle',
+};
+
 export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
     const insets = useSafeAreaInsets();
     const colorScheme = useColorScheme() ?? 'light';
     const { isDarkMode, toggleTheme } = useTheme();
+    const colors = useAppColors();
 
-    // Couleurs dynamiques basées sur le thème
-    const backgroundColor = useThemeColor({}, 'background');
-    const textColor = useThemeColor({}, 'text');
-    const iconColor = useThemeColor({}, 'icon');
-    const tintColor = useThemeColor({}, 'tint');
-
-    // Couleurs spécifiques pour l'écran
-    const cardBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
-    const borderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
-    const secondaryTextColor = colorScheme === 'dark' ? '#9BA1A6' : '#666';
-    const headerBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
-    const headerBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
-    const scrollBackgroundColor = colorScheme === 'dark' ? '#000000' : '#F3F3F7';
-    const inputBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#F3F3F7';
-    const placeholderColor = colorScheme === 'dark' ? '#9BA1A6' : '#A6A6AA';
-    const inactiveIconColor = colorScheme === 'dark' ? '#9BA1A6' : '#9E9E9E';
-    const inactiveTabTextColor = colorScheme === 'dark' ? '#9BA1A6' : '#9E9E9E';
-    const activeTabColor = tintColor === '#fff' ? '#1776BA' : tintColor;
-    const modalBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
-    const modalBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#F0F0F0';
-    const emergencyInfoBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#F5F5F5';
-    const profileImagePlaceholderBackgroundColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
-    const tripsIconContainerBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#E3F2FD';
-    const clientTypeCardBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#E8F5E9';
-    const coinsCardBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#FFF3E0';
-    const actionButtonBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
+    // Mémorisation de toutes les couleurs pour éviter les recalculs
+    const themeColors = useMemo(() => ({
+        text: colors.text,
+        icon: colors.icon,
+        tint: colors.tint,
+        cardBackground: colors.cardBackground,
+        border: colors.border,
+        secondaryText: colors.secondaryText,
+        headerBackground: colors.headerBackground,
+        headerBorder: colors.headerBorder,
+        scrollBackground: colors.scrollBackground,
+        inputBackground: colors.inputBackground,
+        placeholder: colors.placeholder,
+        inactiveIcon: colors.inactiveIcon,
+        inactiveTabText: colors.inactiveTabText,
+        activeTab: colors.activeTabColor,
+        modalBackground: colors.modalBackground,
+        modalBorder: colors.modalBorder,
+        emergencyInfoBackground: colors.emergencyInfoBackground,
+        profileImagePlaceholderBackground: colors.profileImagePlaceholderBackground,
+        tripsIconContainerBackground: colors.tripsIconContainerBackground,
+        clientTypeCardBackground: colors.clientTypeCardBackground,
+        coinsCardBackground: colors.coinsCardBackground,
+    }), [colors, colorScheme]);
 
     const [user, setUser] = useState<User | null>(null);
     const [bookingList, setBookingList] = useState<Booking[] | any>([]);
@@ -54,59 +81,55 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
     const [showStatusModal, setShowStatusModal] = useState<boolean>(false);
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [isLoadingBooking, setIsLoadingBooking] = useState<string | null>(null);
-    // Ajouter un état pour le modal de confirmation
     const [showLogoutModal, setShowLogoutModal] = useState(false);
     const navigation = useNavigation();
 
     /**
      * Formate le nom complet de l'utilisateur
+     * Mémorisé pour éviter les recalculs inutiles
      */
-    const getFullName = () => {
-        const parts = [user?.firstName, user?.middleName, user?.lastName].filter(Boolean);
-        return parts.join(' ');
-    };
+    const fullName = useMemo(() => {
+        if (!user) return 'Non renseigné';
+        const parts = [user.firstName, user.middleName, user.lastName].filter(Boolean);
+        return parts.join(' ') || 'Non renseigné';
+    }, [user?.firstName, user?.middleName, user?.lastName]);
 
     /**
      * Formate la date de naissance pour l'affichage
+     * Mémorisé pour éviter les recalculs inutiles
      */
-    const formatDateOfBirth = () => {
+    const formattedDateOfBirth = useMemo(() => {
         if (!user?.dateOfBirth) return 'Non renseigné';
-        const date = new Date(user?.dateOfBirth);
+        const date = new Date(user.dateOfBirth);
         return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
-    };
+    }, [user?.dateOfBirth]);
 
     /**
      * Formate la civilité pour l'affichage
+     * Mémorisé pour éviter les recalculs inutiles
      */
-    const formatCivility = () => {
-        const civilityMap: { [key: string]: string } = {
-            'MR': 'Monsieur',
-            'MRS': 'Madame',
-            'MISS': 'Mademoiselle',
-        };
-        return civilityMap[user?.civility] || user?.civility;
-    };
+    const formattedCivility = useMemo(() => {
+        if (!user?.civility) return '';
+        return CIVILITY_MAP[user.civility] || user.civility;
+    }, [user?.civility]);
 
     /**
      * Gère la déconnexion de l'utilisateur
+     * Mémorisé avec useCallback pour éviter les recréations
      */
-    const handleLogout = async () => {
+    const handleLogout = useCallback(() => {
         setShowLogoutModal(true);
-    };
+    }, []);
 
     /**
      * Confirme et exécute la déconnexion
+     * Mémorisé avec useCallback pour éviter les recréations
      */
-    const confirmLogout = async () => {
+    const confirmLogout = useCallback(async () => {
         setShowLogoutModal(false);
         try {
             const onboardingValue = await AsyncStorage.getItem('onboarding');
-            await AsyncStorage.multiRemove([
-                'token',
-                'refresh_token',
-                'expires_at',
-                'token_type',
-            ]);
+            await clearAuthData();
             if (onboardingValue) {
                 await AsyncStorage.setItem('onboarding', onboardingValue);
             }
@@ -115,57 +138,89 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
             console.error('Erreur lors de la déconnexion:', error);
             Alert.alert('Erreur', 'Une erreur est survenue lors de la déconnexion');
         }
-    };
+    }, [onLogout]);
 
     /**
      * Récupère les informations de l'utilisateur
+     * Mémorisé avec useCallback pour éviter les recréations
      */
-    const getUserInfo = async () => {
-        const token = await AsyncStorage.getItem('token');
-        const userId = await AsyncStorage.getItem('user_id');
-        const response = await authGetUserInfo(userId, token);
-        console.log('response user info ======> ', response.data);
-        if (response.status === 200) {
-            return response.data;
-        } else {
-            Alert.alert('Erreur', 'Une erreur est survenue lors de la récupération des informations de l\'utilisateur');
+    const getUserInfo = useCallback(async () => {
+        try {
+            const token = await getAuthToken();
+            const userId = await AsyncStorage.getItem('user_id');
+            
+            if (!token || token.trim() === '') {
+                Alert.alert('Erreur', 'Token d\'authentification manquant. Veuillez vous reconnecter.');
+                return null;
+            }
+            
+            if (!userId || userId.trim() === '') {
+                Alert.alert('Erreur', 'ID utilisateur manquant. Veuillez vous reconnecter.');
+                return null;
+            }
+            
+            const response = await authGetUserInfo(userId, token);
+            if (response.status === 200) {
+                return response.data;
+            } else {
+                Alert.alert('Erreur', 'Une erreur est survenue lors de la récupération des informations de l\'utilisateur');
+                return null;
+            }
+        } catch (error: any) {
+            console.error('Erreur lors de la récupération des informations utilisateur:', error);
+            Alert.alert('Erreur', error?.response?.data?.message || 'Une erreur est survenue lors de la récupération des informations de l\'utilisateur');
             return null;
         }
-    };
+    }, []);
 
     /**
      * Récupère la liste des réservations de l'utilisateur
+     * Mémorisé avec useCallback pour éviter les recréations
      */
-    const getBookingList = async () => {
+    const getBookingList = useCallback(async () => {
         try {
-            const token = await AsyncStorage.getItem('token');
+            const token = await getAuthToken();
             const userId = await AsyncStorage.getItem('user_id');
-            // console.log('userId getBookingList : ', userId);
-            // console.log('token getBookingList : ', token);
-            const response = await bookingListInfo(userId as string, token as string);
-            // console.log('response booking list: ', response);
+            
+            if (!token || token.trim() === '') {
+                Alert.alert('Erreur', 'Token d\'authentification manquant. Veuillez vous reconnecter.');
+                return;
+            }
+            
+            if (!userId || userId.trim() === '') {
+                Alert.alert('Erreur', 'ID utilisateur manquant. Veuillez vous reconnecter.');
+                return;
+            }
+            
+            const response = await bookingListInfo(userId, token);
             if (response.status === 200 && response.data?.items) {
                 setBookingList(response.data.items);
             } else {
                 Alert.alert('Erreur', 'Une erreur est survenue lors de la récupération de la liste des réservations');
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Erreur lors de la récupération de la liste des réservations:', error);
-            Alert.alert('Erreur', 'Une erreur est survenue lors de la récupération de la liste des réservations');
+            Alert.alert('Erreur', error?.response?.data?.message || 'Une erreur est survenue lors de la récupération de la liste des réservations');
         }
-    };
+    }, []);
 
     /**
      * Affiche les détails d'une réservation
+     * Mémorisé avec useCallback pour éviter les recréations
      */
-    const handleViewBooking = async (bookingId: string) => {
+    const handleViewBooking = useCallback(async (bookingId: string) => {
         try {
             setIsLoadingBooking(bookingId);
-            const token = await AsyncStorage.getItem('token');
-            const response = await getBookingDetails(bookingId, token as string);
-            // console.log('response booking details: ', response.data);
+            const token = await getAuthToken();
+            
+            if (!token || token.trim() === '') {
+                Alert.alert('Erreur', 'Token d\'authentification manquant. Veuillez vous reconnecter.');
+                setIsLoadingBooking(null);
+                return;
+            }
+            
+            const response = await getBookingDetails(bookingId, token);
             if (response.status === 200) {
-                // Utiliser navigation.navigate au lieu de router.push
                 navigation.navigate('trip/ticket-details' as never, { ticketDetails: response.data } as never);
             } else {
                 Alert.alert('Erreur', 'Une erreur est survenue lors de la récupération des détails de la réservation');
@@ -176,7 +231,7 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
         } finally {
             setIsLoadingBooking(null);
         }
-    }
+    }, [navigation]);
 
     /**
      * Récupère les informations de l'utilisateur au montage de l'écran
@@ -189,10 +244,6 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                 try {
                     const userInfo = await getUserInfo();
                     setUser(userInfo);
-                    console.log('user info address: ', userInfo?.address);
-                    getFullName();
-                    formatDateOfBirth();
-                    formatCivility();
                     await getBookingList();
                 } catch (error) {
                     console.error('Erreur lors du chargement des données:', error);
@@ -201,33 +252,16 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                 }
             };
             fetchData();
-        }, [])
+        }, [getUserInfo, getBookingList])
     );
 
     /**
      * Navigue vers l'écran de modification du profil
+     * Mémorisé avec useCallback pour éviter les recréations
      */
-    const handleUpdateUserInfo = () => {
+    const handleUpdateUserInfo = useCallback(() => {
         router.push('/profile/edit');
-    };
-
-    /**
-     * Capitalise la première lettre d'une chaîne
-     */
-    const capitalizeFirstLetter = (string: string) => {
-        return string ? string.charAt(0).toUpperCase() + string.slice(1) : '';
-    };
-
-    /**
-     * Options de statut pour le filtre
-     */
-    const statusOptions = [
-        { value: '', label: '--Choisir un statut--' },
-        { value: 'PAID', label: 'Payé' },
-        { value: 'PENDING', label: 'En attente' },
-        { value: 'CANCELLED', label: 'Annulé' },
-        { value: 'REFUNDED', label: 'Remboursé' },
-    ];
+    }, []);
 
     /**
      * Filtre et recherche les réservations
@@ -237,13 +271,14 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
             // Filtre par recherche
             const matchesSearch =
                 !searchQuery ||
-                booking.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                booking.trip.stationFrom.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                booking.trip.stationTo.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                booking.companyName.toLowerCase().includes(searchQuery.toLowerCase());
+                booking.code?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                booking.trip?.stationFrom?.city?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                booking.trip?.stationTo?.city?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                booking.companyName?.toLowerCase().includes(searchQuery.toLowerCase());
 
-            // Filtre par statut
-            const matchesStatus = !selectedStatus || booking.status === selectedStatus;
+            // Filtre par statut (comparaison insensible à la casse)
+            const matchesStatus = !selectedStatus || 
+                booking.status?.toUpperCase() === selectedStatus.toUpperCase();
 
             return matchesSearch && matchesStatus;
         });
@@ -259,79 +294,87 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
             showsVerticalScrollIndicator={false}
         >
             {/* Main Profile Card */}
-            <View style={[styles.profileCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
+            <View style={[styles.profileCard, { backgroundColor: themeColors.cardBackground, borderColor: themeColors.border }]}>
                 <View style={styles.profileCardHeader}>
-                    <Text style={[styles.businessLabel, { color: secondaryTextColor }]}>Profil Utilisateur</Text>
-                    <View style={[styles.statusBadge, { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'space-between', alignItems: 'center' }]}>
+                    <Text style={[styles.businessLabel, { color: themeColors.secondaryText }]}>Profil Utilisateur</Text>
+                    <View style={[styles.statusBadge, { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'space-between' }]}>
                         <View style={[styles.statusDot, { backgroundColor: user?.active ? '#4CAF50' : '#9E9E9E' }]} />
-                        <Text style={[styles.statusLabel, { color: secondaryTextColor }]}>{user?.active ? 'Actif' : 'Inactif'}</Text>
+                        <Text style={[styles.statusLabel, { color: themeColors.secondaryText }]}>{user?.active ? 'Actif' : 'Inactif'}</Text>
                     </View>
                 </View>
 
                 <View style={styles.profileInfo}>
-                    <View style={[styles.profileImageContainer, { backgroundColor: profileImagePlaceholderBackgroundColor }]}>
+                    <View style={[styles.profileImageContainer, { backgroundColor: themeColors.profileImagePlaceholderBackground }]}>
                         {user?.picture ? (
                             <Image
                                 source={{ uri: user?.picture }}
                                 style={styles.profileImage}
                             />
                         ) : (
-                            <View style={[styles.profileImagePlaceholder, { backgroundColor: profileImagePlaceholderBackgroundColor }]}>
-                                <MaterialCommunityIcons name="account" size={40} color={secondaryTextColor} />
+                            <View style={[styles.profileImagePlaceholder, { backgroundColor: themeColors.profileImagePlaceholderBackground }]}>
+                                <MaterialCommunityIcons name="account" size={40} color={themeColors.secondaryText} />
                             </View>
                         )}
                     </View>
-                    <Text style={[styles.userName, { color: textColor }]}>{getFullName() || 'Non renseigné'}</Text>
-                    <Text style={[styles.userRole, { color: secondaryTextColor }]}>{formatCivility()}</Text>
+                    <Text style={[styles.userName, { color: themeColors.text }]}>{fullName}</Text>
+                    <Text style={[styles.userRole, { color: themeColors.secondaryText }]}>{formattedCivility}</Text>
                     {user?.company && (
-                        <Text style={[styles.userCompany, { color: activeTabColor }]}>{user?.company}</Text>
+                        <Text style={[styles.userCompany, { color: themeColors.activeTab }]}>{user?.company}</Text>
                     )}
                 </View>
 
                 {/* Informations détaillées */}
-                <View style={[styles.detailsSection, { borderTopColor: borderColor }]}>
+                <View style={[styles.detailsSection, { borderTopColor: themeColors.border }]}>
                     <View style={styles.detailRow}>
-                        <MaterialCommunityIcons name="email-outline" size={18} color={secondaryTextColor} />
-                        <Text style={[styles.detailLabel, { color: textColor }]}>Email:</Text>
-                        <Text style={[styles.detailValue, { color: secondaryTextColor }]}>{user?.email ?? 'Non renseigné'}</Text>
+                        <MaterialCommunityIcons name="email-outline" size={18} color={themeColors.secondaryText} />
+                        <Text style={[styles.detailLabel, { color: themeColors.text }]}>Email:</Text>
+                        <Text style={[styles.detailValue, { color: themeColors.secondaryText }]}>{user?.email ?? 'Non renseigné'}</Text>
                         {user?.isEmailVerified && (
                             <MaterialCommunityIcons name="check-circle" size={16} color="#4CAF50" />
                         )}
                     </View>
                     <View style={styles.detailRow}>
-                        <MaterialCommunityIcons name="account-outline" size={18} color={secondaryTextColor} />
-                        <Text style={[styles.detailLabel, { color: textColor }]}>Nom d'utilisateur:</Text>
-                        <Text style={[styles.detailValue, { color: secondaryTextColor }]}>{'@' + user?.username ?? 'Non renseigné'}</Text>
+                        <MaterialCommunityIcons name="account-outline" size={18} color={themeColors.secondaryText} />
+                        <Text style={[styles.detailLabel, { color: themeColors.text }]}>Nom d'utilisateur:</Text>
+                        <Text style={[styles.detailValue, { color: themeColors.secondaryText }]}>{user?.username ? `@${user.username}` : 'Non renseigné'}</Text>
                     </View>
                     <View style={styles.detailRow}>
-                        <MaterialCommunityIcons name="phone-outline" size={18} color={secondaryTextColor} />
-                        <Text style={[styles.detailLabel, { color: textColor }]}>Téléphone:</Text>
-                        <Text style={[styles.detailValue, { color: secondaryTextColor }]}>+225 {user?.phones?.[0]?.digits}</Text>
+                        <MaterialCommunityIcons name="phone-outline" size={18} color={themeColors.secondaryText} />
+                        <Text style={[styles.detailLabel, { color: themeColors.text }]}>Téléphone:</Text>
+                        <Text style={[styles.detailValue, { color: themeColors.secondaryText }]}>+225 {user?.phones?.[0]?.digits ?? 'Non renseigné'}</Text>
                     </View>
                     {user?.dateOfBirth && (
                         <View style={styles.detailRow}>
-                            <MaterialCommunityIcons name="calendar-outline" size={18} color={secondaryTextColor} />
-                            <Text style={[styles.detailLabel, { color: textColor }]}>Date de naissance:</Text>
-                            <Text style={[styles.detailValue, { color: secondaryTextColor }]}>{formatDateOfBirth()}</Text>
+                            <MaterialCommunityIcons name="calendar-outline" size={18} color={themeColors.secondaryText} />
+                            <Text style={[styles.detailLabel, { color: themeColors.text }]}>Date de naissance:</Text>
+                            <Text style={[styles.detailValue, { color: themeColors.secondaryText }]}>{formattedDateOfBirth}</Text>
                         </View>
                     )}
                     {user?.address && (
                         <View style={styles.detailRow}>
-                            <MaterialCommunityIcons name="map-marker-outline" size={18} color={secondaryTextColor} />
-                            <Text style={[styles.detailLabel, { color: textColor }]}>Adresse:</Text>
-                            <Text style={[styles.detailValue, { color: secondaryTextColor }]}>{user?.address ? user?.address?.city + ' ' + (user?.address?.country?.name ?? '') : ''}</Text>
+                            <MaterialCommunityIcons name="map-marker-outline" size={18} color={themeColors.secondaryText} />
+                            <Text style={[styles.detailLabel, { color: themeColors.text }]}>Adresse:</Text>
+                            <Text style={[styles.detailValue, { color: themeColors.secondaryText }]}>
+                                {user.address.city ? `${user.address.city} ${user.address.country?.name ?? ''}`.trim() : 'Non renseigné'}
+                            </Text>
                         </View>
                     )}
                 </View>
 
                 {/* Contact d'urgence */}
                 {user?.contactUrgent && (
-                    <View style={[styles.emergencySection, { borderTopColor: borderColor }]}>
-                        <Text style={[styles.sectionTitle, { color: textColor }]}>Contact d'urgence</Text>
-                        <View style={[styles.emergencyInfo, { backgroundColor: emergencyInfoBackgroundColor }]}>
-                            <Text style={[styles.emergencyName, { color: textColor }]}>{user?.contactUrgent?.firstName ?? 'Non renseigné'} {user?.contactUrgent?.lastName ?? 'Non renseigné'}</Text>
-                            <Text style={[styles.emergencyPhone, { color: secondaryTextColor }]}>{user?.contactUrgent?.phone ?? 'Non renseigné'}</Text>
-                            <Text style={[styles.emergencyRelation, { color: secondaryTextColor }]}>Relation : {user?.contactUrgent?.relationship ? user?.contactUrgent?.relationship.charAt(0).toUpperCase() + user?.contactUrgent?.relationship.slice(1).toLowerCase() : 'Non renseigné'}</Text>
+                    <View style={[styles.emergencySection, { borderTopColor: themeColors.border }]}>
+                        <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Contact d'urgence</Text>
+                        <View style={[styles.emergencyInfo, { backgroundColor: themeColors.emergencyInfoBackground }]}>
+                            <Text style={[styles.emergencyName, { color: themeColors.text }]}>
+                                {user.contactUrgent.firstName ?? 'Non renseigné'} {user.contactUrgent.lastName ?? 'Non renseigné'}
+                            </Text>
+                            <Text style={[styles.emergencyPhone, { color: themeColors.secondaryText }]}>{user.contactUrgent.phone ?? 'Non renseigné'}</Text>
+                            <Text style={[styles.emergencyRelation, { color: themeColors.secondaryText }]}>
+                                Relation : {user.contactUrgent.relationship 
+                                    ? user.contactUrgent.relationship.charAt(0).toUpperCase() + user.contactUrgent.relationship.slice(1).toLowerCase() 
+                                    : 'Non renseigné'}
+                            </Text>
                         </View>
                     </View>
                 )}
@@ -340,21 +383,21 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
             {/* Statistiques utilisateur */}
             <View style={styles.statsSection}>
                 {/* Voyages effectués */}
-                <View style={[styles.tripsCompletedCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
-                    <View style={[styles.tripsIconContainer, { backgroundColor: tripsIconContainerBackgroundColor }]}>
-                        <MaterialCommunityIcons name="check-circle" size={24} color={activeTabColor} />
+                <View style={[styles.tripsCompletedCard, { backgroundColor: themeColors.cardBackground, borderColor: themeColors.border }]}>
+                    <View style={[styles.tripsIconContainer, { backgroundColor: themeColors.tripsIconContainerBackground }]}>
+                        <MaterialCommunityIcons name="check-circle" size={24} color={themeColors.activeTab} />
                     </View>
                     <View style={styles.statsContent}>
-                        <Text style={[styles.statsLabel, { color: secondaryTextColor }]}>Voyages effectués</Text>
-                        <Text style={[styles.tripsCount, { color: activeTabColor }]}>{user?.customerProfile?.totalTripsPaid ?? 0}</Text>
+                        <Text style={[styles.statsLabel, { color: themeColors.secondaryText }]}>Voyages effectués</Text>
+                        <Text style={[styles.tripsCount, { color: themeColors.activeTab }]}>{user?.customerProfile?.totalTripsPaid ?? 0}</Text>
                     </View>
                 </View>
 
                 {/* Type de clients */}
-                <View style={[styles.clientTypeCard, { backgroundColor: clientTypeCardBackgroundColor, borderColor }]}>
+                <View style={[styles.clientTypeCard, { backgroundColor: themeColors.clientTypeCardBackground, borderColor: themeColors.border }]}>
                     <MaterialCommunityIcons name="wallet" size={24} color="#4CAF50" />
                     <View style={styles.statsContent}>
-                        <Text style={[styles.statsLabel, { color: secondaryTextColor }]}>Type de client</Text>
+                        <Text style={[styles.statsLabel, { color: themeColors.secondaryText }]}>Type de client</Text>
                         <Text style={[styles.clientTypeValue, { color: '#4CAF50' }]}>
                             {user?.customerProfile?.loyaltyTier && user.customerProfile.loyaltyTier.trim()
                                 ? user.customerProfile.loyaltyTier.charAt(0).toUpperCase() + user.customerProfile.loyaltyTier.slice(1).toLowerCase()
@@ -364,17 +407,17 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                 </View>
 
                 {/* AllOn Coin gagnés */}
-                <View style={[styles.coinsCard, { backgroundColor: coinsCardBackgroundColor, borderColor }]}>
+                <View style={[styles.coinsCard, { backgroundColor: themeColors.coinsCardBackground, borderColor: themeColors.border }]}>
                     <MaterialCommunityIcons name="star" size={24} color="#FFA726" />
                     <View style={styles.statsContent}>
-                        <Text style={[styles.statsLabel, { color: secondaryTextColor }]}>AllOn Coin gagnés</Text>
+                        <Text style={[styles.statsLabel, { color: themeColors.secondaryText }]}>AllOn Coin gagnés</Text>
                         <Text style={[styles.coinsValue, { color: '#FFA726' }]}>{user?.customerProfile?.totalCoinsEarned ?? '0.00'}</Text>
                     </View>
                 </View>
             </View>
 
             {/* Toggle Mode Dark */}
-            <View style={[styles.themeToggleCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
+            <View style={[styles.themeToggleCard, { backgroundColor: themeColors.cardBackground, borderColor: themeColors.border }]}>
                 <View style={styles.themeToggleContent}>
                     <MaterialCommunityIcons
                         name={isDarkMode ? "weather-night" : "weather-sunny"}
@@ -382,8 +425,8 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                         color={isDarkMode ? "#FFA726" : "#FFC107"}
                     />
                     <View style={styles.themeToggleTextContainer}>
-                        <Text style={[styles.themeToggleLabel, { color: textColor }]}>Mode sombre</Text>
-                        <Text style={[styles.themeToggleDescription, { color: secondaryTextColor }]}>
+                        <Text style={[styles.themeToggleLabel, { color: themeColors.text }]}>Mode sombre</Text>
+                        <Text style={[styles.themeToggleDescription, { color: themeColors.secondaryText }]}>
                             {isDarkMode ? 'Activé' : 'Désactivé'}
                         </Text>
                     </View>
@@ -392,7 +435,7 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                     value={isDarkMode}
                     onValueChange={toggleTheme}
                     trackColor={{ false: '#E0E0E0', true: '#1776BA' }}
-                    thumbColor={isDarkMode ? '#FFFFFF' : '#FFFFFF'}
+                    thumbColor="#FFFFFF"
                     ios_backgroundColor="#E0E0E0"
                 />
             </View>
@@ -406,106 +449,115 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
     );
 
     /**
+     * Label du statut sélectionné pour le filtre
+     * Mémorisé pour éviter les recalculs
+     */
+    const selectedStatusLabel = useMemo(() => {
+        return selectedStatus 
+            ? STATUS_OPTIONS.find(opt => opt.value === selectedStatus)?.label 
+            : 'Tous les statuts';
+    }, [selectedStatus]);
+
+    /**
      * Rendu du contenu de l'onglet Mes réservations
      */
     const renderTicketsTab = () => (
-        <View style={[styles.ticketsContainer, { backgroundColor: scrollBackgroundColor }]}>
-            {/* Barre de recherche et filtre */}
-            <View style={[styles.searchFilterContainer, { backgroundColor: headerBackgroundColor }]}>
-                <TextInput
-                    style={[
-                        styles.searchInput,
-                        {
-                            backgroundColor: inputBackgroundColor,
-                            borderColor,
-                            color: textColor
-                        }
-                    ]}
-                    placeholder="Rechercher par ville, référence ou compagnie"
-                    placeholderTextColor={placeholderColor}
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                />
-                <Pressable
-                    style={[
-                        styles.statusFilter,
-                        {
-                            backgroundColor: inputBackgroundColor,
-                            borderColor
-                        }
-                    ]}
-                    onPress={() => setShowStatusModal(true)}
-                >
-                    <Text style={[
-                        styles.statusFilterText,
-                        { color: selectedStatus ? textColor : placeholderColor }
-                    ]}>
-                        {selectedStatus ? statusOptions.find(opt => opt.value === selectedStatus)?.label : '-- Choisir un statut --'}
-                    </Text>
-                    <MaterialCommunityIcons name="chevron-down" size={20} color={secondaryTextColor} />
-                </Pressable>
-            </View>
-
-            {/* Liste des réservations */}
-            {filteredBookings.length === 0 ? (
-                <View style={styles.emptyStateContainer}>
-                    <MaterialCommunityIcons name="ticket-outline" size={64} color={inactiveIconColor} />
-                    <Text style={[styles.emptyStateText, { color: textColor }]}>Aucun ticket disponible</Text>
-                    <Text style={[styles.emptyStateSubtext, { color: secondaryTextColor }]}>Vos tickets de voyage apparaîtront ici</Text>
+            <View style={[styles.ticketsContainer, { backgroundColor: themeColors.scrollBackground }]}>
+                {/* Barre de recherche et filtre */}
+                <View style={[styles.searchFilterContainer, { backgroundColor: themeColors.headerBackground }]}>
+                    <TextInput
+                        style={[
+                            styles.searchInput,
+                            {
+                                backgroundColor: themeColors.inputBackground,
+                                borderColor: themeColors.border,
+                                color: themeColors.text
+                            }
+                        ]}
+                        placeholder="Rechercher par ville, référence ou compagnie"
+                        placeholderTextColor={themeColors.placeholder}
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                    />
+                    <Pressable
+                        style={[
+                            styles.statusFilter,
+                            {
+                                backgroundColor: themeColors.inputBackground,
+                                borderColor: themeColors.border
+                            }
+                        ]}
+                        onPress={() => setShowStatusModal(true)}
+                    >
+                        <Text style={[
+                            styles.statusFilterText,
+                            { color: selectedStatus ? themeColors.text : themeColors.placeholder }
+                        ]}>
+                            {selectedStatusLabel}
+                        </Text>
+                        <MaterialCommunityIcons name="chevron-down" size={20} color={themeColors.secondaryText} />
+                    </Pressable>
                 </View>
-            ) : (
-                <ScrollView
-                    style={styles.scrollView}
-                    contentContainerStyle={styles.scrollContent}
-                    showsVerticalScrollIndicator={false}
-                >
-                    {filteredBookings.map((booking) => (
-                        <View key={booking.id} style={[styles.bookingCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
-                            {/* Route et date */}
-                            <View style={styles.bookingHeader}>
-                                <Text style={[styles.routeText, { color: textColor }]}>
-                                    {booking.trip.stationFrom.city} → {booking.trip.stationTo.city}
-                                </Text>
-                                <Text style={[styles.dateText, { color: secondaryTextColor }]}>
-                                    {formatBookingDate(booking.departureDateTime)}
-                                </Text>
-                                <Text style={[styles.timeText, { color: secondaryTextColor }]}>
-                                    {booking.departureTime} - {booking.arrivalTime}
-                                </Text>
-                            </View>
 
-                            {/* Compagnie et passagers */}
-                            <View style={styles.bookingInfo}>
-                                <Text style={[styles.companyText, { color: textColor }]}>{booking.companyName}</Text>
-                                <Text style={[styles.passengersText, { color: secondaryTextColor }]}>
-                                    {booking.passengers.length} passager(s)
-                                </Text>
-                            </View>
-
-                            {/* Référence, prix et statut */}
-                            <View style={styles.bookingFooter}>
-                                <Text style={[styles.referenceText, { color: secondaryTextColor }]}>Réf: {booking.code}</Text>
-                                <View style={styles.priceStatusContainer}>
-                                    <Text style={[styles.priceText, { color: activeTabColor }]}>
-                                        {parseFloat(booking.totalAmount).toLocaleString('fr-FR')} {booking.currency}
+                {/* Liste des réservations */}
+                {filteredBookings.length === 0 ? (
+                    <View style={styles.emptyStateContainer}>
+                        <MaterialCommunityIcons name="ticket-outline" size={64} color={themeColors.inactiveIcon} />
+                        <Text style={[styles.emptyStateText, { color: themeColors.text }]}>Aucun ticket disponible</Text>
+                        <Text style={[styles.emptyStateSubtext, { color: themeColors.secondaryText }]}>Vos tickets de voyage apparaîtront ici</Text>
+                    </View>
+                ) : (
+                    <ScrollView
+                        style={styles.scrollView}
+                        contentContainerStyle={styles.scrollContent}
+                        showsVerticalScrollIndicator={false}
+                    >
+                        {filteredBookings.map((booking) => (
+                            <View key={booking.id} style={[styles.bookingCard, { backgroundColor: themeColors.cardBackground, borderColor: themeColors.border }]}>
+                                {/* Route et date */}
+                                <View style={styles.bookingHeader}>
+                                    <Text style={[styles.routeText, { color: themeColors.text }]}>
+                                        {booking.trip.stationFrom.city} → {booking.trip.stationTo.city}
                                     </Text>
-                                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(booking.status), justifyContent: 'center', alignItems: 'center' }]}>
-                                        <Text style={styles.statusBadgeText}>
-                                            {formatStatus(booking.status)}
+                                    <Text style={[styles.dateText, { color: themeColors.secondaryText }]}>
+                                        {formatBookingDate(booking.departureDateTime)}
+                                    </Text>
+                                    <Text style={[styles.timeText, { color: themeColors.secondaryText }]}>
+                                        {booking.departureTime} - {booking.arrivalTime}
+                                    </Text>
+                                </View>
+
+                                {/* Compagnie et passagers */}
+                                <View style={styles.bookingInfo}>
+                                    <Text style={[styles.companyText, { color: themeColors.text }]}>{booking.companyName}</Text>
+                                    <Text style={[styles.passengersText, { color: themeColors.secondaryText }]}>
+                                        {booking.passengers.length} passager(s)
+                                    </Text>
+                                </View>
+
+                                {/* Référence, prix et statut */}
+                                <View style={styles.bookingFooter}>
+                                    <Text style={[styles.referenceText, { color: themeColors.secondaryText }]}>Réf: {booking.code}</Text>
+                                    <View style={styles.priceStatusContainer}>
+                                        <Text style={[styles.priceText, { color: themeColors.activeTab }]}>
+                                            {parseFloat(booking.totalAmount).toLocaleString('fr-FR')} {booking.currency}
                                         </Text>
+                                        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(booking.status || ''), justifyContent: 'center', alignItems: 'center' }]}>
+                                            <Text style={styles.statusBadgeText}>
+                                                {formatStatus(booking.status || '')}
+                                            </Text>
+                                        </View>
                                     </View>
                                 </View>
-                            </View>
 
-                            {/* Boutons d'action */}
-                            {/* {booking.status === 'PAID' && ( */}
+                                {/* Boutons d'action */}
                                 <View style={styles.actionButtons}>
                                     <Pressable
                                         style={[
                                             styles.actionButton,
                                             {
-                                                backgroundColor: activeTabColor,
-                                                borderColor: activeTabColor,
+                                                backgroundColor: themeColors.activeTab,
+                                                borderColor: themeColors.activeTab,
                                                 opacity: isLoadingBooking === booking.id ? 0.7 : 1
                                             }
                                         ]}
@@ -522,119 +574,125 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                                         )}
                                     </Pressable>
                                     <Pressable
-                                        style={[styles.actionButton, { backgroundColor: 'transparent', borderColor }]}
+                                        style={[styles.actionButton, { backgroundColor: 'transparent', borderColor: themeColors.border }]}
                                         onPress={() => {
                                             navigation.navigate('trip/route-viewer' as never, { booking: JSON.stringify(booking) } as never);
                                         }}
                                     >
-                                        <MaterialCommunityIcons name="map-marker-outline" size={20} color={secondaryTextColor} />
-                                        <Text style={[styles.actionButtonText, { color: secondaryTextColor }]}>Itinéraire</Text>
+                                        <MaterialCommunityIcons name="map-marker-outline" size={20} color={themeColors.secondaryText} />
+                                        <Text style={[styles.actionButtonText, { color: themeColors.secondaryText }]}>Itinéraire</Text>
                                     </Pressable>
                                 </View>
-                            {/* )} */}
-                        </View>
-                    ))}
-                </ScrollView>
-            )}
+                            </View>
+                        ))}
+                    </ScrollView>
+                )}
 
-            {/* Modal de sélection du statut */}
-            <Modal
-                visible={showStatusModal}
-                transparent={true}
-                animationType="fade"
-                onRequestClose={() => setShowStatusModal(false)}
-            >
-                <Pressable
-                    style={styles.modalOverlay}
-                    onPress={() => setShowStatusModal(false)}
+                {/* Modal de sélection du statut */}
+                <Modal
+                    visible={showStatusModal}
+                    transparent={true}
+                    animationType="fade"
+                    onRequestClose={() => setShowStatusModal(false)}
                 >
-                    <View style={[styles.modalContent, { backgroundColor: modalBackgroundColor }]} onStartShouldSetResponder={() => true}>
-                        <View style={[styles.modalHeader, { borderBottomColor: borderColor }]}>
-                            <Text style={[styles.modalTitle, { color: textColor }]}>Choisir un statut</Text>
-                            <Pressable onPress={() => setShowStatusModal(false)}>
-                                <MaterialCommunityIcons name="close" size={24} color={iconColor} />
-                            </Pressable>
-                        </View>
-                        <ScrollView>
-                            {statusOptions.map((option) => (
-                                <Pressable
-                                    key={option.value}
-                                    style={[styles.modalOption, { borderBottomColor: modalBorderColor }]}
-                                    onPress={() => {
-                                        setSelectedStatus(option.value);
-                                        setShowStatusModal(false);
-                                    }}
-                                >
-                                    <Text style={[styles.modalOptionText, { color: textColor }]}>{option.label}</Text>
-                                    {selectedStatus === option.value && (
-                                        <MaterialCommunityIcons name="check" size={20} color={activeTabColor} />
-                                    )}
+                    <Pressable
+                        style={styles.modalOverlay}
+                        onPress={() => setShowStatusModal(false)}
+                    >
+                        <View style={[styles.modalContent, { backgroundColor: themeColors.modalBackground }]} onStartShouldSetResponder={() => true}>
+                            <View style={[styles.modalHeader, { borderBottomColor: themeColors.border }]}>
+                                <Text style={[styles.modalTitle, { color: themeColors.text }]}>Choisir un statut</Text>
+                                <Pressable onPress={() => setShowStatusModal(false)}>
+                                    <MaterialCommunityIcons name="close" size={24} color={themeColors.icon} />
                                 </Pressable>
-                            ))}
-                        </ScrollView>
-                    </View>
-                </Pressable>
-            </Modal>
-        </View>
+                            </View>
+                            <ScrollView>
+                                {STATUS_OPTIONS.map((option) => (
+                                    <Pressable
+                                        key={option.value}
+                                        style={[styles.modalOption, { borderBottomColor: themeColors.modalBorder }]}
+                                        onPress={() => {
+                                            setSelectedStatus(option.value);
+                                            setShowStatusModal(false);
+                                        }}
+                                    >
+                                        <Text style={[styles.modalOptionText, { color: themeColors.text }]}>{option.label}</Text>
+                                        {selectedStatus === option.value && (
+                                            <MaterialCommunityIcons name="check" size={20} color={themeColors.activeTab} />
+                                        )}
+                                    </Pressable>
+                                ))}
+                            </ScrollView>
+                        </View>
+                    </Pressable>
+                </Modal>
+            </View>
     );
 
     /**
      * Rendu de l'indicateur de chargement
      */
-    const renderLoading = () => (
-        <View style={[styles.loadingContainer, { backgroundColor: scrollBackgroundColor }]}>
-            <ActivityIndicator size="large" color={activeTabColor} />
+    const renderLoading = useCallback(() => (
+        <View style={[styles.loadingContainer, { backgroundColor: themeColors.scrollBackground }]}>
+            <ActivityIndicator size="large" color={themeColors.activeTab} />
         </View>
-    );
+    ), [themeColors.scrollBackground, themeColors.activeTab]);
+
+    /**
+     * Handlers pour les onglets
+     */
+    const handleTabPress = useCallback((tab: 'info' | 'tickets') => {
+        setActiveTab(tab);
+    }, []);
 
     return (
-        <View style={[styles.container, { backgroundColor: scrollBackgroundColor }]}>
+        <View style={[styles.container, { backgroundColor: themeColors.scrollBackground }]}>
             {/* Header */}
             <View style={[
                 styles.header,
                 {
                     paddingTop: insets.top,
-                    backgroundColor: headerBackgroundColor,
-                    borderBottomColor: headerBorderColor
+                    backgroundColor: themeColors.headerBackground,
+                    borderBottomColor: themeColors.headerBorder
                 }
             ]}>
-                <Text style={[styles.headerTitle, { color: textColor }]}>Mon profil</Text>
+                <Text style={[styles.headerTitle, { color: themeColors.text }]}>Mon profil</Text>
                 <Pressable style={styles.headerButton} onPress={handleLogout}>
-                    <MaterialCommunityIcons name="logout" size={24} color={iconColor} />
+                    <MaterialCommunityIcons name="logout" size={24} color={themeColors.icon} />
                 </Pressable>
             </View>
 
             {/* Tabs Navigation */}
-            <View style={[styles.tabsContainer, { backgroundColor: headerBackgroundColor, borderBottomColor: headerBorderColor }]}>
+            <View style={[styles.tabsContainer, { backgroundColor: themeColors.headerBackground, borderBottomColor: themeColors.headerBorder }]}>
                 <Pressable
-                    style={[styles.tab, activeTab === 'info' && { borderBottomColor: activeTabColor }]}
-                    onPress={() => setActiveTab('info')}
+                    style={[styles.tab, activeTab === 'info' && { borderBottomColor: themeColors.activeTab }]}
+                    onPress={() => handleTabPress('info')}
                 >
                     <MaterialCommunityIcons
                         name="account-outline"
                         size={20}
-                        color={activeTab === 'info' ? activeTabColor : inactiveIconColor}
+                        color={activeTab === 'info' ? themeColors.activeTab : themeColors.inactiveIcon}
                     />
                     <Text style={[
                         styles.tabText,
-                        { color: activeTab === 'info' ? activeTabColor : inactiveTabTextColor },
+                        { color: activeTab === 'info' ? themeColors.activeTab : themeColors.inactiveTabText },
                         activeTab === 'info' && styles.tabTextActive
                     ]}>
                         Mes informations
                     </Text>
                 </Pressable>
                 <Pressable
-                    style={[styles.tab, activeTab === 'tickets' && { borderBottomColor: activeTabColor }]}
-                    onPress={() => setActiveTab('tickets')}
+                    style={[styles.tab, activeTab === 'tickets' && { borderBottomColor: themeColors.activeTab }]}
+                    onPress={() => handleTabPress('tickets')}
                 >
                     <MaterialCommunityIcons
                         name="ticket-outline"
                         size={20}
-                        color={activeTab === 'tickets' ? activeTabColor : inactiveIconColor}
+                        color={activeTab === 'tickets' ? themeColors.activeTab : themeColors.inactiveIcon}
                     />
                     <Text style={[
                         styles.tabText,
-                        { color: activeTab === 'tickets' ? activeTabColor : inactiveTabTextColor },
+                        { color: activeTab === 'tickets' ? themeColors.activeTab : themeColors.inactiveTabText },
                         activeTab === 'tickets' && styles.tabTextActive
                     ]}>
                         Mes tickets
@@ -659,14 +717,14 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                     <View
                         style={[
                             styles.logoutModalContent,
-                            { backgroundColor: cardBackgroundColor, borderColor }
+                            { backgroundColor: themeColors.cardBackground, borderColor: themeColors.border }
                         ]}
                         onStartShouldSetResponder={() => true}
                     >
-                        <Text style={[styles.logoutModalTitle, { color: textColor }]}>
+                        <Text style={[styles.logoutModalTitle, { color: themeColors.text }]}>
                             Déconnexion
                         </Text>
-                        <Text style={[styles.logoutModalMessage, { color: secondaryTextColor }]}>
+                        <Text style={[styles.logoutModalMessage, { color: themeColors.secondaryText }]}>
                             Êtes-vous sûr de vouloir vous déconnecter ?
                         </Text>
                         <View style={styles.logoutModalButtons}>
@@ -674,11 +732,11 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                                 style={[
                                     styles.logoutModalButton,
                                     styles.logoutModalButtonCancel,
-                                    { borderColor }
+                                    { borderColor: themeColors.border }
                                 ]}
                                 onPress={() => setShowLogoutModal(false)}
                             >
-                                <Text style={[styles.logoutModalButtonText, { color: textColor }]}>
+                                <Text style={[styles.logoutModalButtonText, { color: themeColors.text }]}>
                                     Annuler
                                 </Text>
                             </Pressable>

@@ -1,5 +1,6 @@
 import { busTrackingService } from '@/services/busTrackingService';
 import { routingService } from '@/services/routingService';
+import { getAuthToken } from '@/utils/storage';
 import { BusPosition, BusStop, Trip } from '@/types/tracking';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -129,11 +130,27 @@ export function useBusTracking(tripId: string, bookingId: string): UseBusTrackin
             setIsLoading(true);
             setError(null);
 
+            // Récupérer le token d'authentification
+            const token = await getAuthToken();
+            
+            // Si pas de token, utiliser les données de test
+            if (!token || token.trim() === '') {
+                console.log('Token d\'authentification manquant, utilisation des données de test');
+                const testData = getDefaultTestData(tripId);
+                setTrip(testData.trip);
+                setBusStops(testData.busStops);
+                setBusPosition(testData.busPosition);
+                setIsConnected(true);
+                setIsLoading(false);
+                return;
+            }
+
+            // Note: Cette URL est un placeholder - à remplacer par l'URL réelle de l'API
             const response = await fetch(
                 `https://votre-backend.com/api/trips/${tripId}`,
                 {
                     headers: {
-                        Authorization: `Bearer votreToken`,
+                        Authorization: `Bearer ${token}`,
                     },
                 }
             );
