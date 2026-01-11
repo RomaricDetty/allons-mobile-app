@@ -18,6 +18,9 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    Keyboard,
+    KeyboardAvoidingView,
+    Platform,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -250,6 +253,9 @@ const PassengersInfo = () => {
     
     // État pour suivre si l'attribution automatique a déjà été effectuée
     const [seatsAutoAssigned, setSeatsAutoAssigned] = useState(false);
+
+    // État pour suivre la visibilité du clavier
+    const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 
     if (!trip) {
         return (
@@ -966,10 +972,37 @@ const PassengersInfo = () => {
         setPaymentNumber('');
     }, [selectedPaymentMethod]);
 
+    /**
+     * Écoute les événements du clavier pour ajuster l'interface
+     */
+    useEffect(() => {
+        const keyboardWillShow = Keyboard.addListener(
+            Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+            () => {
+                setIsKeyboardVisible(true);
+            }
+        );
+
+        const keyboardWillHide = Keyboard.addListener(
+            Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+            () => {
+                setIsKeyboardVisible(false);
+            }
+        );
+
+        return () => {
+            keyboardWillShow.remove();
+            keyboardWillHide.remove();
+        };
+    }, []);
+
 
     return (
-        <View style={[styles.container, { backgroundColor: scrollBackgroundColor }]}>
-
+        <KeyboardAvoidingView
+            style={[styles.container, { backgroundColor: scrollBackgroundColor }]}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        >
             {isLoading && (
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color={tintColor} />
@@ -979,6 +1012,7 @@ const PassengersInfo = () => {
             {/* Header */}
             <View style={[
                 styles.header,
+                isKeyboardVisible && styles.headerReduced,
                 {
                     paddingTop: insets.top,
                     backgroundColor: headerBackgroundColor,
@@ -989,52 +1023,71 @@ const PassengersInfo = () => {
                     onPress={handleGoBack}
                     style={styles.backButton}
                 >
-                    <Icon name="arrow-left" size={25} color={iconColor} />
+                    <Icon name="arrow-left" size={isKeyboardVisible ? 20 : 25} color={iconColor} />
                 </Pressable>
 
                 <View style={[styles.routeBadge, { width: '200' }]}>
-                    <Text style={[styles.routeBadgeText, { color: tintColor }]}>
-                        {trip.departureCity} <Icon name="chevron-right" size={15} color={tintColor} /> {trip.arrivalCity}
+                    <Text style={[
+                        styles.routeBadgeText,
+                        isKeyboardVisible && styles.routeBadgeTextReduced,
+                        { color: tintColor }
+                    ]}>
+                        {trip.departureCity} <Icon name="chevron-right" size={isKeyboardVisible ? 12 : 15} color={tintColor} /> {trip.arrivalCity}
                         {isRoundTrip && returnTrip && (
-                            <> <Icon name="chevron-right" size={15} color={tintColor} /> {returnTrip.arrivalCity}</>
+                            <> <Icon name="chevron-right" size={isKeyboardVisible ? 12 : 15} color={tintColor} /> {returnTrip.arrivalCity}</>
                         )}
                     </Text>
                 </View>
 
-                <Text style={[styles.stepIndicator, { color: secondaryTextColor }]}>Étape 2 sur 3</Text>
+                {!isKeyboardVisible && (
+                    <Text style={[styles.stepIndicator, { color: secondaryTextColor }]}>Étape 2 sur 3</Text>
+                )}
             </View>
 
             {/* Barre de progression */}
-            <View style={[styles.progressContainer, { backgroundColor: headerBackgroundColor }]}>
-                <Text style={[styles.progressTitle, { color: textColor }]}>Vérifier et payer</Text>
-                <View style={styles.progressBarContainer}>
-                    <View style={[styles.progressBar, { backgroundColor: progressBarBackgroundColor }]}>
-                        <View style={[styles.progressFill, { width: '67%', backgroundColor: tintColor }]} />
+            {!isKeyboardVisible && (
+                <View style={[styles.progressContainer, { backgroundColor: headerBackgroundColor }]}>
+                    <Text style={[styles.progressTitle, { color: textColor }]}>Vérifier et payer</Text>
+                    <View style={styles.progressBarContainer}>
+                        <View style={[styles.progressBar, { backgroundColor: progressBarBackgroundColor }]}>
+                            <View style={[styles.progressFill, { width: '67%', backgroundColor: tintColor }]} />
+                        </View>
+                        <Text style={[styles.progressText, { color: secondaryTextColor }]}>67%</Text>
                     </View>
-                    <Text style={[styles.progressText, { color: secondaryTextColor }]}>67%</Text>
                 </View>
-            </View>
+            )}
 
             {/* Indicateurs de progression */}
-            <View style={[styles.progressIndicators, { backgroundColor: headerBackgroundColor }]}>
-                <View style={[styles.progressDot, { backgroundColor: '#4CAF50' }]}>
-                    <Icon name="check" size={12} color="#FFFFFF" />
+            {!isKeyboardVisible && (
+                <View style={[styles.progressIndicators, { backgroundColor: headerBackgroundColor }]}>
+                    <View style={[styles.progressDot, { backgroundColor: '#4CAF50' }]}>
+                        <Icon name="check" size={12} color="#FFFFFF" />
+                    </View>
+                    <View style={[styles.progressDot, { backgroundColor: tintColor }]} />
+                    <View style={[styles.progressDot, { backgroundColor: progressDotBackgroundColor }]} />
                 </View>
-                <View style={[styles.progressDot, { backgroundColor: tintColor }]} />
-                <View style={[styles.progressDot, { backgroundColor: progressDotBackgroundColor }]} />
-            </View>
+            )}
 
             <ScrollView
                 style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
             >
                 {/* Titre principal */}
-                <View style={styles.titleSection}>
-                    <Text style={[styles.mainTitle, { color: textColor }]}>Vérifier et payer</Text>
-                    <Text style={[styles.subtitle, { color: secondaryTextColor }]}>
-                        Complétez vos informations et procédez au paiement
+                <View style={[styles.titleSection, isKeyboardVisible && styles.titleSectionReduced]}>
+                    <Text style={[
+                        styles.mainTitle,
+                        isKeyboardVisible && styles.mainTitleReduced,
+                        { color: textColor }
+                    ]}>
+                        Vérifier et payer
                     </Text>
+                    {!isKeyboardVisible && (
+                        <Text style={[styles.subtitle, { color: secondaryTextColor }]}>
+                            Complétez vos informations et procédez au paiement
+                        </Text>
+                    )}
                 </View>
 
                 {/* Carte principale */}
@@ -1168,7 +1221,7 @@ const PassengersInfo = () => {
                 errors={validationErrors}
                 onClose={() => setShowErrorModal(false)}
             />
-        </View>
+        </KeyboardAvoidingView>
     );
 };
 
@@ -1184,6 +1237,9 @@ const styles = StyleSheet.create({
         paddingBottom: 12,
         borderBottomWidth: 1,
     },
+    headerReduced: {
+        paddingBottom: 8,
+    },
     backButton: {
         padding: 8,
     },
@@ -1198,6 +1254,9 @@ const styles = StyleSheet.create({
     routeBadgeText: {
         fontSize: 15,
         fontFamily: 'Ubuntu_Medium',
+    },
+    routeBadgeTextReduced: {
+        fontSize: 13,
     },
     stepIndicator: {
         fontSize: 12,
@@ -1259,10 +1318,17 @@ const styles = StyleSheet.create({
     titleSection: {
         marginBottom: 20,
     },
+    titleSectionReduced: {
+        marginBottom: 12,
+    },
     mainTitle: {
         fontSize: 28,
         fontFamily: 'Ubuntu_Bold',
         marginBottom: 8,
+    },
+    mainTitleReduced: {
+        fontSize: 20,
+        marginBottom: 4,
     },
     subtitle: {
         fontSize: 14,

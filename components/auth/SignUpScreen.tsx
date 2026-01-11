@@ -3,8 +3,8 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Dimensions, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Animated, Dimensions, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { authRegister } from '../../api/auth_register';
@@ -72,6 +72,58 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [showCivilityPicker, setShowCivilityPicker] = useState(false);
     const [showRelationPicker, setShowRelationPicker] = useState(false);
+
+    // Valeurs animées pour réduire le header quand le clavier apparaît
+    const headerScale = useRef(new Animated.Value(1)).current;
+    const headerTranslateY = useRef(new Animated.Value(0)).current;
+
+    /**
+     * Gère l'animation de réduction/agrandissement du header selon l'état du clavier
+     */
+    useEffect(() => {
+        const keyboardWillShow = Keyboard.addListener(
+            Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+            () => {
+                // Réduire le header quand le clavier apparaît
+                Animated.parallel([
+                    Animated.timing(headerScale, {
+                        toValue: 0.85,
+                        duration: 250,
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(headerTranslateY, {
+                        toValue: -16,
+                        duration: 250,
+                        useNativeDriver: true,
+                    }),
+                ]).start();
+            }
+        );
+
+        const keyboardWillHide = Keyboard.addListener(
+            Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+            () => {
+                // Restaurer la taille initiale quand le clavier disparaît
+                Animated.parallel([
+                    Animated.timing(headerScale, {
+                        toValue: 1,
+                        duration: 250,
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(headerTranslateY, {
+                        toValue: 0,
+                        duration: 250,
+                        useNativeDriver: true,
+                    }),
+                ]).start();
+            }
+        );
+
+        return () => {
+            keyboardWillShow.remove();
+            keyboardWillHide.remove();
+        };
+    }, [headerScale, headerTranslateY]);
 
     // Options pour la civilité
     const civilityOptions = [
@@ -469,24 +521,41 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
                     <ActivityIndicator size="large" color={loadingIndicatorColor} />
                 </View>
             ) : (
-                <ScrollView
+                <KeyboardAvoidingView
                     style={[styles.container, { backgroundColor: scrollBackgroundColor }]}
-                    contentContainerStyle={styles.contentContainer}
-                    showsVerticalScrollIndicator={false}
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
                 >
+                    <ScrollView
+                        style={styles.scrollView}
+                        contentContainerStyle={styles.contentContainer}
+                        showsVerticalScrollIndicator={false}
+                        keyboardShouldPersistTaps="handled"
+                    >
 
-                    <View style={[styles.header, { paddingTop: insets.top }]}>
-                        <Text style={[styles.title, { color: textColor }]}>Inscription</Text>
-                        {/* <Text style={[styles.subtitle, { color: secondaryTextColor }]}>
-                            Créez un compte ou connectez-vous pour explorer notre application.
-                        </Text> */}
-                        <View style={[styles.footer, { justifyContent: 'flex-start' }]}>
-                            <Text style={[styles.footerText, { color: secondaryTextColor }]}>Vous avez déjà un compte ? </Text>
-                            <Pressable onPress={onSwitchToSignIn}>
-                                <Text style={[styles.footerLink, { color: linkColor }]}>Connectez-vous !</Text>
-                            </Pressable>
-                        </View>
-                    </View>
+                        <Animated.View 
+                            style={[
+                                styles.header,
+                                { paddingTop: insets.top },
+                                {
+                                    transform: [
+                                        { scale: headerScale },
+                                        { translateY: headerTranslateY }
+                                    ],
+                                }
+                            ]}
+                        >
+                            <Text style={[styles.title, { color: textColor }]}>Inscription</Text>
+                            {/* <Text style={[styles.subtitle, { color: secondaryTextColor }]}>
+                                Créez un compte ou connectez-vous pour explorer notre application.
+                            </Text> */}
+                            <View style={[styles.footer, { justifyContent: 'flex-start' }]}>
+                                <Text style={[styles.footerText, { color: secondaryTextColor }]}>Vous avez déjà un compte ? </Text>
+                                <Pressable onPress={onSwitchToSignIn}>
+                                    <Text style={[styles.footerLink, { color: linkColor }]}>Connectez-vous !</Text>
+                                </Pressable>
+                            </View>
+                        </Animated.View>
 
                     <View style={styles.form}>
                         {/* Section 1: Informations personnelles */}
@@ -866,7 +935,8 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
                         onSelect={handleSelectRelation}
                         onClose={() => setShowRelationPicker(false)}
                     />
-                </ScrollView>
+                    </ScrollView>
+                </KeyboardAvoidingView>
             )}
         </>
     );
@@ -874,6 +944,9 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
 
 const styles = StyleSheet.create({
     container: {
+        flex: 1,
+    },
+    scrollView: {
         flex: 1,
     },
     contentContainer: {

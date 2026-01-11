@@ -4,8 +4,8 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
-import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Animated, Image, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AuthFormField } from './AuthFormField';
 import { PasswordField } from './PasswordField';
 // const logoImage = require('@/assets/images/allon-logo.png');
@@ -66,6 +66,80 @@ export const SignInScreen = ({ onSignIn, onSwitchToSignUp, onForgotPassword }: S
     const [password, setPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [rememberMe, setRememberMe] = useState(false);
+
+    // Valeurs animées pour réduire les éléments quand le clavier apparaît
+    const logoScale = useRef(new Animated.Value(1)).current;
+    const headerScale = useRef(new Animated.Value(1)).current;
+    const logoTranslateY = useRef(new Animated.Value(0)).current;
+    const headerTranslateY = useRef(new Animated.Value(0)).current;
+
+    /**
+     * Gère l'animation de réduction/agrandissement des éléments selon l'état du clavier
+     */
+    useEffect(() => {
+        const keyboardWillShow = Keyboard.addListener(
+            Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+            () => {
+                // Réduire les éléments quand le clavier apparaît
+                Animated.parallel([
+                    Animated.timing(logoScale, {
+                        toValue: 0.6,
+                        duration: 250,
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(headerScale, {
+                        toValue: 0.85,
+                        duration: 250,
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(logoTranslateY, {
+                        toValue: -20,
+                        duration: 250,
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(headerTranslateY, {
+                        toValue: -16,
+                        duration: 250,
+                        useNativeDriver: true,
+                    }),
+                ]).start();
+            }
+        );
+
+        const keyboardWillHide = Keyboard.addListener(
+            Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+            () => {
+                // Restaurer la taille initiale quand le clavier disparaît
+                Animated.parallel([
+                    Animated.timing(logoScale, {
+                        toValue: 1,
+                        duration: 250,
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(headerScale, {
+                        toValue: 1,
+                        duration: 250,
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(logoTranslateY, {
+                        toValue: 0,
+                        duration: 250,
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(headerTranslateY, {
+                        toValue: 0,
+                        duration: 250,
+                        useNativeDriver: true,
+                    }),
+                ]).start();
+            }
+        );
+
+        return () => {
+            keyboardWillShow.remove();
+            keyboardWillHide.remove();
+        };
+    }, [logoScale, headerScale, logoTranslateY, headerTranslateY]);
 
     /**
      * Handle the sign in action
@@ -161,8 +235,17 @@ export const SignInScreen = ({ onSignIn, onSwitchToSignUp, onForgotPassword }: S
      * Composant logo simple avec deux formes en 'C' stylisées
      */
     const Logo = () => (
-        <View style={styles.logoContainer}>
-            
+        <Animated.View 
+            style={[
+                styles.logoContainer,
+                {
+                    transform: [
+                        { scale: logoScale },
+                        { translateY: logoTranslateY }
+                    ],
+                }
+            ]}
+        >
             {/* Forme avant (plus foncée) */}
             <View style={styles.logoFront}>
                 <Image 
@@ -171,21 +254,36 @@ export const SignInScreen = ({ onSignIn, onSwitchToSignUp, onForgotPassword }: S
                     style={{ width: 100, height: 100 }} 
                 />
             </View>
-        </View>
+        </Animated.View>
     );
 
     return (
-        <ScrollView
+        <KeyboardAvoidingView
             style={[styles.container, { backgroundColor: scrollBackgroundColor }]}
-            contentContainerStyle={styles.contentContainer}
-            showsVerticalScrollIndicator={false}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
-            <Logo />
-            
-            <View style={styles.header}>
-                <Text style={[styles.title, { color: textColor }]}>Bienvenue !</Text>
-                <Text style={[styles.subtitle, { color: secondaryTextColor }]}>Veuillez renseigner vos informations de connexion.</Text>
-            </View>
+            <ScrollView
+                style={styles.scrollView}
+                contentContainerStyle={styles.contentContainer}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+            >
+                <Logo />
+                <Animated.View 
+                    style={[
+                        styles.header,
+                        {
+                            transform: [
+                                { scale: headerScale },
+                                { translateY: headerTranslateY }
+                            ],
+                        }
+                    ]}
+                >
+                    <Text style={[styles.title, { color: textColor }]}>Bienvenue !</Text>
+                    <Text style={[styles.subtitle, { color: secondaryTextColor }]}>Veuillez renseigner vos informations de connexion.</Text>
+                </Animated.View>
 
             <View style={[styles.sectionCard, { backgroundColor: cardBackgroundColor, borderColor: cardBorderColor }]}>
                 <View style={styles.form}>
@@ -230,12 +328,16 @@ export const SignInScreen = ({ onSignIn, onSwitchToSignUp, onForgotPassword }: S
             </View>
 
             
-        </ScrollView>
+            </ScrollView>
+        </KeyboardAvoidingView>
     );
 };
 
 const styles = StyleSheet.create({
     container: {
+        flex: 1,
+    },
+    scrollView: {
         flex: 1,
     },
     contentContainer: {
@@ -248,7 +350,7 @@ const styles = StyleSheet.create({
         width: 60,
         height: 60,
         alignSelf: 'center',
-        marginBottom: 40,
+        marginBottom: 15,
         position: 'relative',
         justifyContent: 'center',
         alignItems: 'center',
