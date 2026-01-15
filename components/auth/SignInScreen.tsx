@@ -392,7 +392,7 @@ const styles = StyleSheet.create({
         opacity: 1,
     },
     header: {
-        marginBottom: 32,
+        marginBottom: 20,
         alignItems: 'center',
     },
     title: {

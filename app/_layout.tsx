@@ -155,6 +155,7 @@ function RootContent() {
                     <Stack.Screen name="trip/ticket-qr" options={{ headerShown: false }} />
                     <Stack.Screen name="trip/live-tracking" options={{ headerShown: false }} />
                     <Stack.Screen name="trip/route-viewer" options={{ headerShown: false }} />
+                    <Stack.Screen name="auth/forgot-password" options={{ headerShown: false }} />
                 </Stack>
                 <StatusBar 
                     style={colorScheme === 'dark' ? 'light' : 'dark'} 

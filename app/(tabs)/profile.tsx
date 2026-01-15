@@ -4,6 +4,7 @@ import { SignInScreen } from '@/components/auth/SignInScreen';
 import { SignUpScreen } from '@/components/auth/SignUpScreen';
 import { clearAuthData } from '@/utils/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { StyleSheet } from 'react-native';
 
@@ -175,6 +176,7 @@ export default function TabTwoScreen() {
     const handleForgotPassword = () => {
         // TODO: Implémenter la logique de réinitialisation de mot de passe
         console.log('Forgot password');
+        router.push('/auth/forgot-password');
     };
 
     // Afficher un écran de chargement pendant la vérification de la session

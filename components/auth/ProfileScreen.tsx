@@ -9,9 +9,10 @@ import { Booking, ProfileScreenProps, User } from '@/interfaces';
 import { clearAuthData, getAuthToken } from '@/utils/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
@@ -285,6 +286,36 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
     }, [bookingList, searchQuery, selectedStatus]);
 
     /**
+     * Partage l'application avec retour haptique
+     * Mémorisé avec useCallback pour éviter les recréations
+     */
+    const handleShareApp = useCallback(() => {
+        // Déclenche un retour haptique lors du partage de l'application
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        if (Platform.OS === 'ios') {
+            Share.share({
+                message: 'Partagez l\'application avec vos amis et vos proches pour profiter des avantages de l\'application AllOn.',
+                url: 'https://allon-frontoffice-ng.onrender.com/home',
+            });
+        } else {
+            Share.share({
+                title: 'Partagez l\'application AllOn.',
+                message: 'Partagez l\'application avec vos amis et vos proches pour profiter des avantages de l\'application AllOn via le lien suivant: https://allon-frontoffice-ng.onrender.com/home',
+            });
+        }
+    }, []);
+
+    /**
+     * Gère le changement de thème avec retour haptique
+     * Mémorisé avec useCallback pour éviter les recréations
+     */
+    const handleThemeToggle = useCallback((value: boolean) => {
+        // Déclenche un retour haptique lors du changement de thème
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        toggleTheme();
+    }, [toggleTheme]);
+
+    /**
      * Rendu du contenu de l'onglet Mes informations
      */
     /**
@@ -505,12 +536,35 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                 </View>
                 <Switch
                     value={isDarkMode}
-                    onValueChange={toggleTheme}
+                    onValueChange={handleThemeToggle}
                     trackColor={{ false: '#E0E0E0', true: '#1776BA' }}
                     thumbColor="#FFFFFF"
                     ios_backgroundColor="#E0E0E0"
                 />
             </View>
+
+            {/* Partage de l'application */}
+            <View style={[styles.themeToggleCard, { backgroundColor: themeColors.cardBackground, borderColor: themeColors.border }]}>
+                <Pressable onPress={() => handleShareApp()} style={styles.themeToggleContent}>
+                    <View style={[
+                        styles.themeIconContainer,
+                        { backgroundColor: themeColors.tripsIconContainerBackground }
+                    ]}>
+                        <MaterialCommunityIcons
+                            name="share-outline"
+                            size={24}
+                            color={themeColors.activeTab}
+                        />
+                    </View>
+                    <View style={styles.themeToggleTextContainer}>
+                        <Text style={[styles.themeToggleLabel, { color: themeColors.text }]}>Partager l'application</Text>
+                        <Text style={[styles.themeToggleDescription, { color: themeColors.secondaryText }]}>
+                            Partagez l'application avec vos amis et vos proches.
+                        </Text>
+                    </View>
+                </Pressable>
+            </View>
+
 
             {/* Modify Button */}
             <Pressable 

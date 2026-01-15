@@ -42,7 +42,7 @@ export const EmergencyContactBlock = ({
                 value={emergencyContact.firstName}
                 onChangeText={(text) => onUpdateEmergencyContact('firstName', text)}
                 placeholder="Entrez le prénom"
-                required
+                required={false}
             />
 
             <FormField
@@ -50,14 +50,14 @@ export const EmergencyContactBlock = ({
                 value={emergencyContact.lastName}
                 onChangeText={(text) => onUpdateEmergencyContact('lastName', text)}
                 placeholder="Entrez le nom"
-                required
+                required={false}
             />
 
             <PhoneField
                 label="Téléphone"
                 value={emergencyContact.phone}
                 onChangeText={(text) => onUpdateEmergencyContact('phone', text)}
-                required
+                required={false}
             />
 
             <FormField
@@ -66,13 +66,14 @@ export const EmergencyContactBlock = ({
                 onChangeText={(text) => onUpdateEmergencyContact('email', text)}
                 placeholder="exemple@email.com"
                 keyboardType="email-address"
+                required={false}
             />
 
             <SelectField
                 label="Relation"
                 value={emergencyContact.relationship}
                 placeholder="Sélectionner une relation"
-                required
+                required={false}
                 selectionType="relation"
                 options={[
                     {value: 'parent', label: 'Parent'},

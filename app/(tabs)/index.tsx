@@ -1,11 +1,15 @@
 // @ts-nocheck
+import { authGetUserInfo } from '@/api/auth_register';
 import { getPopularTrips } from '@/api/trip';
 import { DepartureCard } from '@/components/departure-card';
 import { ItineraryCard } from '@/components/itinerary-card';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
+import { User } from '@/interfaces';
 import { PopularTrip } from '@/types';
+import { getAuthToken, getUserId } from '@/utils/storage';
 import { useNavigation } from '@react-navigation/native';
+import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
@@ -63,6 +67,7 @@ export default function HomeScreen() {
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [popularTrips, setPopularTrips] = useState<PopularTrip[]>([]);
+    const [user, setUser] = useState<User | null>(null);
     const colorScheme = useColorScheme() ?? 'dark';
     const backgroundColor = useThemeColor({}, 'background');
     const textColor = useThemeColor({}, 'text');
@@ -76,14 +81,48 @@ export default function HomeScreen() {
         iconColor: colorScheme === 'dark' ? '#9BA1A6' : '#A6A6AA',
     }), [colorScheme]);
 
+    // Couleur principale de l'application
+    const primaryColor = '#1776BA';
+
     // Mémorisation des styles dynamiques
     const dynamicStyles = useMemo(() => ({
         scrollView: { backgroundColor, paddingTop: insets.top },
         titleText: { color: textColor },
+        nameText: { color: textColor },
         searchContainer: { backgroundColor: searchColors.backgroundColor },
         searchText: { color: searchColors.textColor },
         sectionTitle: { color: textColor },
-    }), [backgroundColor, insets.top, textColor, searchColors]);
+        nextTripCard: { backgroundColor: primaryColor },
+    }), [backgroundColor, insets.top, textColor, searchColors, primaryColor]);
+
+    /**
+     * Détermine la salutation selon l'heure de la journée
+     * @returns "Bonjour" avant 18h, "Bonsoir" après 18h
+     */
+    const getGreeting = useCallback(() => {
+        const hour = new Date().getHours();
+        return hour < 18 ? 'Bonjour' : 'Bonsoir';
+    }, []);
+
+    /**
+     * Récupère les informations de l'utilisateur connecté
+     * @returns void
+     */
+    const fetchUserInfo = useCallback(async () => {
+        try {
+            const token = await getAuthToken();
+            const userId = await getUserId();
+            
+            if (token && userId) {
+                const response = await authGetUserInfo(userId, token);
+                if (response.status === 200) {
+                    setUser(response.data);
+                }
+            }
+        } catch (error) {
+            console.error('Erreur lors de la récupération des informations utilisateur:', error);
+        }
+    }, []);
 
     /**
      * Récupère les trajets populaires
@@ -126,6 +165,7 @@ export default function HomeScreen() {
      * @returns void
      */
     const handlePopularTripPress = useCallback((item: PopularTrip) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         navigation.navigate('trip/search', { popularTrip: item as PopularTrip });
     }, [navigation]);
 
@@ -134,6 +174,7 @@ export default function HomeScreen() {
      * @returns void
      */
     const handleSearchPress = useCallback(() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         navigation.navigate('trip/search');
     }, [navigation]);
 
@@ -142,6 +183,7 @@ export default function HomeScreen() {
      * @returns void
      */
     const handleSeeMorePress = useCallback(() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         console.log('Okay');
     }, []);
 
@@ -162,7 +204,8 @@ export default function HomeScreen() {
 
     useEffect(() => {
         getPopularTripsFunction();
-    }, [getPopularTripsFunction]);
+        fetchUserInfo();
+    }, [getPopularTripsFunction, fetchUserInfo]);
 
     // Mémorisation du composant de chargement
     const loadingView = useMemo(() => (
@@ -182,6 +225,15 @@ export default function HomeScreen() {
                     refreshControl={
                         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
                     }>
+
+                    {/* Salutation et nom */}
+                    {user && (
+                        <View style={styles.nameContainer}>
+                            <Text style={[styles.nameText, dynamicStyles.nameText]}>
+                                {getGreeting()} {user.firstName.split(' ')[0]},
+                            </Text>
+                        </View>
+                    )}
 
                     {/* Rechercher un départ */}
                     <View style={styles.titleContainer}>
@@ -264,6 +316,52 @@ export default function HomeScreen() {
                         </View>
                     </View>
                     {/* Nos itinéraires en promotion */}
+
+                    {/* Prochain voyage */}
+                    {user && (
+                        <View style={styles.nextTripContainer}>
+                            <Text style={[styles.sectionTitle, dynamicStyles.sectionTitle]}>
+                                Prochain voyage
+                            </Text>
+                            <View style={[styles.nextTripCard, dynamicStyles.nextTripCard]}>
+                                {/* Section gauche - Départ */}
+                                <View style={styles.tripSection}>
+                                    <View style={styles.tripHeader}>
+                                        <MaterialCommunityIcons
+                                            name="bus"
+                                            size={16}
+                                            color="#FFFFFF"
+                                        />
+                                        <Text style={styles.tripTime}>18:20</Text>
+                                    </View>
+                                    <Text style={styles.tripAirportCode}>BOU</Text>
+                                    <Text style={styles.tripCity}>Bouaké</Text>
+                                </View>
+
+                                {/* Section centrale - Durée */}
+                                <View style={[styles.tripCenter]}>
+                                    <View style={styles.tripArcContainer}>
+                                        <View style={styles.tripArc} />
+                                    </View>
+                                    <Text style={styles.tripDuration}>7h20min</Text>
+                                </View>
+
+                                {/* Section droite - Arrivée */}
+                                <View style={[styles.tripSection, styles.tripSectionRight]}>
+                                    <View style={styles.tripHeader}>
+                                        <MaterialCommunityIcons
+                                            name="bus-stop"
+                                            size={16}
+                                            color="#FFFFFF"
+                                        />
+                                        <Text style={styles.tripTime}>01:00</Text>
+                                    </View>
+                                    <Text style={styles.tripAirportCode}>ABJ</Text>
+                                    <Text style={styles.tripCity}>Abidjan</Text>
+                                </View>
+                            </View>
+                        </View>
+                    )}
                 </ScrollView>
             )}
         </>
@@ -279,13 +377,23 @@ const styles = StyleSheet.create({
     scrollContent: {
         paddingTop: 0,
     },
+    nameContainer: {
+        width: '100%',
+        paddingHorizontal: 20,
+        paddingTop: 20,
+    },
+    nameText: {
+        fontSize: 20,
+        fontFamily: 'Ubuntu_Bold',
+        textAlign: 'left',
+    },
     titleContainer: {
         width: '100%',
         paddingHorizontal: 20,
         paddingTop: 20,
     },
     title: {
-        fontSize: 30,
+        fontSize: 28,
         fontFamily: 'Ubuntu_Bold',
         textAlign: 'left',
     },
@@ -445,6 +553,91 @@ const styles = StyleSheet.create({
         fontSize: 14,
     },
 
-
-
+    nextTripContainer: {
+        width: '100%',
+        paddingHorizontal: 20,
+        paddingBottom: 30,
+    },
+    nextTripCard: {
+        borderRadius: 20,
+        padding: 24,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 4,
+        },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 8,
+    },
+    tripSection: {
+        flex: 1,
+        alignItems: 'flex-start',
+    },
+    tripSectionRight: {
+        alignItems: 'flex-end',
+    },
+    tripHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginBottom: 8,
+    },
+    tripTime: {
+        fontSize: 14,
+        fontFamily: 'Ubuntu_Regular',
+        color: '#FFFFFF',
+    },
+    tripAirportCode: {
+        fontSize: 32,
+        fontFamily: 'Ubuntu_Bold',
+        color: '#FFFFFF',
+        marginBottom: 4,
+    },
+    tripCity: {
+        fontSize: 14,
+        fontFamily: 'Ubuntu_Regular',
+        color: '#FFFFFF',
+        opacity: 0.8,
+    },
+    tripCenter: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginHorizontal: 16,
+        position: 'relative',
+        minWidth: 90,
+        height: 55,
+    },
+    tripArcContainer: {
+        width: 120,
+        height: 90,
+        // overflow: 'hidden',
+        position: 'absolute',
+        top: 0,
+        alignItems: 'center',
+        justifyContent: 'flex-start',
+    },
+    tripArc: {
+        width: 120,
+        height: 90,
+        borderRadius: 90,
+        borderWidth: 2.5,
+        borderColor: 'rgba(255, 255, 255, 0.2)',
+        borderBottomColor: 'transparent',
+        borderLeftColor: 'transparent',
+        borderRightColor: 'transparent',
+        position: 'absolute',
+        // top: -90,
+        left: 0,
+    },
+    tripDuration: {
+        fontSize: 13,
+        fontFamily: 'Ubuntu_Medium',
+        color: '#FFFFFF',
+        marginTop: 25,
+        zIndex: 1,
+    },
 });

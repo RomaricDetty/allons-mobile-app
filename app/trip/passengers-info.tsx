@@ -547,32 +547,32 @@ const PassengersInfo = () => {
         });
 
         // Validation du contact d'urgence
-        const emergencyFirstNameTrimmed = emergencyContact.firstName?.trim() || '';
-        if (!emergencyFirstNameTrimmed) {
-            errors.push('Le prénom du contact d\'urgence est requis');
-        }
+        // const emergencyFirstNameTrimmed = emergencyContact.firstName?.trim() || '';
+        // if (!emergencyFirstNameTrimmed) {
+        //     errors.push('Le prénom du contact d\'urgence est requis');
+        // }
 
-        const emergencyLastNameTrimmed = emergencyContact.lastName?.trim() || '';
-        if (!emergencyLastNameTrimmed) {
-            errors.push('Le nom du contact d\'urgence est requis');
-        }
+        // const emergencyLastNameTrimmed = emergencyContact.lastName?.trim() || '';
+        // if (!emergencyLastNameTrimmed) {
+        //     errors.push('Le nom du contact d\'urgence est requis');
+        // }
 
-        const emergencyPhoneTrimmed = emergencyContact.phone?.trim() || '';
-        if (!emergencyPhoneTrimmed) {
-            errors.push('Le téléphone du contact d\'urgence est requis');
-        } else if (!isValidPhone(emergencyPhoneTrimmed)) {
-            errors.push('Le format du téléphone du contact d\'urgence est invalide (Ex: 0123456789)');
-        }
+        // const emergencyPhoneTrimmed = emergencyContact.phone?.trim() || '';
+        // if (!emergencyPhoneTrimmed) {
+        //     errors.push('Le téléphone du contact d\'urgence est requis');
+        // } else if (!isValidPhone(emergencyPhoneTrimmed)) {
+        //     errors.push('Le format du téléphone du contact d\'urgence est invalide (Ex: 0123456789)');
+        // }
 
-        if (!emergencyContact.relationship || emergencyContact.relationship.trim() === '') {
-            errors.push('La relation avec le contact d\'urgence est requise');
-        }
+        // if (!emergencyContact.relationship || emergencyContact.relationship.trim() === '') {
+        //     errors.push('La relation avec le contact d\'urgence est requise');
+        // }
 
         // Validation de l'email du contact d'urgence si renseigné
-        const emergencyEmailTrimmed = emergencyContact.email?.trim() || '';
-        if (emergencyEmailTrimmed && !isValidEmail(emergencyEmailTrimmed)) {
-            errors.push('Le format de l\'email du contact d\'urgence est invalide');
-        }
+        // const emergencyEmailTrimmed = emergencyContact.email?.trim() || '';
+        // if (emergencyEmailTrimmed && !isValidEmail(emergencyEmailTrimmed)) {
+        //     errors.push('Le format de l\'email du contact d\'urgence est invalide');
+        // }
 
         // Validation de la méthode de paiement
         if (!selectedPaymentMethod) {
@@ -674,9 +674,9 @@ const PassengersInfo = () => {
 
             // Formatage du contact d'urgence
             const contact = {
-                firstName: emergencyContact.firstName.trim(),
-                lastName: emergencyContact.lastName.trim(),
-                phone: emergencyContact.phone.trim(),
+                firstName: emergencyContact.firstName.trim() || '',
+                lastName: emergencyContact.lastName.trim() || '',
+                phone: emergencyContact.phone.trim() || '',
                 email: emergencyContact.email.trim() || '',
                 relationship: emergencyContact.relationship.trim().toLowerCase() || 'autre'
             };

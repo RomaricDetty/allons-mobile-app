@@ -12,13 +12,13 @@ export function HapticTab(props: BottomTabBarButtonProps) {
         <PlatformPressable
             {...props}
             onPressIn={(ev) => {
-                // Ajoute un retour haptique léger lors de l'appui sur les onglets
+                // Ajoute un retour haptique avec intensité moyenne lors de l'appui sur les onglets
                 if (Platform.OS === 'android') {
-                    // Utilise la méthode spécifique Android avec une valeur string
-                    Haptics.performAndroidHapticsAsync('context-click' as any);
+                    // Utilise impactAsync avec style Medium pour une intensité plus forte
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                 } else {
-                    // iOS utilise impactAsync
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    // iOS utilise impactAsync avec style Medium pour une intensité plus forte
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                 }
                 props.onPressIn?.(ev);
             }}
