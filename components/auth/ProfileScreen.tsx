@@ -11,8 +11,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Animated, Dimensions, Image, Modal, Platform, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
@@ -83,7 +83,12 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [isLoadingBooking, setIsLoadingBooking] = useState<string | null>(null);
     const [showLogoutModal, setShowLogoutModal] = useState(false);
+    const [refreshing, setRefreshing] = useState<boolean>(false);
     const navigation = useNavigation();
+    const scrollViewRef = useRef<ScrollView>(null);
+    const screenWidth = Dimensions.get('window').width;
+    const scrollX = useRef(new Animated.Value(0)).current;
+    const isProgrammaticScrollRef = useRef(false);
 
     /**
      * Formate le nom complet de l'utilisateur
@@ -149,17 +154,17 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
         try {
             const token = await getAuthToken();
             const userId = await AsyncStorage.getItem('user_id');
-            
+
             if (!token || token.trim() === '') {
                 Alert.alert('Erreur', 'Token d\'authentification manquant. Veuillez vous reconnecter.');
                 return null;
             }
-            
+
             if (!userId || userId.trim() === '') {
                 Alert.alert('Erreur', 'ID utilisateur manquant. Veuillez vous reconnecter.');
                 return null;
             }
-            
+
             const response = await authGetUserInfo(userId, token);
             if (response.status === 200) {
                 return response.data;
@@ -182,17 +187,17 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
         try {
             const token = await getAuthToken();
             const userId = await AsyncStorage.getItem('user_id');
-            
+
             if (!token || token.trim() === '') {
                 Alert.alert('Erreur', 'Token d\'authentification manquant. Veuillez vous reconnecter.');
                 return;
             }
-            
+
             if (!userId || userId.trim() === '') {
                 Alert.alert('Erreur', 'ID utilisateur manquant. Veuillez vous reconnecter.');
                 return;
             }
-            
+
             const response = await bookingListInfo(userId, token);
             if (response.status === 200 && response.data?.items) {
                 setBookingList(response.data.items);
@@ -213,13 +218,13 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
         try {
             setIsLoadingBooking(bookingId);
             const token = await getAuthToken();
-            
+
             if (!token || token.trim() === '') {
                 Alert.alert('Erreur', 'Token d\'authentification manquant. Veuillez vous reconnecter.');
                 setIsLoadingBooking(null);
                 return;
             }
-            
+
             const response = await getBookingDetails(bookingId, token);
             if (response.status === 200) {
                 navigation.navigate('trip/ticket-details' as never, { ticketDetails: response.data } as never);
@@ -257,12 +262,52 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
     );
 
     /**
+     * Initialise la position du scroll au démarrage selon l'onglet actif
+     */
+    useEffect(() => {
+        if (!isLoading && scrollViewRef.current) {
+            // Petit délai pour s'assurer que le layout est prêt
+            setTimeout(() => {
+                const index = activeTab === 'info' ? 0 : 1;
+                const scrollPosition = index * screenWidth;
+
+                if (scrollViewRef.current) {
+                    scrollViewRef.current.scrollTo({
+                        x: scrollPosition,
+                        animated: false
+                    });
+                }
+
+                // Mettre à jour scrollX sans animation
+                scrollX.setValue(scrollPosition);
+            }, 100);
+        }
+    }, [isLoading]); 
+
+    /**
      * Navigue vers l'écran de modification du profil
      * Mémorisé avec useCallback pour éviter les recréations
      */
     const handleUpdateUserInfo = useCallback(() => {
         router.push('/profile/edit');
     }, []);
+
+    /**
+     * Gère le pull to refresh pour recharger les données
+     * Mémorisé avec useCallback pour éviter les recréations
+     */
+    const handleRefresh = useCallback(async () => {
+        setRefreshing(true);
+        try {
+            const userInfo = await getUserInfo();
+            setUser(userInfo);
+            await getBookingList();
+        } catch (error) {
+            console.error('Erreur lors du rafraîchissement des données:', error);
+        } finally {
+            setRefreshing(false);
+        }
+    }, [getUserInfo, getBookingList]);
 
     /**
      * Filtre et recherche les réservations
@@ -278,7 +323,7 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                 booking.companyName?.toLowerCase().includes(searchQuery.toLowerCase());
 
             // Filtre par statut (comparaison insensible à la casse)
-            const matchesStatus = !selectedStatus || 
+            const matchesStatus = !selectedStatus ||
                 booking.status?.toUpperCase() === selectedStatus.toUpperCase();
 
             return matchesSearch && matchesStatus;
@@ -327,6 +372,14 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
             style={styles.scrollView}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
+            refreshControl={
+                <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={handleRefresh}
+                    tintColor={themeColors.activeTab}
+                    colors={[themeColors.activeTab]}
+                />
+            }
         >
             {/* Main Profile Card */}
             <View style={[styles.profileCard, { backgroundColor: themeColors.cardBackground, borderColor: themeColors.border }]}>
@@ -463,8 +516,8 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                                 <View style={styles.emergencyDetailItem}>
                                     <MaterialCommunityIcons name="account-heart" size={14} color={themeColors.secondaryText} />
                                     <Text style={[styles.emergencyRelation, { color: themeColors.secondaryText }]}>
-                                        {user.contactUrgent.relationship 
-                                            ? user.contactUrgent.relationship.charAt(0).toUpperCase() + user.contactUrgent.relationship.slice(1).toLowerCase() 
+                                        {user.contactUrgent.relationship
+                                            ? user.contactUrgent.relationship.charAt(0).toUpperCase() + user.contactUrgent.relationship.slice(1).toLowerCase()
                                             : 'Non renseigné'}
                                     </Text>
                                 </View>
@@ -567,8 +620,8 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
 
 
             {/* Modify Button */}
-            <Pressable 
-                style={[styles.upgradeButton, { backgroundColor: themeColors.activeTab }]} 
+            <Pressable
+                style={[styles.upgradeButton, { backgroundColor: themeColors.activeTab }]}
                 onPress={handleUpdateUserInfo}
             >
                 <MaterialCommunityIcons name="pencil" size={20} color="#FFFFFF" />
@@ -582,8 +635,8 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
      * Mémorisé pour éviter les recalculs
      */
     const selectedStatusLabel = useMemo(() => {
-        return selectedStatus 
-            ? STATUS_OPTIONS.find(opt => opt.value === selectedStatus)?.label 
+        return selectedStatus
+            ? STATUS_OPTIONS.find(opt => opt.value === selectedStatus)?.label
             : 'Tous les statuts';
     }, [selectedStatus]);
 
@@ -591,171 +644,179 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
      * Rendu du contenu de l'onglet Mes réservations
      */
     const renderTicketsTab = () => (
-            <View style={[styles.ticketsContainer, { backgroundColor: themeColors.scrollBackground }]}>
-                {/* Barre de recherche et filtre */}
-                <View style={[styles.searchFilterContainer, { backgroundColor: themeColors.headerBackground }]}>
-                    <TextInput
-                        style={[
-                            styles.searchInput,
-                            {
-                                backgroundColor: themeColors.inputBackground,
-                                borderColor: themeColors.border,
-                                color: themeColors.text
-                            }
-                        ]}
-                        placeholder="Rechercher par ville, référence ou compagnie"
-                        placeholderTextColor={themeColors.placeholder}
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                    />
-                    <Pressable
-                        style={[
-                            styles.statusFilter,
-                            {
-                                backgroundColor: themeColors.inputBackground,
-                                borderColor: themeColors.border
-                            }
-                        ]}
-                        onPress={() => setShowStatusModal(true)}
-                    >
-                        <Text style={[
-                            styles.statusFilterText,
-                            { color: selectedStatus ? themeColors.text : themeColors.placeholder }
-                        ]}>
-                            {selectedStatusLabel}
-                        </Text>
-                        <MaterialCommunityIcons name="chevron-down" size={20} color={themeColors.secondaryText} />
-                    </Pressable>
+        <View style={[styles.ticketsContainer, { backgroundColor: themeColors.scrollBackground }]}>
+            {/* Barre de recherche et filtre */}
+            <View style={[styles.searchFilterContainer, { backgroundColor: themeColors.headerBackground }]}>
+                <TextInput
+                    style={[
+                        styles.searchInput,
+                        {
+                            backgroundColor: themeColors.inputBackground,
+                            borderColor: themeColors.border,
+                            color: themeColors.text
+                        }
+                    ]}
+                    placeholder="Rechercher par ville, référence ou compagnie"
+                    placeholderTextColor={themeColors.placeholder}
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                />
+                <Pressable
+                    style={[
+                        styles.statusFilter,
+                        {
+                            backgroundColor: themeColors.inputBackground,
+                            borderColor: themeColors.border
+                        }
+                    ]}
+                    onPress={() => setShowStatusModal(true)}
+                >
+                    <Text style={[
+                        styles.statusFilterText,
+                        { color: selectedStatus ? themeColors.text : themeColors.placeholder }
+                    ]}>
+                        {selectedStatusLabel}
+                    </Text>
+                    <MaterialCommunityIcons name="chevron-down" size={20} color={themeColors.secondaryText} />
+                </Pressable>
+            </View>
+
+            {/* Liste des réservations */}
+            {filteredBookings.length === 0 ? (
+                <View style={styles.emptyStateContainer}>
+                    <MaterialCommunityIcons name="ticket-outline" size={64} color={themeColors.inactiveIcon} />
+                    <Text style={[styles.emptyStateText, { color: themeColors.text }]}>Aucun ticket disponible</Text>
+                    <Text style={[styles.emptyStateSubtext, { color: themeColors.secondaryText }]}>Vos tickets de voyage apparaîtront ici</Text>
                 </View>
+            ) : (
+                <ScrollView
+                    style={styles.scrollView}
+                    contentContainerStyle={styles.scrollContent}
+                    showsVerticalScrollIndicator={false}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={handleRefresh}
+                            tintColor={themeColors.activeTab}
+                            colors={[themeColors.activeTab]}
+                        />
+                    }
+                >
+                    {filteredBookings.map((booking) => (
+                        <View key={booking.id} style={[styles.bookingCard, { backgroundColor: themeColors.cardBackground, borderColor: themeColors.border }]}>
+                            {/* Route et date */}
+                            <View style={styles.bookingHeader}>
+                                <Text style={[styles.routeText, { color: themeColors.text }]}>
+                                    {booking.trip.stationFrom.city} → {booking.trip.stationTo.city}
+                                </Text>
+                                <Text style={[styles.dateText, { color: themeColors.secondaryText }]}>
+                                    {formatBookingDate(booking.departureDateTime)}
+                                </Text>
+                                <Text style={[styles.timeText, { color: themeColors.secondaryText }]}>
+                                    {booking.departureTime} - {booking.arrivalTime}
+                                </Text>
+                            </View>
 
-                {/* Liste des réservations */}
-                {filteredBookings.length === 0 ? (
-                    <View style={styles.emptyStateContainer}>
-                        <MaterialCommunityIcons name="ticket-outline" size={64} color={themeColors.inactiveIcon} />
-                        <Text style={[styles.emptyStateText, { color: themeColors.text }]}>Aucun ticket disponible</Text>
-                        <Text style={[styles.emptyStateSubtext, { color: themeColors.secondaryText }]}>Vos tickets de voyage apparaîtront ici</Text>
-                    </View>
-                ) : (
-                    <ScrollView
-                        style={styles.scrollView}
-                        contentContainerStyle={styles.scrollContent}
-                        showsVerticalScrollIndicator={false}
-                    >
-                        {filteredBookings.map((booking) => (
-                            <View key={booking.id} style={[styles.bookingCard, { backgroundColor: themeColors.cardBackground, borderColor: themeColors.border }]}>
-                                {/* Route et date */}
-                                <View style={styles.bookingHeader}>
-                                    <Text style={[styles.routeText, { color: themeColors.text }]}>
-                                        {booking.trip.stationFrom.city} → {booking.trip.stationTo.city}
-                                    </Text>
-                                    <Text style={[styles.dateText, { color: themeColors.secondaryText }]}>
-                                        {formatBookingDate(booking.departureDateTime)}
-                                    </Text>
-                                    <Text style={[styles.timeText, { color: themeColors.secondaryText }]}>
-                                        {booking.departureTime} - {booking.arrivalTime}
-                                    </Text>
-                                </View>
+                            {/* Compagnie et passagers */}
+                            <View style={styles.bookingInfo}>
+                                <Text style={[styles.companyText, { color: themeColors.text }]}>{booking.companyName}</Text>
+                                <Text style={[styles.passengersText, { color: themeColors.secondaryText }]}>
+                                    {booking.passengers.length} passager(s)
+                                </Text>
+                            </View>
 
-                                {/* Compagnie et passagers */}
-                                <View style={styles.bookingInfo}>
-                                    <Text style={[styles.companyText, { color: themeColors.text }]}>{booking.companyName}</Text>
-                                    <Text style={[styles.passengersText, { color: themeColors.secondaryText }]}>
-                                        {booking.passengers.length} passager(s)
+                            {/* Référence, prix et statut */}
+                            <View style={styles.bookingFooter}>
+                                <Text style={[styles.referenceText, { color: themeColors.secondaryText }]}>Réf: {booking.code}</Text>
+                                <View style={styles.priceStatusContainer}>
+                                    <Text style={[styles.priceText, { color: themeColors.activeTab }]}>
+                                        {parseFloat(booking.totalAmount).toLocaleString('fr-FR')} {booking.currency}
                                     </Text>
-                                </View>
-
-                                {/* Référence, prix et statut */}
-                                <View style={styles.bookingFooter}>
-                                    <Text style={[styles.referenceText, { color: themeColors.secondaryText }]}>Réf: {booking.code}</Text>
-                                    <View style={styles.priceStatusContainer}>
-                                        <Text style={[styles.priceText, { color: themeColors.activeTab }]}>
-                                            {parseFloat(booking.totalAmount).toLocaleString('fr-FR')} {booking.currency}
+                                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(booking.status || ''), justifyContent: 'center', alignItems: 'center' }]}>
+                                        <Text style={styles.statusBadgeText}>
+                                            {formatStatus(booking.status || '')}
                                         </Text>
-                                        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(booking.status || ''), justifyContent: 'center', alignItems: 'center' }]}>
-                                            <Text style={styles.statusBadgeText}>
-                                                {formatStatus(booking.status || '')}
-                                            </Text>
-                                        </View>
                                     </View>
                                 </View>
-
-                                {/* Boutons d'action */}
-                                <View style={styles.actionButtons}>
-                                    <Pressable
-                                        style={[
-                                            styles.actionButton,
-                                            {
-                                                backgroundColor: themeColors.activeTab,
-                                                borderColor: themeColors.activeTab,
-                                                opacity: isLoadingBooking === booking.id ? 0.7 : 1
-                                            }
-                                        ]}
-                                        onPress={() => handleViewBooking(booking.id)}
-                                        disabled={isLoadingBooking === booking.id}
-                                    >
-                                        {isLoadingBooking === booking.id ? (
-                                            <ActivityIndicator size="small" color="#ffffff" />
-                                        ) : (
-                                            <>
-                                                <MaterialCommunityIcons name="eye-outline" size={20} color="#ffffff" />
-                                                <Text style={styles.actionButtonText}>Ticket</Text>
-                                            </>
-                                        )}
-                                    </Pressable>
-                                    <Pressable
-                                        style={[styles.actionButton, { backgroundColor: 'transparent', borderColor: themeColors.border }]}
-                                        onPress={() => {
-                                            navigation.navigate('trip/route-viewer' as never, { booking: JSON.stringify(booking) } as never);
-                                        }}
-                                    >
-                                        <MaterialCommunityIcons name="map-marker-outline" size={20} color={themeColors.secondaryText} />
-                                        <Text style={[styles.actionButtonText, { color: themeColors.secondaryText }]}>Itinéraire</Text>
-                                    </Pressable>
-                                </View>
                             </View>
-                        ))}
-                    </ScrollView>
-                )}
 
-                {/* Modal de sélection du statut */}
-                <Modal
-                    visible={showStatusModal}
-                    transparent={true}
-                    animationType="fade"
-                    onRequestClose={() => setShowStatusModal(false)}
-                >
-                    <Pressable
-                        style={styles.modalOverlay}
-                        onPress={() => setShowStatusModal(false)}
-                    >
-                        <View style={[styles.modalContent, { backgroundColor: themeColors.modalBackground }]} onStartShouldSetResponder={() => true}>
-                            <View style={[styles.modalHeader, { borderBottomColor: themeColors.border }]}>
-                                <Text style={[styles.modalTitle, { color: themeColors.text }]}>Choisir un statut</Text>
-                                <Pressable onPress={() => setShowStatusModal(false)}>
-                                    <MaterialCommunityIcons name="close" size={24} color={themeColors.icon} />
+                            {/* Boutons d'action */}
+                            <View style={styles.actionButtons}>
+                                <Pressable
+                                    style={[
+                                        styles.actionButton,
+                                        {
+                                            backgroundColor: themeColors.activeTab,
+                                            borderColor: themeColors.activeTab,
+                                            opacity: isLoadingBooking === booking.id ? 0.7 : 1
+                                        }
+                                    ]}
+                                    onPress={() => handleViewBooking(booking.id)}
+                                    disabled={isLoadingBooking === booking.id}
+                                >
+                                    {isLoadingBooking === booking.id ? (
+                                        <ActivityIndicator size="small" color="#ffffff" />
+                                    ) : (
+                                        <>
+                                            <MaterialCommunityIcons name="eye-outline" size={20} color="#ffffff" />
+                                            <Text style={styles.actionButtonText}>Ticket</Text>
+                                        </>
+                                    )}
+                                </Pressable>
+                                <Pressable
+                                    style={[styles.actionButton, { backgroundColor: 'transparent', borderColor: themeColors.border }]}
+                                    onPress={() => {
+                                        navigation.navigate('trip/route-viewer' as never, { booking: JSON.stringify(booking) } as never);
+                                    }}
+                                >
+                                    <MaterialCommunityIcons name="map-marker-outline" size={20} color={themeColors.secondaryText} />
+                                    <Text style={[styles.actionButtonText, { color: themeColors.secondaryText }]}>Itinéraire</Text>
                                 </Pressable>
                             </View>
-                            <ScrollView>
-                                {STATUS_OPTIONS.map((option) => (
-                                    <Pressable
-                                        key={option.value}
-                                        style={[styles.modalOption, { borderBottomColor: themeColors.modalBorder }]}
-                                        onPress={() => {
-                                            setSelectedStatus(option.value);
-                                            setShowStatusModal(false);
-                                        }}
-                                    >
-                                        <Text style={[styles.modalOptionText, { color: themeColors.text }]}>{option.label}</Text>
-                                        {selectedStatus === option.value && (
-                                            <MaterialCommunityIcons name="check" size={20} color={themeColors.activeTab} />
-                                        )}
-                                    </Pressable>
-                                ))}
-                            </ScrollView>
                         </View>
-                    </Pressable>
-                </Modal>
-            </View>
+                    ))}
+                </ScrollView>
+            )}
+
+            {/* Modal de sélection du statut */}
+            <Modal
+                visible={showStatusModal}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setShowStatusModal(false)}
+            >
+                <Pressable
+                    style={styles.modalOverlay}
+                    onPress={() => setShowStatusModal(false)}
+                >
+                    <View style={[styles.modalContent, { backgroundColor: themeColors.modalBackground }]} onStartShouldSetResponder={() => true}>
+                        <View style={[styles.modalHeader, { borderBottomColor: themeColors.border }]}>
+                            <Text style={[styles.modalTitle, { color: themeColors.text }]}>Choisir un statut</Text>
+                            <Pressable onPress={() => setShowStatusModal(false)}>
+                                <MaterialCommunityIcons name="close" size={24} color={themeColors.icon} />
+                            </Pressable>
+                        </View>
+                        <ScrollView>
+                            {STATUS_OPTIONS.map((option) => (
+                                <Pressable
+                                    key={option.value}
+                                    style={[styles.modalOption, { borderBottomColor: themeColors.modalBorder }]}
+                                    onPress={() => {
+                                        setSelectedStatus(option.value);
+                                        setShowStatusModal(false);
+                                    }}
+                                >
+                                    <Text style={[styles.modalOptionText, { color: themeColors.text }]}>{option.label}</Text>
+                                    {selectedStatus === option.value && (
+                                        <MaterialCommunityIcons name="check" size={20} color={themeColors.activeTab} />
+                                    )}
+                                </Pressable>
+                            ))}
+                        </ScrollView>
+                    </View>
+                </Pressable>
+            </Modal>
+        </View>
     );
 
     /**
@@ -769,10 +830,75 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
 
     /**
      * Handlers pour les onglets
+     * Version corrigée avec meilleure synchronisation
      */
     const handleTabPress = useCallback((tab: 'info' | 'tickets') => {
+        // Mise à jour immédiate de l'onglet actif
         setActiveTab(tab);
-    }, []);
+        const index = tab === 'info' ? 0 : 1;
+        const scrollPosition = index * screenWidth;
+
+        // Marquer qu'on fait un scroll programmatique
+        isProgrammaticScrollRef.current = true;
+
+        // Scroll du ScrollView UNIQUEMENT
+        // On laisse handleScrollEvent mettre à jour scrollX automatiquement
+        if (scrollViewRef.current) {
+            scrollViewRef.current.scrollTo({
+                x: scrollPosition,
+                animated: true
+            });
+        }
+
+        // Réinitialiser le flag après un délai pour laisser l'animation se terminer
+        setTimeout(() => {
+            isProgrammaticScrollRef.current = false;
+        }, 350); // Légèrement plus long que la durée de l'animation (300ms)
+
+        // Retour haptique
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }, [screenWidth]);
+
+    /**
+     * Gère le scroll en temps réel pour animer l'indicateur
+     * Version corrigée - met toujours à jour scrollX
+     */
+    const handleScrollEvent = Animated.event(
+        [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+        {
+            useNativeDriver: false,
+            listener: (event: any) => {
+                // Optionnel : logger pour debug
+                // console.log('Scroll X:', event.nativeEvent.contentOffset.x);
+            }
+        }
+    );
+
+    /**
+     * Gère le changement d'onglet lors du swipe terminé
+     * Version corrigée avec tolérance
+     */
+    const handleScrollEnd = useCallback((event: any) => {
+        const offsetX = event.nativeEvent.contentOffset.x;
+        const index = Math.round(offsetX / screenWidth);
+        const newTab = index === 0 ? 'info' : 'tickets';
+
+        if (newTab !== activeTab) {
+            setActiveTab(newTab);
+            // Retour haptique lors du changement d'onglet par swipe
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        }
+
+        // S'assurer que le scroll est bien aligné
+        if (Math.abs(offsetX - (index * screenWidth)) > 1) {
+            if (scrollViewRef.current) {
+                scrollViewRef.current.scrollTo({
+                    x: index * screenWidth,
+                    animated: true
+                });
+            }
+        }
+    }, [screenWidth, activeTab]);
 
     return (
         <View style={[styles.container, { backgroundColor: themeColors.scrollBackground }]}>
@@ -793,44 +919,86 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
 
             {/* Tabs Navigation */}
             <View style={[styles.tabsContainer, { backgroundColor: themeColors.headerBackground, borderBottomColor: themeColors.headerBorder }]}>
-                <Pressable
-                    style={[styles.tab, activeTab === 'info' && { borderBottomColor: themeColors.activeTab }]}
-                    onPress={() => handleTabPress('info')}
-                >
-                    <MaterialCommunityIcons
-                        name="account-outline"
-                        size={20}
-                        color={activeTab === 'info' ? themeColors.activeTab : themeColors.inactiveIcon}
-                    />
-                    <Text style={[
-                        styles.tabText,
-                        { color: activeTab === 'info' ? themeColors.activeTab : themeColors.inactiveTabText },
-                        activeTab === 'info' && styles.tabTextActive
-                    ]}>
-                        Mes informations
-                    </Text>
-                </Pressable>
-                <Pressable
-                    style={[styles.tab, activeTab === 'tickets' && { borderBottomColor: themeColors.activeTab }]}
-                    onPress={() => handleTabPress('tickets')}
-                >
-                    <MaterialCommunityIcons
-                        name="ticket-outline"
-                        size={20}
-                        color={activeTab === 'tickets' ? themeColors.activeTab : themeColors.inactiveIcon}
-                    />
-                    <Text style={[
-                        styles.tabText,
-                        { color: activeTab === 'tickets' ? themeColors.activeTab : themeColors.inactiveTabText },
-                        activeTab === 'tickets' && styles.tabTextActive
-                    ]}>
-                        Mes tickets
-                    </Text>
-                </Pressable>
+                <View style={styles.tabsWrapper}>
+                    <Pressable
+                        style={styles.tab}
+                        onPress={() => handleTabPress('info')}
+                    >
+                        <MaterialCommunityIcons
+                            name="account-outline"
+                            size={20}
+                            color={activeTab === 'info' ? themeColors.activeTab : themeColors.inactiveIcon}
+                        />
+                        <Text style={[
+                            styles.tabText,
+                            { color: activeTab === 'info' ? themeColors.activeTab : themeColors.inactiveTabText },
+                            activeTab === 'info' && styles.tabTextActive
+                        ]}>
+                            Mes informations
+                        </Text>
+                    </Pressable>
+                    <Pressable
+                        style={styles.tab}
+                        onPress={() => handleTabPress('tickets')}
+                    >
+                        <MaterialCommunityIcons
+                            name="ticket-outline"
+                            size={20}
+                            color={activeTab === 'tickets' ? themeColors.activeTab : themeColors.inactiveIcon}
+                        />
+                        <Text style={[
+                            styles.tabText,
+                            { color: activeTab === 'tickets' ? themeColors.activeTab : themeColors.inactiveTabText },
+                            activeTab === 'tickets' && styles.tabTextActive
+                        ]}>
+                            Mes tickets
+                        </Text>
+                    </Pressable>
+                </View>
+                {/* Indicateur animé qui suit le swipe */}
+                <Animated.View
+                    style={[
+                        styles.tabIndicator,
+                        {
+                            backgroundColor: themeColors.activeTab,
+                            transform: [{
+                                translateX: scrollX.interpolate({
+                                    inputRange: [0, screenWidth],
+                                    outputRange: [
+                                        25.5 + 0.075 * screenWidth,
+                                        -4.5 + 0.575 * screenWidth
+                                    ],
+                                    extrapolate: 'clamp',
+                                }),
+                            }],
+                        },
+                    ]}
+                />
             </View>
 
-            {/* Tab Content */}
-            {isLoading ? renderLoading() : (activeTab === 'info' ? renderPersonalInfoTab() : renderTicketsTab())}
+            {/* Tab Content avec swipe horizontal */}
+            {isLoading ? (
+                renderLoading()
+            ) : (
+                <ScrollView
+                    ref={scrollViewRef}
+                    horizontal
+                    pagingEnabled
+                    showsHorizontalScrollIndicator={false}
+                    onScroll={handleScrollEvent}
+                    onMomentumScrollEnd={handleScrollEnd}
+                    scrollEventThrottle={16}
+                    style={styles.tabScrollView}
+                    contentContainerStyle={{ width: screenWidth * 2 }}
+                >
+                    <View style={[styles.tabPage, { width: screenWidth }]}>
+                        {renderPersonalInfoTab()}
+                    </View>
+                    <View style={[styles.tabPage, { width: screenWidth }]}>
+                        {renderTicketsTab()}
+                    </View>
+                </ScrollView>
+            )}
 
             {/* Modal de confirmation de déconnexion */}
             <Modal
@@ -1291,9 +1459,12 @@ const styles = StyleSheet.create({
         fontFamily: 'Ubuntu_Bold',
     },
     tabsContainer: {
-        flexDirection: 'row',
+        position: 'relative',
         borderBottomWidth: 1,
         paddingHorizontal: 30,
+    },
+    tabsWrapper: {
+        flexDirection: 'row',
     },
     tab: {
         flex: 1,
@@ -1302,8 +1473,14 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         paddingVertical: 20,
         gap: 8,
-        borderBottomWidth: 2,
-        borderBottomColor: 'transparent',
+    },
+    tabIndicator: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        width: '35%',
+        height: 2,
+        borderRadius: 1,
     },
     tabText: {
         fontSize: 14,
@@ -1565,6 +1742,12 @@ const styles = StyleSheet.create({
     themeToggleDescription: {
         fontSize: 12,
         fontFamily: 'Ubuntu_Regular',
+    },
+    tabScrollView: {
+        flex: 1,
+    },
+    tabPage: {
+        flex: 1,
     },
 });
 

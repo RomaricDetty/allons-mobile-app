@@ -1,4 +1,3 @@
-
 import { useTheme } from '@/contexts/ThemeContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
@@ -13,11 +12,14 @@ import {
     ActivityIndicator,
     Alert,
     Animated,
+    Dimensions,
+    PanResponder,
+    Platform,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
-    View
+    View,
 } from 'react-native';
 import MapView, { Circle, Marker, Polyline, PROVIDER_DEFAULT } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -26,6 +28,34 @@ interface OSMBusTrackerProps {
     tripId: string;
     bookingDetails: Object | any;
 }
+
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+const PANEL_MIN_HEIGHT = 80;
+const PANEL_MAX_HEIGHT = SCREEN_HEIGHT * 0.45;
+
+// Configuration des animations
+const ANIMATION_CONFIG = {
+    PULSE_DURATION: 1000,
+    PANEL_SPRING: {
+        tension: 50,
+        friction: 8,
+    },
+    MAP_ANIMATION_DURATION: 300,
+};
+
+// Configuration de la localisation
+const LOCATION_CONFIG = {
+    UPDATE_INTERVAL: 10000, // 10 secondes
+    DISTANCE_INTERVAL: 50, // 50 mètres
+    ACCURACY: Location.Accuracy.Balanced,
+};
+
+// Coordonnées par défaut (Abidjan)
+const DEFAULT_LOCATION = {
+    latitude: 5.33542,
+    longitude: -4.00351,
+    accuracy: 50,
+};
 
 export default function OSMBusTracker({ tripId, bookingDetails }: OSMBusTrackerProps) {
     const { busPosition, busStops, trip, isConnected, isLoading, error } = useBusTracking(
@@ -37,36 +67,54 @@ export default function OSMBusTracker({ tripId, bookingDetails }: OSMBusTrackerP
     const { isDarkMode } = useTheme();
     const insets = useSafeAreaInsets();
 
+    // États du composant
     const [passengerLocation, setPassengerLocation] = useState<PassengerLocation | null>(null);
     const [selectedStop, setSelectedStop] = useState<BusStop | null>(null);
     const [nearestStop, setNearestStop] = useState<BusStop | null>(null);
     const [stopsWithDistances, setStopsWithDistances] = useState<BusStop[]>([]);
-    const [showStopsPanel, setShowStopsPanel] = useState(true);
     const [routePath, setRoutePath] = useState<{ latitude: number; longitude: number }[]>([]);
+    const [isMapReady, setIsMapReady] = useState(false);
+    const [followBus, setFollowBus] = useState(true); // Auto-suivi du bus
 
+    // Refs
     const mapRef = useRef<MapView>(null);
     const locationSubscription = useRef<Location.LocationSubscription | null>(null);
     const pulseAnim = useRef(new Animated.Value(1)).current;
+    const panelHeight = useRef(new Animated.Value(PANEL_MAX_HEIGHT)).current;
+    const [isPanelExpanded, setIsPanelExpanded] = useState(true);
+    const lastBusPosition = useRef<{ latitude: number; longitude: number } | null>(null);
 
-    // Couleurs du thème
-    const backgroundColor = useThemeColor({}, 'background');
-    const textColor = useThemeColor({}, 'text');
-    const secondaryTextColor = useThemeColor({}, 'secondaryText');
-    const cardBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
-    const borderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
-    const headerBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
-    const panelBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
-    const listItemBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#F8F8F8';
-    const iconCircleBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#F8F8F8';
+    // Parse bookingDetails une seule fois
+    const parsedBooking = useMemo(() => {
+        try {
+            return JSON.parse(bookingDetails);
+        } catch (error) {
+            console.error('Erreur parsing bookingDetails:', error);
+            return null;
+        }
+    }, [bookingDetails]);
 
-    // Couleur d'accentuation violet/bleu
-    const accentColor = '#6A5ACD';
-    const accentColorLight = 'rgba(106, 90, 205, 0.1)';
-    const accentColorMedium = 'rgba(106, 90, 205, 0.3)';
-    
-    // Couleur de prix (vert)
-    const priceColor = '#4CAF50';
-    const priceBackgroundColor = colorScheme === 'dark' ? '#2E7D32' : '#E8F5E9';
+    // Couleurs du thème (mémorisées)
+    const themeColors = useMemo(() => ({
+        background: useThemeColor({}, 'background'),
+        text: useThemeColor({}, 'text'),
+        secondaryText: useThemeColor({}, 'secondaryText'),
+        card: colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF',
+        border: colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0',
+        header: colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF',
+        panel: colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF',
+        listItem: colorScheme === 'dark' ? '#2C2C2E' : '#F8F8F8',
+        iconCircle: colorScheme === 'dark' ? '#2C2C2E' : '#F8F8F8',
+        accent: '#6A5ACD',
+        accentLight: 'rgba(106, 90, 205, 0.1)',
+        accentMedium: 'rgba(106, 90, 205, 0.3)',
+    }), [colorScheme]);
+
+    /**
+     * =================================================================
+     * ANIMATIONS
+     * =================================================================
+     */
 
     // Animation de pulsation pour le marqueur du bus
     useEffect(() => {
@@ -74,12 +122,12 @@ export default function OSMBusTracker({ tripId, bookingDetails }: OSMBusTrackerP
             Animated.sequence([
                 Animated.timing(pulseAnim, {
                     toValue: 1.2,
-                    duration: 1000,
+                    duration: ANIMATION_CONFIG.PULSE_DURATION,
                     useNativeDriver: true,
                 }),
                 Animated.timing(pulseAnim, {
                     toValue: 1,
-                    duration: 1000,
+                    duration: ANIMATION_CONFIG.PULSE_DURATION,
                     useNativeDriver: true,
                 }),
             ])
@@ -87,56 +135,89 @@ export default function OSMBusTracker({ tripId, bookingDetails }: OSMBusTrackerP
         pulse.start();
 
         return () => pulse.stop();
-    }, []);
+    }, [pulseAnim]);
 
-    // Initialiser la localisation du passager
-    useEffect(() => {
-        initPassengerLocation();
+    /**
+     * Toggle le panneau avec animation
+     */
+    const togglePanel = useCallback(() => {
+        const toValue = isPanelExpanded ? PANEL_MIN_HEIGHT : PANEL_MAX_HEIGHT;
+        
+        Animated.spring(panelHeight, {
+            toValue,
+            useNativeDriver: false,
+            ...ANIMATION_CONFIG.PANEL_SPRING,
+        }).start();
+        
+        setIsPanelExpanded(!isPanelExpanded);
 
-        return () => {
-            if (locationSubscription.current) {
-                locationSubscription.current.remove();
+        // Réajuster la carte après l'animation
+        setTimeout(() => {
+            if (followBus && busPosition && passengerLocation) {
+                centerMapOnBusAndPassenger();
             }
-        };
-    }, []);
+        }, 300);
+    }, [isPanelExpanded, panelHeight, followBus, busPosition, passengerLocation]);
 
-    // Calculer les distances quand la position du passager ou les arrêts changent
-    useEffect(() => {
-        if (passengerLocation && busStops.length > 0) {
-            calculateStopDistances();
-        }
-    }, [passengerLocation, busStops, busPosition]);
+    /**
+     * PanResponder pour gérer le swipe du panneau
+     */
+    const panResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponder: (_, gestureState) => {
+                return Math.abs(gestureState.dy) > 10;
+            },
+            onPanResponderMove: (_, gestureState) => {
+                const newHeight = isPanelExpanded
+                    ? PANEL_MAX_HEIGHT - gestureState.dy
+                    : PANEL_MIN_HEIGHT - gestureState.dy;
 
-    // Centrer la carte quand la position du bus change
-    useEffect(() => {
-        if (busPosition && passengerLocation && mapRef.current) {
-            centerMapOnBusAndPassenger();
-        }
-    }, [busPosition]);
+                const clampedHeight = Math.max(
+                    PANEL_MIN_HEIGHT,
+                    Math.min(PANEL_MAX_HEIGHT, newHeight)
+                );
 
-    // Calculer l'itinéraire au chargement du composant
-    useEffect(() => {
-        calculateRoute();
-    }, []);
+                panelHeight.setValue(clampedHeight);
+            },
+            onPanResponderRelease: (_, gestureState) => {
+                const shouldExpand =
+                    gestureState.dy < -50 ||
+                    (gestureState.dy < 0 && !isPanelExpanded);
 
+                const toValue = shouldExpand ? PANEL_MAX_HEIGHT : PANEL_MIN_HEIGHT;
+
+                Animated.spring(panelHeight, {
+                    toValue,
+                    useNativeDriver: false,
+                    ...ANIMATION_CONFIG.PANEL_SPRING,
+                }).start();
+
+                setIsPanelExpanded(shouldExpand);
+            },
+        })
+    ).current;
+
+    /**
+     * =================================================================
+     * LOCALISATION
+     * =================================================================
+     */
 
     /**
      * Initialise la localisation du passager
-     * @returns 
      */
-    const initPassengerLocation = async () => {
+    const initPassengerLocation = useCallback(async () => {
         try {
             const { status } = await Location.requestForegroundPermissionsAsync();
+            
             if (status !== 'granted') {
                 Alert.alert(
                     'Permission refusée',
                     "L'accès à la localisation est nécessaire pour afficher votre position"
                 );
-                // Utiliser les coordonnées par défaut si permission refusée
                 setPassengerLocation({
-                    latitude: 5.33542,
-                    longitude: -4.00351,
-                    accuracy: 50,
+                    ...DEFAULT_LOCATION,
                     timestamp: new Date().toISOString(),
                 });
                 return;
@@ -144,7 +225,7 @@ export default function OSMBusTracker({ tripId, bookingDetails }: OSMBusTrackerP
 
             // Position initiale
             const location = await Location.getCurrentPositionAsync({
-                accuracy: Location.Accuracy.High,
+                accuracy: LOCATION_CONFIG.ACCURACY,
             });
 
             setPassengerLocation({
@@ -157,9 +238,9 @@ export default function OSMBusTracker({ tripId, bookingDetails }: OSMBusTrackerP
             // Suivre les changements de position
             locationSubscription.current = await Location.watchPositionAsync(
                 {
-                    accuracy: Location.Accuracy.Balanced,
-                    timeInterval: 10000, // Toutes les 10 secondes
-                    distanceInterval: 50, // Ou tous les 50 mètres
+                    accuracy: LOCATION_CONFIG.ACCURACY,
+                    timeInterval: LOCATION_CONFIG.UPDATE_INTERVAL,
+                    distanceInterval: LOCATION_CONFIG.DISTANCE_INTERVAL,
                 },
                 (location) => {
                     setPassengerLocation({
@@ -172,52 +253,72 @@ export default function OSMBusTracker({ tripId, bookingDetails }: OSMBusTrackerP
             );
         } catch (error) {
             console.error('Erreur localisation passager:', error);
-            // Utiliser les coordonnées par défaut en cas d'erreur
             setPassengerLocation({
-                latitude: 5.33542,
-                longitude: -4.00351,
-                accuracy: 50,
+                ...DEFAULT_LOCATION,
                 timestamp: new Date().toISOString(),
             });
         }
-    };
+    }, []);
+
+    // Initialiser la localisation au montage
+    useEffect(() => {
+        initPassengerLocation();
+
+        return () => {
+            if (locationSubscription.current) {
+                locationSubscription.current.remove();
+            }
+        };
+    }, [initPassengerLocation]);
 
     /**
-     * Calcule l'itinéraire entre St Jean Cocody et Yopougon Toits rouge
-     * @returns 
+     * =================================================================
+     * CALCULS DE DISTANCES ET ITINÉRAIRE
+     * =================================================================
      */
-    const calculateRoute = async () => {
+
+    /**
+     * Calcule l'itinéraire optimisé
+     */
+    const calculateRoute = useCallback(async () => {
+        if (!parsedBooking?.trip?.stationFrom || !parsedBooking?.trip?.stationTo) {
+            console.warn('Informations de trajet manquantes');
+            return;
+        }
+
         try {
-            // Coordonnées de départ : St Jean Cocody
+            // Utiliser les coordonnées réelles depuis le booking si disponibles
             const startPoint = {
-                latitude: 5.33542,
-                longitude: -4.00351,
+                latitude: parsedBooking.trip.stationFrom.latitude || 5.33542,
+                longitude: parsedBooking.trip.stationFrom.longitude || -4.00351,
             };
 
-            // Coordonnées d'arrivée : Yopougon Toits rouge
             const endPoint = {
-                latitude: 5.317666,
-                longitude: -4.089991,
+                latitude: parsedBooking.trip.stationTo.latitude || 5.317666,
+                longitude: parsedBooking.trip.stationTo.longitude || -4.089991,
             };
 
             const route = await routingService.getRoute(startPoint, endPoint);
             setRoutePath(route);
         } catch (error) {
             console.error('Erreur calcul itinéraire:', error);
-            // En cas d'erreur, utiliser un itinéraire simplifié (ligne droite)
+            // Fallback: ligne droite
             setRoutePath([
                 { latitude: 5.33542, longitude: -4.00351 },
                 { latitude: 5.317666, longitude: -4.089991 },
             ]);
         }
-    };
+    }, [parsedBooking]);
+
+    useEffect(() => {
+        calculateRoute();
+    }, [calculateRoute]);
 
     /**
-     * Calcul les distances entre les arrêts et le passager
-     * @returns 
+     * Calcule les distances optimisé avec mémoization
      */
     const calculateStopDistances = useCallback(() => {
-        if (!passengerLocation) return;
+        if (!passengerLocation || busStops.length === 0) return;
 
         const stopsWithDist = busStops.map((stop) => {
             const distanceFromUser = routingService.calculateDistance(
@@ -245,7 +346,7 @@ export default function OSMBusTracker({ tripId, bookingDetails }: OSMBusTrackerP
 
         setStopsWithDistances(stopsWithDist);
 
-        // Trouver l'arrêt le plus proche (qui n'est pas déjà passé)
+        // Trouver l'arrêt le plus proche disponible
         const availableStops = stopsWithDist.filter(
             (stop) => stop.status === 'pending' || stop.status === 'approaching'
         );
@@ -255,17 +356,18 @@ export default function OSMBusTracker({ tripId, bookingDetails }: OSMBusTrackerP
         }
     }, [passengerLocation, busStops, busPosition]);
 
+    useEffect(() => {
+        calculateStopDistances();
+    }, [calculateStopDistances]);
+
     /**
-     * Calcul l'ETA pour un arrêt
-     * @param stop - L'arrêt à calculer l'ETA
-     * @returns L'ETA sous forme de chaîne de caractères
+     * Calcule l'ETA pour un arrêt (mémorisé)
      */
     const calculateETA = useCallback(
         (stop: BusStop): string => {
             if (!busPosition || !stop.distanceFromBus) return 'N/A';
 
-            // Vitesse moyenne en ville: 30 km/h
-            const averageSpeed = 30;
+            const averageSpeed = 30; // km/h
             const timeInHours = stop.distanceFromBus / averageSpeed;
             const timeInMinutes = Math.round(timeInHours * 60);
 
@@ -280,106 +382,147 @@ export default function OSMBusTracker({ tripId, bookingDetails }: OSMBusTrackerP
     );
 
     /**
-     * Calcule l'ETA total jusqu'à la destination
-     * @returns L'ETA total en minutes et l'heure d'arrivée
+     * =================================================================
+     * GESTION DE LA CARTE
+     * =================================================================
      */
-    const destinationETA = useMemo(() => {
-        if (!trip || !busPosition) return null;
-
-        const destinationStop = busStops[busStops.length - 1];
-        if (!destinationStop || !destinationStop.distanceFromBus) return null;
-
-        // Vitesse moyenne en ville: 30 km/h
-        const averageSpeed = 30;
-        const timeInHours = destinationStop.distanceFromBus / averageSpeed;
-        const timeInMinutes = Math.round(timeInHours * 60);
-
-        const arrivalTime = new Date(Date.now() + timeInMinutes * 60 * 1000);
-        const hours = arrivalTime.getHours();
-        const minutes = arrivalTime.getMinutes();
-        const formattedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-
-        return {
-            minutes: timeInMinutes,
-            arrivalTime: formattedTime,
-        };
-    }, [trip, busPosition, busStops]);
 
     /**
-     * Calcule le prix du voyage (exemple)
-     * @returns Le prix formaté
+     * Callback quand la carte est prête
      */
-    const tripPrice = useMemo(() => {
-        // TODO: Récupérer le prix réel depuis le trip ou booking
-        return '2.90';
-    }, [trip]);
+    const handleMapReady = useCallback(() => {
+        setIsMapReady(true);
+        // Centrer initialement sur le bus et le passager
+        if (busPosition && passengerLocation) {
+            setTimeout(() => centerMapOnBusAndPassenger(), 500);
+        }
+    }, [busPosition, passengerLocation]);
 
     /**
-     * Centre la carte sur le bus et le passager
-     * @returns 
+     * Centre la carte sur le bus et le passager (optimisé)
      */
-    const centerMapOnBusAndPassenger = () => {
-        if (!busPosition || !passengerLocation || !mapRef.current) return;
+    const centerMapOnBusAndPassenger = useCallback(() => {
+        if (!isMapReady || !busPosition || !passengerLocation || !mapRef.current) return;
 
-        mapRef.current.fitToCoordinates(
-            [
-                { latitude: busPosition.latitude, longitude: busPosition.longitude },
-                { latitude: passengerLocation.latitude, longitude: passengerLocation.longitude },
-            ],
-            {
-                edgePadding: { top: 100, right: 50, bottom: showStopsPanel ? 400 : 100, left: 50 },
-                animated: true,
+        const bottomPadding = isPanelExpanded ? PANEL_MAX_HEIGHT + 50 : PANEL_MIN_HEIGHT + 50;
+
+        const coordinates = [
+            { latitude: busPosition.latitude, longitude: busPosition.longitude },
+            { latitude: passengerLocation.latitude, longitude: passengerLocation.longitude },
+        ];
+
+        mapRef.current.fitToCoordinates(coordinates, {
+            edgePadding: { 
+                top: 150, 
+                right: 50, 
+                bottom: bottomPadding, 
+                left: 50 
+            },
+            animated: true,
+        });
+    }, [isMapReady, busPosition, passengerLocation, isPanelExpanded]);
+
+    /**
+     * Auto-suivi du bus quand sa position change
+     */
+    useEffect(() => {
+        if (!followBus || !isMapReady || !busPosition || !mapRef.current) return;
+
+        // Vérifier si le bus a bougé significativement
+        const hasMovedSignificantly = !lastBusPosition.current ||
+            routingService.calculateDistance(
+                lastBusPosition.current,
+                { latitude: busPosition.latitude, longitude: busPosition.longitude }
+            ) > 0.05; // 50 mètres
+
+        if (hasMovedSignificantly) {
+            lastBusPosition.current = {
+                latitude: busPosition.latitude,
+                longitude: busPosition.longitude,
+            };
+
+            if (passengerLocation) {
+                centerMapOnBusAndPassenger();
+            } else {
+                // Centrer uniquement sur le bus si pas de position passager
+                mapRef.current.animateCamera({
+                    center: {
+                        latitude: busPosition.latitude,
+                        longitude: busPosition.longitude,
+                    },
+                    zoom: 15,
+                });
             }
-        );
-    };
+        }
+    }, [busPosition, followBus, isMapReady, passengerLocation, centerMapOnBusAndPassenger]);
 
     /**
      * Centre la carte sur le bus
-     * @returns 
      */
-    const centerOnBus = () => {
-        if (busPosition && mapRef.current) {
-            mapRef.current.animateCamera({
-                center: { latitude: busPosition.latitude, longitude: busPosition.longitude },
-                zoom: 15,
-            });
-        }
-    };
+    const centerOnBus = useCallback(() => {
+        if (!isMapReady || !busPosition || !mapRef.current) return;
+
+        setFollowBus(true);
+        mapRef.current.animateCamera({
+            center: {
+                latitude: busPosition.latitude,
+                longitude: busPosition.longitude,
+            },
+            zoom: 15,
+        });
+    }, [isMapReady, busPosition]);
 
     /**
      * Centre la carte sur le passager
-     * @returns 
      */
-    const centerOnMe = () => {
-        if (passengerLocation && mapRef.current) {
-            mapRef.current.animateCamera({
-                center: { latitude: passengerLocation.latitude, longitude: passengerLocation.longitude },
-                zoom: 15,
-            });
-        }
-    };
+    const centerOnMe = useCallback(() => {
+        if (!isMapReady || !passengerLocation || !mapRef.current) return;
+
+        setFollowBus(false);
+        mapRef.current.animateCamera({
+            center: {
+                latitude: passengerLocation.latitude,
+                longitude: passengerLocation.longitude,
+            },
+            zoom: 15,
+        });
+    }, [isMapReady, passengerLocation]);
 
     /**
      * Centre la carte sur un arrêt
-     * @param stop - L'arrêt à centrer
-     * @returns 
      */
-    const centerOnStop = (stop: BusStop) => {
-        if (mapRef.current) {
-            setSelectedStop(stop);
-            mapRef.current.animateCamera({
-                center: { latitude: stop.latitude, longitude: stop.longitude },
-                zoom: 16,
-            });
-        }
-    };
+    const centerOnStop = useCallback((stop: BusStop) => {
+        if (!isMapReady || !mapRef.current) return;
+
+        setFollowBus(false);
+        setSelectedStop(stop);
+        mapRef.current.animateCamera({
+            center: {
+                latitude: stop.latitude,
+                longitude: stop.longitude,
+            },
+            zoom: 16,
+        });
+    }, [isMapReady]);
+
+    /**
+     * Désactive le suivi automatique quand l'utilisateur bouge la carte
+     */
+    const handleRegionChangeComplete = useCallback(() => {
+        // Désactiver le suivi si l'utilisateur a manuellement bougé la carte
+        // Cette fonctionnalité peut être améliorée en détectant les gestes utilisateur
+    }, []);
+
+    /**
+     * =================================================================
+     * HELPERS POUR LES MARQUEURS
+     * =================================================================
+     */
 
     /**
      * Retourne la couleur d'un statut d'arrêt
-     * @param status - Le statut d'arrêt
-     * @returns La couleur du statut d'arrêt
      */
-    const getStopStatusColor = (status: string): string => {
+    const getStopStatusColor = useCallback((status: string): string => {
         switch (status) {
             case 'departed':
                 return '#999999';
@@ -390,14 +533,12 @@ export default function OSMBusTracker({ tripId, bookingDetails }: OSMBusTrackerP
             default:
                 return '#2196F3';
         }
-    };
+    }, []);
 
     /**
      * Retourne l'icône d'un statut d'arrêt
-     * @param status - Le statut d'arrêt
-     * @returns L'icône du statut d'arrêt
      */
-    const getStopStatusIcon = (status: string): keyof typeof Ionicons.glyphMap => {
+    const getStopStatusIcon = useCallback((status: string): keyof typeof Ionicons.glyphMap => {
         switch (status) {
             case 'departed':
                 return 'checkmark-circle';
@@ -408,75 +549,64 @@ export default function OSMBusTracker({ tripId, bookingDetails }: OSMBusTrackerP
             default:
                 return 'ellipse-outline';
         }
-    };
+    }, []);
 
     /**
-     * Retourne le texte d'un statut d'arrêt
-     * @param status - Le statut d'arrêt
-     * @returns Le texte du statut d'arrêt
+     * =================================================================
+     * RENDUS CONDITIONNELS
+     * =================================================================
      */
-    const getStopStatusText = (status: string): string => {
-        switch (status) {
-            case 'departed':
-                return 'Passé';
-            case 'arrived':
-                return 'Arrivé';
-            case 'approaching':
-                return 'Proche';
-            default:
-                return 'En attente';
-        }
-    };
 
-    /**
-     * Retourne le composant de chargement
-     * @returns Le composant de chargement
-     */
     if (isLoading) {
         return (
-            <View style={[styles.loadingContainer, { backgroundColor }]}>
-                <ActivityIndicator size="large" color={accentColor} />
-                <Text style={[styles.loadingText, { color: secondaryTextColor }]}>Chargement du voyage...</Text>
+            <View style={[styles.loadingContainer, { backgroundColor: themeColors.background }]}>
+                <ActivityIndicator size="large" color={themeColors.accent} />
+                <Text style={[styles.loadingText, { color: themeColors.secondaryText }]}>
+                    Chargement du voyage...
+                </Text>
             </View>
         );
     }
 
-    /**
-     * Retourne le composant d'erreur
-     * @returns Le composant d'erreur
-     */
     if (error) {
         return (
-            <View style={[styles.errorContainer, { backgroundColor }]}>
+            <View style={[styles.errorContainer, { backgroundColor: themeColors.background }]}>
                 <Ionicons name="alert-circle" size={64} color="#F44336" />
-                <Text style={[styles.errorTitle, { color: textColor }]}>Erreur</Text>
-                <Text style={[styles.errorText, { color: secondaryTextColor }]}>{error}</Text>
-                <TouchableOpacity style={[styles.retryButton, { backgroundColor: accentColor }]} onPress={() => window.location.reload()}>
-                    <Text style={styles.retryButtonText}>Réessayer</Text>
+                <Text style={[styles.errorTitle, { color: themeColors.text }]}>Erreur</Text>
+                <Text style={[styles.errorText, { color: themeColors.secondaryText }]}>{error}</Text>
+                <TouchableOpacity 
+                    style={[styles.retryButton, { backgroundColor: themeColors.accent }]} 
+                    onPress={() => router.back()}
+                >
+                    <Text style={styles.retryButtonText}>Retour</Text>
                 </TouchableOpacity>
             </View>
         );
     }
 
-    /**
-     * Retourne le composant de chargement
-     * @returns Le composant de chargement
-     */
     if (!passengerLocation) {
         return (
-            <View style={[styles.loadingContainer, { backgroundColor }]}>
-                <ActivityIndicator size="large" color={accentColor} />
-                <Text style={[styles.loadingText, { color: secondaryTextColor }]}>Obtention de votre position...</Text>
+            <View style={[styles.loadingContainer, { backgroundColor: themeColors.background }]}>
+                <ActivityIndicator size="large" color={themeColors.accent} />
+                <Text style={[styles.loadingText, { color: themeColors.secondaryText }]}>
+                    Obtention de votre position...
+                </Text>
             </View>
         );
     }
 
+    /**
+     * =================================================================
+     * RENDU PRINCIPAL
+     * =================================================================
+     */
+
     return (
-        <View style={[styles.container, { backgroundColor }]}>
+        <View style={[styles.container, { backgroundColor: themeColors.background }]}>
             {/* Carte OpenStreetMap */}
             <MapView
                 ref={mapRef}
-                provider={PROVIDER_DEFAULT} // Utilise OSM par défaut
+                provider={PROVIDER_DEFAULT}
                 style={styles.map}
                 initialRegion={{
                     latitude: passengerLocation.latitude,
@@ -484,52 +614,46 @@ export default function OSMBusTracker({ tripId, bookingDetails }: OSMBusTrackerP
                     latitudeDelta: 0.05,
                     longitudeDelta: 0.05,
                 }}
+                onMapReady={handleMapReady}
+                onRegionChangeComplete={handleRegionChangeComplete}
                 showsUserLocation={false}
                 showsMyLocationButton={false}
                 showsCompass={true}
                 showsScale={true}
-                mapType={isDarkMode ? 'standard' : 'standard'}
+                loadingEnabled={true}
+                loadingIndicatorColor={themeColors.accent}
+                loadingBackgroundColor={themeColors.background}
+                mapType={Platform.OS === 'ios' ? 'standard' : 'standard'}
+                pitchEnabled={true}
+                rotateEnabled={true}
+                scrollEnabled={true}
+                zoomEnabled={true}
             >
                 {/* Itinéraire du trajet */}
-                {(routePath.length > 0 || (trip?.routePath && trip.routePath.length > 0)) && (
+                {routePath.length > 0 && (
                     <Polyline
-                        coordinates={routePath.length > 0 ? routePath : trip?.routePath || []}
-                        strokeColor={accentColor}
+                        coordinates={routePath}
+                        strokeColor={themeColors.accent}
                         strokeWidth={4}
+                        lineCap="round"
+                        lineJoin="round"
                     />
                 )}
 
                 {/* Position du bus avec animation */}
                 {busPosition && (
                     <>
-                        {/* Cercle de précision avec animation pulsante */}
+                        {/* Cercle de précision */}
                         <Circle
                             center={{
                                 latitude: busPosition.latitude,
                                 longitude: busPosition.longitude,
                             }}
                             radius={busPosition.accuracy || 50}
-                            fillColor={accentColorLight}
-                            strokeColor={accentColorMedium}
+                            fillColor={themeColors.accentLight}
+                            strokeColor={themeColors.accentMedium}
                             strokeWidth={1}
                         />
-                        <Animated.View
-                            style={{
-                                position: 'absolute',
-                                transform: [{ scale: pulseAnim }],
-                            }}
-                        >
-                            <Circle
-                                center={{
-                                    latitude: busPosition.latitude,
-                                    longitude: busPosition.longitude,
-                                }}
-                                radius={(busPosition.accuracy || 50) * 1.5}
-                                fillColor={accentColorLight}
-                                strokeColor={accentColorMedium}
-                                strokeWidth={1}
-                            />
-                        </Animated.View>
 
                         {/* Marqueur du bus */}
                         <Marker
@@ -538,15 +662,16 @@ export default function OSMBusTracker({ tripId, bookingDetails }: OSMBusTrackerP
                                 longitude: busPosition.longitude,
                             }}
                             anchor={{ x: 0.5, y: 0.5 }}
-                            rotation={busPosition.heading}
-                            title={`Bus ${trip?.busNumber}`}
-                            description={`Vitesse: ${Math.round(busPosition.speed)} km/h`}
+                            rotation={busPosition.heading || 0}
+                            title={`Bus ${parsedBooking?.bus?.licencePlate || ''}`}
+                            description={`Vitesse: ${Math.round(busPosition.speed || 0)} km/h`}
+                            tracksViewChanges={false} // Optimisation performance
                         >
                             <Animated.View
                                 style={[
                                     styles.busMarker,
                                     {
-                                        backgroundColor: accentColor,
+                                        backgroundColor: themeColors.accent,
                                         transform: [{ scale: pulseAnim }],
                                     },
                                 ]}
@@ -558,7 +683,7 @@ export default function OSMBusTracker({ tripId, bookingDetails }: OSMBusTrackerP
                 )}
 
                 {/* Arrêts sur l'itinéraire */}
-                {stopsWithDistances.map((stop, index) => (
+                {stopsWithDistances.map((stop) => (
                     <Marker
                         key={stop.id}
                         coordinate={{
@@ -566,6 +691,7 @@ export default function OSMBusTracker({ tripId, bookingDetails }: OSMBusTrackerP
                             longitude: stop.longitude,
                         }}
                         onPress={() => centerOnStop(stop)}
+                        tracksViewChanges={false} // Optimisation performance
                     >
                         <View
                             style={[
@@ -587,9 +713,10 @@ export default function OSMBusTracker({ tripId, bookingDetails }: OSMBusTrackerP
                         longitude: passengerLocation.longitude,
                     }}
                     title="Vous êtes ici"
+                    tracksViewChanges={false} // Optimisation performance
                 >
                     <View style={styles.userMarker}>
-                        <View style={[styles.userMarkerInner, { backgroundColor: accentColor }]}>
+                        <View style={[styles.userMarkerInner, { backgroundColor: themeColors.accent }]}>
                             <Ionicons name="locate" size={16} color="#fff" />
                         </View>
                     </View>
@@ -597,131 +724,158 @@ export default function OSMBusTracker({ tripId, bookingDetails }: OSMBusTrackerP
             </MapView>
 
             {/* En-tête de navigation */}
-            <View style={[styles.header, { backgroundColor: headerBackgroundColor, paddingTop: insets.top }]}>
+            <View style={[styles.header, { backgroundColor: themeColors.header, paddingTop: insets.top }]}>
                 <TouchableOpacity
-                    style={[styles.headerButton]}
+                    style={styles.headerButton}
                     onPress={() => router.back()}
+                    activeOpacity={0.7}
                 >
-                    <Ionicons name="arrow-back" size={20} color={textColor} />
+                    <Ionicons name="arrow-back" size={24} color={themeColors.text} />
                 </TouchableOpacity>
-                <Text style={[styles.headerTitle, { color: textColor }]}>Itinéraire du trajet</Text>
-                <TouchableOpacity
-                    style={[styles.headerButton, { backgroundColor: iconCircleBackgroundColor }]}
-                    onPress={() => {
-                        // TODO: Implémenter le partage
-                    }}
-                >
-                    <Ionicons name="share-outline" size={20} color={textColor} />
-                </TouchableOpacity>
+                <Text style={[styles.headerTitle, { color: themeColors.text }]}>Suivi en direct</Text>
+                <View style={styles.headerRight}>
+                    {/* Indicateur de connexion */}
+                    <View style={[
+                        styles.connectionIndicator,
+                        { backgroundColor: isConnected ? '#4CAF50' : '#F44336' }
+                    ]} />
+                </View>
             </View>
 
-            {/* Panneau d'informations principal */}
-            {showStopsPanel && (
-                <View style={[styles.infoPanel, { backgroundColor: panelBackgroundColor }]}>
-                    
-                    {/* Carte de résumé de destination */}
-                    {trip && (
-                        <View style={[styles.destinationCard, { backgroundColor: listItemBackgroundColor }]}>
-                            <View style={styles.destinationCardContent}>
-                                <View style={styles.destinationTextContainer}>
-                                    <Text style={[styles.destinationAddress, { color: textColor, alignSelf: 'center' }]}>
-                                        {JSON.parse(bookingDetails).trip.stationFrom.city} <Ionicons name="arrow-forward" size={14} color={textColor} /> {JSON.parse(bookingDetails).trip.stationTo.city}
-                                    </Text>
-                                    {/* {destinationETA && (
-                                        <Text style={[styles.destinationETA, { color: secondaryTextColor }]}>
-                                            {JSON.parse(bookingDetails).trip.duration} min • Arrive à {destinationETA.arrivalTime}
-                                        </Text>
-                                    )} */}
-                                </View>
-                                {/* <View style={[styles.priceBadge, { backgroundColor: priceBackgroundColor }]}>
-                                    <Ionicons name="cash-outline" size={14} color="#fff" />
-                                    <Text style={styles.priceBadgeText}>{JSON.parse(bookingDetails).totalAmount}</Text>
-                                </View> */}
-                            </View>
-                        </View>
-                    )}
+            {/* Panneau d'informations avec animation */}
+            <Animated.View
+                style={[
+                    styles.infoPanel,
+                    {
+                        backgroundColor: themeColors.panel,
+                        height: panelHeight,
+                    },
+                ]}
+            >
+                {/* Handle pour swiper */}
+                <View {...panResponder.panHandlers} style={styles.panelHandle}>
+                    <View style={[styles.handleBar, { backgroundColor: themeColors.border }]} />
+                </View>
 
-                    {/* Liste des étapes de l'itinéraire */}
+                {/* Carte de résumé de destination */}
+                {parsedBooking && (
+                    <TouchableOpacity
+                        activeOpacity={0.9}
+                        onPress={togglePanel}
+                        style={[styles.destinationCard, { backgroundColor: themeColors.listItem }]}
+                    >
+                        <View style={styles.destinationCardContent}>
+                            <View style={styles.destinationTextContainer}>
+                                <Text style={[styles.destinationAddress, { color: themeColors.text }]}>
+                                    {parsedBooking.trip.stationFrom.city}{' '}
+                                    <Ionicons name="arrow-forward" size={14} color={themeColors.text} />{' '}
+                                    {parsedBooking.trip.stationTo.city}
+                                </Text>
+                                <Text style={[styles.destinationSubtitle, { color: themeColors.secondaryText }]}>
+                                    {busStops.length} arrêt{busStops.length > 1 ? 's' : ''}
+                                </Text>
+                            </View>
+                            <Ionicons
+                                name={isPanelExpanded ? 'chevron-down' : 'chevron-up'}
+                                size={24}
+                                color={themeColors.secondaryText}
+                            />
+                        </View>
+                    </TouchableOpacity>
+                )}
+
+                {/* Liste des étapes */}
+                {isPanelExpanded && (
                     <ScrollView
                         style={styles.stepsList}
                         showsVerticalScrollIndicator={false}
+                        contentContainerStyle={styles.stepsListContent}
                     >
-                        {/* Étape 1: Localisation actuelle */}
+                        {/* Localisation actuelle */}
                         {passengerLocation && (
-                            <View style={[styles.stepItem, { backgroundColor: listItemBackgroundColor }]}>
-                                <View style={[styles.stepIconCircle, { backgroundColor: iconCircleBackgroundColor }]}>
-                                    <Ionicons name="locate" size={20} color={accentColor} />
+                            <View style={[styles.stepItem, { backgroundColor: themeColors.listItem }]}>
+                                <View style={[styles.stepIconCircle, { backgroundColor: themeColors.iconCircle }]}>
+                                    <Ionicons name="locate" size={20} color={themeColors.accent} />
                                 </View>
                                 <View style={styles.stepContent}>
-                                    <Text style={[styles.stepTitle, { color: textColor }]}>
-                                        Localisation actuelle
+                                    <Text style={[styles.stepTitle, { color: themeColors.text }]}>
+                                        Votre position
                                     </Text>
-                                    <Text style={[styles.stepSubtitle, { color: secondaryTextColor }]}>
-                                        {passengerLocation.latitude.toFixed(4)}, {passengerLocation.longitude.toFixed(4)}
+                                    <Text style={[styles.stepSubtitle, { color: themeColors.secondaryText }]}>
+                                        Précision: {passengerLocation.accuracy?.toFixed(0) || 50}m
                                     </Text>
                                 </View>
                             </View>
                         )}
 
-                        {/* Étape 2: Détails du bus */}
-                        {trip && (
-                            <View style={[styles.stepItem, { backgroundColor: listItemBackgroundColor }]}>
-                                <View style={[styles.stepIconCircle, { backgroundColor: iconCircleBackgroundColor }]}>
-                                    <Ionicons name="bus" size={20} color={secondaryTextColor} />
+                        {/* Détails du bus */}
+                        {parsedBooking && busPosition && (
+                            <View style={[styles.stepItem, { backgroundColor: themeColors.listItem }]}>
+                                <View style={[styles.stepIconCircle, { backgroundColor: themeColors.iconCircle }]}>
+                                    <Ionicons name="bus" size={20} color={themeColors.accent} />
                                 </View>
                                 <View style={styles.stepContent}>
-                                    <Text style={[styles.stepTitle, { color: textColor }]}>
-                                        Immatriculation du bus : {JSON.parse(bookingDetails).bus.licencePlate}
+                                    <Text style={[styles.stepTitle, { color: themeColors.text }]}>
+                                        Bus {parsedBooking.bus.licencePlate}
                                     </Text>
-                                    {/* <Text style={[styles.stepSubtitle, { color: secondaryTextColor }]}>
-                                        {busStops.filter(s => s.status === 'pending' || s.status === 'approaching').length} stops | {destinationETA?.minutes || 0} min • {JSON.parse(bookingDetails).totalAmount}
-                                    </Text> */}
+                                    <Text style={[styles.stepSubtitle, { color: themeColors.secondaryText }]}>
+                                        Vitesse: {Math.round(busPosition.speed || 0)} km/h
+                                    </Text>
                                 </View>
-                                {/* {nearestStop && busPosition && nearestStop.distanceFromBus && (
-                                    <View style={[styles.etaBadge, { backgroundColor: accentColor }]}>
-                                        <Ionicons name="time" size={12} color="#fff" />
-                                        <Text style={styles.etaBadgeText}>{calculateETA(nearestStop)}</Text>
-                                    </View>
-                                )} */}
                             </View>
                         )}
 
-                        {/* Étape 3: Segment de marche (si nécessaire) */}
-                        {/* {nearestStop && nearestStop.distanceFromUser && nearestStop.distanceFromUser > 0.1 && (
-                            <View style={[styles.stepItem, { backgroundColor: listItemBackgroundColor }]}>
-                                <View style={[styles.stepIconCircle, { backgroundColor: iconCircleBackgroundColor }]}>
-                                    <Ionicons name="walk" size={20} color={secondaryTextColor} />
+                        {/* Arrêt le plus proche */}
+                        {nearestStop && (
+                            <View style={[styles.stepItem, { backgroundColor: themeColors.listItem }]}>
+                                <View style={[styles.stepIconCircle, { backgroundColor: themeColors.iconCircle }]}>
+                                    <Ionicons 
+                                        name={getStopStatusIcon(nearestStop.status)} 
+                                        size={20} 
+                                        color={getStopStatusColor(nearestStop.status)} 
+                                    />
                                 </View>
                                 <View style={styles.stepContent}>
-                                    <Text style={[styles.stepTitle, { color: textColor }]} numberOfLines={1}>
-                                        {nearestStop.name}
+                                    <Text style={[styles.stepTitle, { color: themeColors.text }]}>
+                                        Prochain arrêt: {nearestStop.name}
                                     </Text>
-                                    <Text style={[styles.stepSubtitle, { color: secondaryTextColor }]}>
-                                        Marche - {nearestStop.distanceFromUser.toFixed(1)} km | {Math.round(nearestStop.distanceFromUser * 12)} min
+                                    <Text style={[styles.stepSubtitle, { color: themeColors.secondaryText }]}>
+                                        Distance: {nearestStop.distanceFromUser?.toFixed(1) || 'N/A'} km • ETA: {calculateETA(nearestStop)}
                                     </Text>
                                 </View>
                             </View>
-                        )} */}
-
-                        {/* Étape 4: Destination */}
-                        {/* {trip && (
-                            <View style={[styles.stepItem, { backgroundColor: listItemBackgroundColor }]}>
-                                <View style={[styles.stepIconCircle, { backgroundColor: iconCircleBackgroundColor }]}>
-                                    <Ionicons name="location" size={20} color={secondaryTextColor} />
-                                </View>
-                                <View style={styles.stepContent}>
-                                    <Text style={[styles.stepTitle, { color: textColor }]}>
-                                        {JSON.parse(bookingDetails).trip.stationTo.city}
-                                    </Text>
-                                    <Text style={[styles.stepSubtitle, { color: secondaryTextColor }]}>
-                                        Votre destination
-                                    </Text>
-                                </View>
-                            </View>
-                        )} */}
+                        )}
                     </ScrollView>
-                </View>
-            )}
+                )}
+            </Animated.View>
+
+            {/* Boutons flottants */}
+            <Animated.View 
+                style={[
+                    styles.floatingButtons, 
+                    { 
+                        bottom: panelHeight.interpolate({
+                            inputRange: [PANEL_MIN_HEIGHT, PANEL_MAX_HEIGHT],
+                            outputRange: [PANEL_MIN_HEIGHT + 20, PANEL_MAX_HEIGHT + 20],
+                        })
+                    }
+                ]}
+            >
+                <TouchableOpacity
+                    style={[styles.floatingButton, { backgroundColor: themeColors.panel }]}
+                    onPress={centerOnBus}
+                    activeOpacity={0.7}
+                >
+                    <Ionicons name="bus" size={24} color={followBus ? themeColors.accent : themeColors.secondaryText} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={[styles.floatingButton, { backgroundColor: themeColors.panel }]}
+                    onPress={centerOnMe}
+                    activeOpacity={0.7}
+                >
+                    <Ionicons name="locate" size={24} color={themeColors.accent} />
+                </TouchableOpacity>
+            </Animated.View>
         </View>
     );
 }
@@ -737,10 +891,12 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
+        padding: 20,
     },
     loadingText: {
         marginTop: 16,
         fontSize: 16,
+        fontFamily: 'Ubuntu_Regular',
     },
     errorContainer: {
         flex: 1,
@@ -750,27 +906,26 @@ const styles = StyleSheet.create({
     },
     errorTitle: {
         fontSize: 24,
-        fontWeight: 'bold',
+        fontFamily: 'Ubuntu_Bold',
         marginTop: 16,
         marginBottom: 8,
     },
     errorText: {
         fontSize: 16,
+        fontFamily: 'Ubuntu_Regular',
         textAlign: 'center',
         marginBottom: 24,
     },
     retryButton: {
-        backgroundColor: '#2196F3',
         paddingHorizontal: 24,
         paddingVertical: 12,
-        borderRadius: 8,
+        borderRadius: 12,
     },
     retryButtonText: {
         color: '#fff',
         fontSize: 16,
-        fontWeight: '600',
+        fontFamily: 'Ubuntu_Bold',
     },
-    // En-tête de navigation
     header: {
         position: 'absolute',
         top: 0,
@@ -779,7 +934,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingTop: 50,
         paddingBottom: 16,
         paddingHorizontal: 20,
         shadowColor: '#000',
@@ -789,17 +943,28 @@ const styles = StyleSheet.create({
         elevation: 4,
     },
     headerButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
         justifyContent: 'center',
         alignItems: 'center',
     },
     headerTitle: {
         fontSize: 18,
-        fontWeight: 'bold',
+        fontFamily: 'Ubuntu_Bold',
     },
-    // Marqueurs
+    headerRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    connectionIndicator: {
+        width: 12,
+        height: 12,
+        borderRadius: 6,
+        borderWidth: 2,
+        borderColor: '#fff',
+    },
     busMarker: {
         width: 50,
         height: 50,
@@ -841,6 +1006,7 @@ const styles = StyleSheet.create({
         color: 'white',
         fontWeight: 'bold',
         fontSize: 13,
+        fontFamily: 'Ubuntu_Bold',
     },
     userMarker: {
         width: 44,
@@ -864,65 +1030,59 @@ const styles = StyleSheet.create({
         shadowRadius: 3,
         elevation: 5,
     },
-    // Panneau d'informations principal
     infoPanel: {
         position: 'absolute',
         bottom: 0,
         left: 0,
         right: 0,
-        borderTopLeftRadius: 32,
-        borderTopRightRadius: 32,
-        paddingTop: 20,
-        paddingBottom: 20,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: -4 },
         shadowOpacity: 0.1,
         shadowRadius: 8,
         elevation: 8,
-        maxHeight: '45%',
-        minHeight: 200,
+        overflow: 'hidden',
     },
-    // Carte de résumé de destination
+    panelHandle: {
+        alignItems: 'center',
+        paddingVertical: 12,
+    },
+    handleBar: {
+        width: 40,
+        height: 4,
+        borderRadius: 2,
+    },
     destinationCard: {
         marginHorizontal: 20,
-        marginBottom: 16,
+        marginBottom: 12,
         borderRadius: 16,
         padding: 16,
     },
     destinationCardContent: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'flex-start',
+        alignItems: 'center',
     },
     destinationTextContainer: {
         flex: 1,
         marginRight: 12,
     },
     destinationAddress: {
-        fontSize: 18,
-        fontWeight: 'bold',
+        fontSize: 16,
+        fontFamily: 'Ubuntu_Bold',
         marginBottom: 4,
     },
-    destinationETA: {
-        fontSize: 14,
+    destinationSubtitle: {
+        fontSize: 12,
+        fontFamily: 'Ubuntu_Regular',
     },
-    priceBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 12,
-        gap: 4,
-    },
-    priceBadgeText: {
-        color: '#fff',
-        fontSize: 14,
-        fontWeight: 'bold',
-    },
-    // Liste des étapes
     stepsList: {
         paddingHorizontal: 20,
-        maxHeight: 300,
+        flex: 1,
+    },
+    stepsListContent: {
+        paddingBottom: 20,
     },
     stepItem: {
         flexDirection: 'row',
@@ -944,23 +1104,28 @@ const styles = StyleSheet.create({
     },
     stepTitle: {
         fontSize: 14,
-        fontWeight: 'bold',
+        fontFamily: 'Ubuntu_Bold',
         marginBottom: 4,
     },
     stepSubtitle: {
         fontSize: 12,
+        fontFamily: 'Ubuntu_Regular',
     },
-    etaBadge: {
-        flexDirection: 'row',
+    floatingButtons: {
+        position: 'absolute',
+        right: 20,
+        gap: 12,
+    },
+    floatingButton: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        justifyContent: 'center',
         alignItems: 'center',
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        borderRadius: 12,
-        gap: 4,
-    },
-    etaBadgeText: {
-        color: '#fff',
-        fontSize: 12,
-        fontWeight: '600',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+        elevation: 5,
     },
 });

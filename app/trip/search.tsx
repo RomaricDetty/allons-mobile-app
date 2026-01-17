@@ -8,7 +8,7 @@ import { City, PopularTrip } from "@/types";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation, useRoute } from "@react-navigation/native";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -23,7 +23,12 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 
-// Constantes extraites en dehors du composant pour éviter les recréations
+/**
+ * =================================================================
+ * CONSTANTES
+ * =================================================================
+ */
+
 const TYPE_DEPARTURE_OPTIONS = [
     { id: 'ONE_WAY', label: 'Aller simple' },
     { id: 'ROUND_TRIP', label: 'Aller-retour' },
@@ -49,9 +54,13 @@ const DATE_FORMAT_OPTIONS: Intl.DateTimeFormatOptions = {
 };
 
 /**
+ * =================================================================
+ * UTILITAIRES
+ * =================================================================
+ */
+
+/**
  * Formate une date au format YYYY-MM-DD
- * @param date - La date à formater
- * @returns string - La date formatée au format YYYY-MM-DD ou une chaîne vide si la date est null
  */
 const formatDateToYYYYMMDD = (date: Date | null): string => {
     if (!date) return '';
@@ -63,13 +72,17 @@ const formatDateToYYYYMMDD = (date: Date | null): string => {
 
 /**
  * Formate une date pour l'affichage
- * @param date - La date à formater
- * @returns string - La date formatée ou une chaîne vide
  */
 const formatDateForDisplay = (date: Date | null): string => {
     if (!date) return '';
     return date.toLocaleDateString('fr-FR', DATE_FORMAT_OPTIONS);
 };
+
+/**
+ * =================================================================
+ * COMPOSANTS MÉMORISÉS
+ * =================================================================
+ */
 
 /**
  * Composant réutilisable pour un champ de recherche
@@ -85,7 +98,7 @@ interface SearchFieldProps {
     iconColor: string;
 }
 
-const SearchField = React.memo<SearchFieldProps>(({
+const SearchField = memo<SearchFieldProps>(({
     icon,
     placeholder,
     value,
@@ -98,12 +111,16 @@ const SearchField = React.memo<SearchFieldProps>(({
     <Pressable
         style={[styles.field, { backgroundColor }]}
         onPress={onPress}
+        android_ripple={{ color: 'rgba(0, 0, 0, 0.1)' }}
     >
         <Icon name={icon} size={20} color={iconColor} />
-        <Text style={[
-            styles.fieldText,
-            { color: value ? textColor : placeholderColor }
-        ]}>
+        <Text 
+            style={[
+                styles.fieldText,
+                { color: value ? textColor : placeholderColor }
+            ]}
+            numberOfLines={1}
+        >
             {value || placeholder}
         </Text>
         <Icon name="chevron-down" size={20} color={iconColor} />
@@ -111,6 +128,58 @@ const SearchField = React.memo<SearchFieldProps>(({
 ));
 
 SearchField.displayName = 'SearchField';
+
+/**
+ * En-tête avec bouton retour
+ */
+interface HeaderProps {
+    onBack: () => void;
+    iconColor: string;
+    paddingTop: number;
+}
+
+const Header = memo<HeaderProps>(({ onBack, iconColor, paddingTop }) => (
+    <View style={[styles.header, { paddingTop }]}>
+        <Pressable
+            onPress={onBack}
+            style={styles.backButton}
+            android_ripple={{ color: 'rgba(0, 0, 0, 0.1)', borderless: true, radius: 25 }}
+        >
+            <Icon name="arrow-left" size={25} color={iconColor} />
+        </Pressable>
+    </View>
+));
+
+Header.displayName = 'Header';
+
+/**
+ * Bouton de recherche
+ */
+interface SearchButtonProps {
+    loading: boolean;
+    onPress: () => void;
+}
+
+const SearchButton = memo<SearchButtonProps>(({ loading, onPress }) => (
+    <View style={styles.searchButtonContainer}>
+        {loading ? (
+            <View style={[styles.searchButton, styles.searchButtonLoading]}>
+                <ActivityIndicator size="small" color="#FFFFFF" />
+            </View>
+        ) : (
+            <Pressable
+                disabled={loading}
+                style={styles.searchButton}
+                onPress={onPress}
+                android_ripple={{ color: 'rgba(255, 255, 255, 0.3)', borderless: true }}
+            >
+                <MaterialIcons name="search" size={30} color="#FFFFFF" />
+            </Pressable>
+        )}
+    </View>
+));
+
+SearchButton.displayName = 'SearchButton';
 
 /**
  * Composant réutilisable pour le DatePicker iOS
@@ -131,7 +200,7 @@ interface DatePickerModalProps {
     colorScheme: 'light' | 'dark';
 }
 
-const DatePickerModal = React.memo<DatePickerModalProps>(({
+const DatePickerModal = memo<DatePickerModalProps>(({
     visible,
     title,
     value,
@@ -179,13 +248,17 @@ const DatePickerModal = React.memo<DatePickerModalProps>(({
                 >
                     <View style={[styles.datePickerHeader, { borderBottomColor: borderColor, backgroundColor }]}>
                         <Pressable onPress={onCancel}>
-                            <Text style={[styles.datePickerCancel, { color: cancelTextColor }]}>Annuler</Text>
+                            <Text style={[styles.datePickerCancel, { color: cancelTextColor }]}>
+                                Annuler
+                            </Text>
                         </Pressable>
                         <Text style={[styles.datePickerTitle, { color: textColor }]} numberOfLines={1}>
                             {title}
                         </Text>
                         <Pressable onPress={() => onConfirm(tempDate)}>
-                            <Text style={[styles.datePickerConfirm, { color: confirmTextColor }]}>Confirmer</Text>
+                            <Text style={[styles.datePickerConfirm, { color: confirmTextColor }]}>
+                                Confirmer
+                            </Text>
                         </Pressable>
                     </View>
                     <View style={styles.datePickerContent}>
@@ -212,9 +285,80 @@ const DatePickerModal = React.memo<DatePickerModalProps>(({
 DatePickerModal.displayName = 'DatePickerModal';
 
 /**
- * Écran de recherche de trajet avec formulaire de recherche
- * Affiche un formulaire avec plusieurs champs pour rechercher un trajet
+ * Item de ville dans le BottomSheet
  */
+interface CityItemProps {
+    item: City;
+    onSelect: (city: City) => void;
+    tintColor: string;
+    textColor: string;
+    borderColor: string;
+}
+
+const CityItem = memo<CityItemProps>(({ item, onSelect, tintColor, textColor, borderColor }) => (
+    <Pressable
+        style={[styles.cityItem, { borderBottomColor: borderColor }]}
+        onPress={() => onSelect(item)}
+        android_ripple={{ color: 'rgba(0, 0, 0, 0.1)' }}
+    >
+        <Icon name="map-marker" size={20} color={tintColor} />
+        <Text style={[styles.cityItemText, { color: textColor }]}>
+            {item.name}
+        </Text>
+    </Pressable>
+));
+
+CityItem.displayName = 'CityItem';
+
+/**
+ * Item de sélection (type départ, voyageurs)
+ */
+interface SelectionItemProps {
+    item: { id?: string; value?: number; label: string };
+    isSelected: boolean;
+    onSelect: () => void;
+    tintColor: string;
+    textColor: string;
+    iconColor: string;
+    borderColor: string;
+}
+
+const SelectionItem = memo<SelectionItemProps>(({
+    item,
+    isSelected,
+    onSelect,
+    tintColor,
+    textColor,
+    iconColor,
+    borderColor
+}) => (
+    <Pressable
+        style={[styles.typeItem, { borderBottomColor: borderColor }]}
+        onPress={onSelect}
+        android_ripple={{ color: 'rgba(0, 0, 0, 0.1)' }}
+    >
+        <Icon
+            name={isSelected ? "check-circle" : "circle-outline"}
+            size={24}
+            color={isSelected ? tintColor : iconColor}
+        />
+        <Text style={[
+            styles.typeItemText,
+            { color: isSelected ? tintColor : textColor }
+        ]}>
+            {item.label}
+        </Text>
+    </Pressable>
+));
+
+SelectionItem.displayName = 'SelectionItem';
+
+/**
+ * =================================================================
+ * COMPOSANT PRINCIPAL
+ * =================================================================
+ */
+
 const TripSearch = () => {
     const insets = useSafeAreaInsets();
     const navigation = useNavigation();
@@ -222,13 +366,13 @@ const TripSearch = () => {
     const { popularTrip } = (route.params as { popularTrip?: PopularTrip }) || {};
     const colorScheme = useColorScheme() ?? 'light';
     
-    // Couleurs dynamiques basées sur le thème
+    // Hooks de couleurs AVANT tout useMemo/useCallback
     const backgroundColor = useThemeColor({}, 'background');
     const textColor = useThemeColor({}, 'text');
     const iconColor = useThemeColor({}, 'icon');
     const tintColor = useThemeColor({}, 'tint');
     
-    // Couleurs spécifiques mémorisées pour éviter les recalculs
+    // Couleurs thématiques mémorisées
     const themeColors = useMemo(() => ({
         backgroundColor,
         textColor,
@@ -243,10 +387,10 @@ const TripSearch = () => {
         confirmTextColor: colorScheme === 'dark' ? '#0A84FF' : '#1776ba',
     }), [colorScheme, backgroundColor, textColor, iconColor, tintColor]);
 
-    // Ref pour tracker si on a déjà lancé la recherche automatique
+    // Ref pour la recherche automatique
     const hasAutoSearched = useRef(false);
 
-    // États pour les champs du formulaire
+    // États du formulaire
     const [departureCity, setDepartureCity] = useState<City | null>(null);
     const [arrivalCity, setArrivalCity] = useState<City | null>(null);
     const [departureDate, setDepartureDate] = useState<Date | null>(null);
@@ -259,7 +403,7 @@ const TripSearch = () => {
     const [cities, setCities] = useState<Array<City>>([]);
     const [loadingCities, setLoadingCities] = useState<boolean>(false);
 
-    // États pour les modals - regroupés dans un objet pour réduire les re-renders
+    // États des modals
     const [modals, setModals] = useState({
         departure: false,
         arrival: false,
@@ -270,112 +414,60 @@ const TripSearch = () => {
     });
 
     /**
-     * Met à jour l'état d'un modal spécifique
+     * =================================================================
+     * HANDLERS DES MODALS
+     * =================================================================
      */
+
     const setModal = useCallback((key: keyof typeof modals, value: boolean) => {
         setModals(prev => ({ ...prev, [key]: value }));
     }, []);
 
+    const closeAllModals = useCallback(() => {
+        setModals({
+            departure: false,
+            arrival: false,
+            typeDeparture: false,
+            passenger: false,
+            datePicker: false,
+            returnDatePicker: false,
+        });
+    }, []);
+
     /**
-     * Récupère les villes disponibles pour la recherche de trajet
+     * =================================================================
+     * API CALLS
+     * =================================================================
      */
-    const getCitiesFunction = useCallback(async () => {
+
+    /**
+     * Récupère les villes disponibles
+     */
+    const fetchCities = useCallback(async () => {
         try {
             setLoadingCities(true);
             const response = await getCities();
             setCities(response?.data || []);
         } catch (error: any) {
-            console.error('Erreur dans la récupération des villes : ', error);
+            console.error('Erreur récupération villes:', error);
             setCities([]);
+            Alert.alert('Erreur', 'Impossible de charger les villes');
         } finally {
             setLoadingCities(false);
         }
     }, []);
 
     /**
-     * Pré-remplit les champs du formulaire avec les données du trajet populaire
+     * Effectue la recherche de départs
      */
-    const prefillFormFromPopularTrip = useCallback((trip: PopularTrip, citiesList: City[]) => {
-        const fromCity = citiesList.find(city => city.id === trip.stationFrom.cityId);
-        const toCity = citiesList.find(city => city.id === trip.stationTo.cityId);
-        const today = new Date();
-
-        if (fromCity) setDepartureCity(fromCity);
-        if (toCity) setArrivalCity(toCity);
-        setDepartureDate(today);
-        setTempDepartureDate(today);
-    }, []);
-
-    /**
-     * Gère la sélection d'une ville de départ
-     */
-    const handleSelectDepartureCity = useCallback((city: City) => {
-        setDepartureCity(city);
-        setModal('departure', false);
-    }, [setModal]);
-
-    /**
-     * Gère la sélection d'une ville d'arrivée
-     */
-    const handleSelectArrivalCity = useCallback((city: City) => {
-        setArrivalCity(city);
-        setModal('arrival', false);
-    }, [setModal]);
-
-    /**
-     * Gère la sélection du type de départ
-     */
-    const handleSelectTypeDeparture = useCallback((typeId: string) => {
-        setTypeDeparture(typeId);
-        setModal('typeDeparture', false);
-        if (typeId === 'ONE_WAY') {
-            setReturnDate(null);
-        }
-    }, [setModal]);
-
-    /**
-     * Gère la sélection du nombre de voyageurs
-     */
-    const handleSelectPassenger = useCallback((value: number) => {
-        setNumberOfPersons(value);
-        setModal('passenger', false);
-    }, [setModal]);
-
-    /**
-     * Gère la sélection de la date de départ (Android)
-     */
-    const handleDateChange = useCallback((event: any, selectedDate?: Date) => {
-        if (Platform.OS === 'android') {
-            if (selectedDate) {
-                setDepartureDate(selectedDate);
-            }
-            setModal('datePicker', false);
-        }
-    }, [setModal]);
-
-    /**
-     * Gère la sélection de la date de retour (Android)
-     */
-    const handleReturnDateChange = useCallback((event: any, selectedDate?: Date) => {
-        if (Platform.OS === 'android') {
-            if (selectedDate) {
-                setReturnDate(selectedDate);
-            }
-            setModal('returnDatePicker', false);
-        }
-    }, [setModal]);
-
-    /**
-     * Gère la recherche de trajet
-     */
-    const handleSearch = useCallback(async () => {
+    const performSearch = useCallback(async () => {
         if (!departureCity || !arrivalCity || !departureDate) {
-            Alert.alert('Attention !', 'Veuillez sélectionner une ville de départ, une ville d\'arrivée et une date de départ');
+            Alert.alert('Attention', 'Veuillez sélectionner une ville de départ, d\'arrivée et une date');
             return;
         }
 
         if (typeDeparture === 'ROUND_TRIP' && !returnDate) {
-            Alert.alert('Attention !', 'Veuillez sélectionner une date de retour pour un aller-retour');
+            Alert.alert('Attention', 'Veuillez sélectionner une date de retour');
             return;
         }
 
@@ -384,7 +476,6 @@ const TripSearch = () => {
         setLoadingDepartures(true);
         try {
             const response = await getAvailableDepartures(queryParams);
-            console.log('Les départs disponibles : ', response?.data);
             
             if (response?.data?.items?.length > 0) {
                 navigation.navigate('trip/trip-list', {
@@ -398,18 +489,91 @@ const TripSearch = () => {
                     }
                 });
             } else {
-                Alert.alert('Information !', 'Aucun départ disponible pour la recherche, veuillez ajuster vos filtres de recherche.');
+                Alert.alert('Information', 'Aucun départ disponible, ajustez vos critères de recherche');
             }
         } catch (error: any) {
-            console.error('Erreur dans la récupération des départs : ', error);
-            Alert.alert('Attention !', 'Une erreur est survenue lors de la recherche des départs');
+            console.error('Erreur recherche départs:', error);
+            Alert.alert('Erreur', 'Une erreur est survenue lors de la recherche');
         } finally {
             setLoadingDepartures(false);
         }
     }, [departureCity, arrivalCity, departureDate, returnDate, typeDeparture, numberOfPersons, navigation]);
 
     /**
-     * Liste filtrée des villes pour le départ (exclut la ville d'arrivée)
+     * =================================================================
+     * HANDLERS DE SÉLECTION
+     * =================================================================
+     */
+
+    const handleSelectDepartureCity = useCallback((city: City) => {
+        setDepartureCity(city);
+        setModal('departure', false);
+    }, [setModal]);
+
+    const handleSelectArrivalCity = useCallback((city: City) => {
+        setArrivalCity(city);
+        setModal('arrival', false);
+    }, [setModal]);
+
+    const handleSelectTypeDeparture = useCallback((typeId: string) => {
+        setTypeDeparture(typeId);
+        setModal('typeDeparture', false);
+        if (typeId === 'ONE_WAY') {
+            setReturnDate(null);
+        }
+    }, [setModal]);
+
+    const handleSelectPassenger = useCallback((value: number) => {
+        setNumberOfPersons(value);
+        setModal('passenger', false);
+    }, [setModal]);
+
+    /**
+     * Handlers pour les dates Android
+     */
+    const handleDateChange = useCallback((event: any, selectedDate?: Date) => {
+        if (Platform.OS === 'android') {
+            setModal('datePicker', false);
+            if (selectedDate) {
+                setDepartureDate(selectedDate);
+                setTempDepartureDate(selectedDate);
+            }
+        }
+    }, [setModal]);
+
+    const handleReturnDateChange = useCallback((event: any, selectedDate?: Date) => {
+        if (Platform.OS === 'android') {
+            setModal('returnDatePicker', false);
+            if (selectedDate) {
+                setReturnDate(selectedDate);
+                setTempReturnDate(selectedDate);
+            }
+        }
+    }, [setModal]);
+
+    /**
+     * Handlers pour les dates iOS
+     */
+    const handleDepartureDateConfirm = useCallback((date: Date) => {
+        setDepartureDate(date);
+        setTempDepartureDate(date);
+        setModal('datePicker', false);
+    }, [setModal]);
+
+    const handleReturnDateConfirm = useCallback((date: Date) => {
+        setReturnDate(date);
+        setTempReturnDate(date);
+        setModal('returnDatePicker', false);
+    }, [setModal]);
+
+    /**
+     * =================================================================
+     * DONNÉES FILTRÉES ET FORMATÉES
+     * =================================================================
+     */
+
+    /**
+     * Villes disponibles pour le départ (exclut la ville d'arrivée)
      */
     const availableDepartureCities = useMemo(() => {
         if (!arrivalCity) return cities;
@@ -417,7 +581,7 @@ const TripSearch = () => {
     }, [cities, arrivalCity]);
 
     /**
-     * Liste filtrée des villes pour l'arrivée (exclut la ville de départ)
+     * Villes disponibles pour l'arrivée (exclut la ville de départ)
      */
     const availableArrivalCities = useMemo(() => {
         if (!departureCity) return cities;
@@ -436,44 +600,144 @@ const TripSearch = () => {
         passengerLabel: PASSENGER_OPTIONS.find(opt => opt.value === numberOfPersons)?.label || '',
     }), [departureCity, arrivalCity, typeDeparture, departureDate, returnDate, numberOfPersons]);
 
-    // Récupération des villes au montage
-    useEffect(() => {
-        getCitiesFunction();
-    }, [getCitiesFunction]);
+    /**
+     * =================================================================
+     * PRÉPARATION FORMULAIRE
+     * =================================================================
+     */
 
-    // Pré-remplissage du formulaire avec le trajet populaire
+    /**
+     * Pré-remplit le formulaire avec un trajet populaire
+     */
+    const prefillFormFromPopularTrip = useCallback((trip: PopularTrip, citiesList: City[]) => {
+        const fromCity = citiesList.find(city => city.id === trip.stationFrom.cityId);
+        const toCity = citiesList.find(city => city.id === trip.stationTo.cityId);
+        const today = new Date();
+
+        if (fromCity) setDepartureCity(fromCity);
+        if (toCity) setArrivalCity(toCity);
+        setDepartureDate(today);
+        setTempDepartureDate(today);
+    }, []);
+
+    /**
+     * =================================================================
+     * EFFETS
+     * =================================================================
+     */
+
+    // Chargement des villes au montage
+    useEffect(() => {
+        fetchCities();
+    }, [fetchCities]);
+
+    // Pré-remplissage avec trajet populaire
     useEffect(() => {
         if (popularTrip && cities.length > 0 && !hasAutoSearched.current) {
             prefillFormFromPopularTrip(popularTrip, cities);
         }
     }, [popularTrip, cities, prefillFormFromPopularTrip]);
 
-    // Recherche automatique si tous les champs sont remplis
+    // Recherche automatique
     useEffect(() => {
         if (popularTrip && departureCity && arrivalCity && departureDate && !hasAutoSearched.current) {
             hasAutoSearched.current = true;
             const timer = setTimeout(() => {
-                handleSearch();
+                performSearch();
             }, 500);
             return () => clearTimeout(timer);
         }
-    }, [popularTrip, departureCity, arrivalCity, departureDate, handleSearch]);
+    }, [popularTrip, departureCity, arrivalCity, departureDate, performSearch]);
+
+    /**
+     * =================================================================
+     * RENDER CALLBACKS
+     * =================================================================
+     */
+
+    const renderCityItem = useCallback((item: City, onClose: () => void) => (
+        <CityItem
+            item={item}
+            onSelect={(city) => {
+                handleSelectDepartureCity(city);
+                onClose();
+            }}
+            tintColor={themeColors.tintColor}
+            textColor={themeColors.textColor}
+            borderColor={themeColors.borderColor}
+        />
+    ), [handleSelectDepartureCity, themeColors]);
+
+    const renderArrivalCityItem = useCallback((item: City, onClose: () => void) => (
+        <CityItem
+            item={item}
+            onSelect={(city) => {
+                handleSelectArrivalCity(city);
+                onClose();
+            }}
+            tintColor={themeColors.tintColor}
+            textColor={themeColors.textColor}
+            borderColor={themeColors.borderColor}
+        />
+    ), [handleSelectArrivalCity, themeColors]);
+
+    const renderTypeItem = useCallback((item: typeof TYPE_DEPARTURE_OPTIONS[number], onClose: () => void) => (
+        <SelectionItem
+            item={item}
+            isSelected={typeDeparture === item.id}
+            onSelect={() => {
+                handleSelectTypeDeparture(item.id);
+                onClose();
+            }}
+            tintColor={themeColors.tintColor}
+            textColor={themeColors.textColor}
+            iconColor={themeColors.iconColor}
+            borderColor={themeColors.borderColor}
+        />
+    ), [typeDeparture, handleSelectTypeDeparture, themeColors]);
+
+    const renderPassengerItem = useCallback((item: typeof PASSENGER_OPTIONS[number], onClose: () => void) => (
+        <SelectionItem
+            item={item}
+            isSelected={numberOfPersons === item.value}
+            onSelect={() => {
+                handleSelectPassenger(item.value);
+                onClose();
+            }}
+            tintColor={themeColors.tintColor}
+            textColor={themeColors.textColor}
+            iconColor={themeColors.iconColor}
+            borderColor={themeColors.borderColor}
+        />
+    ), [numberOfPersons, handleSelectPassenger, themeColors]);
+
+    const cityKeyExtractor = useCallback((item: City) => item.id, []);
+    const typeKeyExtractor = useCallback((item: typeof TYPE_DEPARTURE_OPTIONS[number]) => item.id, []);
+    const passengerKeyExtractor = useCallback((item: typeof PASSENGER_OPTIONS[number]) => item.value.toString(), []);
+
+    const cityFilterFunction = useCallback((item: City, searchTerm: string) =>
+        item.name.toLowerCase().includes(searchTerm.toLowerCase())
+    , []);
+
+    /**
+     * =================================================================
+     * RENDER
+     * =================================================================
+    */
 
     return (
         <View style={[styles.container, { backgroundColor: themeColors.backgroundColor }]}>
-            {/* Header avec bouton retour */}
-            <View style={[styles.header, { paddingTop: insets.top }]}>
-                <Pressable
-                    onPress={() => navigation.goBack()}
-                    style={styles.backButton}
-                >
-                    <Icon name="arrow-left" size={25} color={themeColors.iconColor} />
-                </Pressable>
-            </View>
+            {/* Header */}
+            <Header
+                onBack={() => navigation.goBack()}
+                iconColor={themeColors.iconColor}
+                paddingTop={insets.top}
+            />
 
             <ScrollView
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
             >
                 <Text style={[styles.sectionTitle, { color: themeColors.textColor }]}>
                     Rechercher un trajet
@@ -517,44 +781,38 @@ const TripSearch = () => {
                     />
 
                     {/* Date de départ */}
-                    <Pressable
-                        style={[styles.field, { backgroundColor: themeColors.fieldBackgroundColor }]}
+                    <SearchField
+                        icon="calendar"
+                        placeholder="Date de départ"
+                        value={displayValues.departureDateFormatted}
                         onPress={() => {
                             setDepartureDate(tempDepartureDate);
                             setModal('datePicker', true);
                         }}
-                    >
-                        <Icon name="calendar" size={20} color={themeColors.tintColor} />
-                        <Text style={[
-                            styles.fieldText,
-                            { color: departureDate ? themeColors.fieldTextColor : themeColors.fieldPlaceholderColor }
-                        ]}>
-                            {displayValues.departureDateFormatted || 'Date de départ'}
-                        </Text>
-                        <Icon name="chevron-down" size={20} color={themeColors.iconColor} />
-                    </Pressable>
+                        backgroundColor={themeColors.fieldBackgroundColor}
+                        textColor={themeColors.fieldTextColor}
+                        placeholderColor={themeColors.fieldPlaceholderColor}
+                        iconColor={themeColors.tintColor}
+                    />
 
-                    {/* Date de retour - Affiché uniquement si Aller-retour */}
+                    {/* Date de retour */}
                     {typeDeparture === 'ROUND_TRIP' && (
-                        <Pressable
-                            style={[styles.field, { backgroundColor: themeColors.fieldBackgroundColor }]}
+                        <SearchField
+                            icon="calendar"
+                            placeholder="Date de retour"
+                            value={displayValues.returnDateFormatted}
                             onPress={() => {
                                 setReturnDate(tempReturnDate);
                                 setModal('returnDatePicker', true);
                             }}
-                        >
-                            <Icon name="calendar" size={20} color={themeColors.tintColor} />
-                            <Text style={[
-                                styles.fieldText,
-                                { color: returnDate ? themeColors.fieldTextColor : themeColors.fieldPlaceholderColor }
-                            ]}>
-                                {displayValues.returnDateFormatted || 'Date de retour'}
-                            </Text>
-                            <Icon name="chevron-down" size={20} color={themeColors.iconColor} />
-                        </Pressable>
+                            backgroundColor={themeColors.fieldBackgroundColor}
+                            textColor={themeColors.fieldTextColor}
+                            placeholderColor={themeColors.fieldPlaceholderColor}
+                            iconColor={themeColors.tintColor}
+                        />
                     )}
 
-                    {/* Nombre de personnes */}
+                    {/* Nombre de voyageurs */}
                     <SearchField
                         icon="account-group"
                         placeholder="Nombre de voyageurs"
@@ -567,165 +825,68 @@ const TripSearch = () => {
                     />
 
                     {/* Bouton Rechercher */}
-                    <View style={styles.searchButtonContainer}>
-                        {loadingDepartures ? (
-                            <View style={[styles.searchButton, { opacity: 0.5 }]}>
-                                <ActivityIndicator size="small" color="#FFFFFF" />
-                            </View>
-                        ) : (
-                            <Pressable
-                                disabled={loadingDepartures}
-                                style={styles.searchButton}
-                                onPress={handleSearch}
-                            >
-                                <MaterialIcons name="search" size={30} color="#FFFFFF" />
-                            </Pressable>
-                        )}
-                    </View>
+                    <SearchButton loading={loadingDepartures} onPress={performSearch} />
                 </View>
             </ScrollView>
 
-            {/* BottomSheet de sélection ville de départ */}
+            {/* BottomSheets */}
             <BottomSheet
                 visible={modals.departure}
                 onClose={() => setModal('departure', false)}
                 title="Ville de départ"
                 data={availableDepartureCities}
                 loading={loadingCities}
-                keyExtractor={(item) => item.id}
-                renderItem={(item, onClose) => (
-                    <Pressable
-                        style={[styles.cityItem, { borderBottomColor: themeColors.borderColor }]}
-                        onPress={() => {
-                            handleSelectDepartureCity(item);
-                            onClose();
-                        }}
-                    >
-                        <Icon name="map-marker" size={20} color={themeColors.tintColor} />
-                        <Text style={[styles.cityItemText, { color: themeColors.textColor }]}>
-                            {item.name}
-                        </Text>
-                    </Pressable>
-                )}
+                keyExtractor={cityKeyExtractor}
+                renderItem={renderCityItem}
                 emptyText="Aucune ville disponible"
                 searchable={true}
                 searchPlaceholder="Rechercher une ville..."
-                filterFunction={(item, searchTerm) =>
-                    item.name.toLowerCase().includes(searchTerm.toLowerCase())
-                }
+                filterFunction={cityFilterFunction}
             />
 
-            {/* BottomSheet de sélection ville d'arrivée */}
             <BottomSheet
                 visible={modals.arrival}
                 onClose={() => setModal('arrival', false)}
                 title="Ville d'arrivée"
                 data={availableArrivalCities}
                 loading={loadingCities}
-                keyExtractor={(item) => item.id}
-                renderItem={(item, onClose) => (
-                    <Pressable
-                        style={[styles.cityItem, { borderBottomColor: themeColors.borderColor }]}
-                        onPress={() => {
-                            handleSelectArrivalCity(item);
-                            onClose();
-                        }}
-                    >
-                        <Icon name="map-marker" size={20} color={themeColors.tintColor} />
-                        <Text style={[styles.cityItemText, { color: themeColors.textColor }]}>
-                            {item.name}
-                        </Text>
-                    </Pressable>
-                )}
+                keyExtractor={cityKeyExtractor}
+                renderItem={renderArrivalCityItem}
                 emptyText="Aucune ville disponible"
                 searchable={true}
                 searchPlaceholder="Rechercher une ville..."
-                filterFunction={(item, searchTerm) =>
-                    item.name.toLowerCase().includes(searchTerm.toLowerCase())
-                }
+                filterFunction={cityFilterFunction}
             />
 
-            {/* BottomSheet de sélection type de départ */}
             <BottomSheet
                 visible={modals.typeDeparture}
                 onClose={() => setModal('typeDeparture', false)}
                 title="Type de départ"
                 data={TYPE_DEPARTURE_OPTIONS}
                 loading={false}
-                keyExtractor={(item) => item.id}
-                renderItem={(item, onClose) => {
-                    const isSelected = typeDeparture === item.id;
-                    return (
-                        <Pressable
-                            style={[styles.typeItem, { borderBottomColor: themeColors.borderColor }]}
-                            onPress={() => {
-                                handleSelectTypeDeparture(item.id);
-                                onClose();
-                            }}
-                        >
-                            <Icon
-                                name={isSelected ? "check-circle" : "circle-outline"}
-                                size={24}
-                                color={isSelected ? themeColors.tintColor : themeColors.iconColor}
-                            />
-                            <Text style={[
-                                styles.typeItemText,
-                                { color: isSelected ? themeColors.tintColor : themeColors.textColor }
-                            ]}>
-                                {item.label}
-                            </Text>
-                        </Pressable>
-                    );
-                }}
+                keyExtractor={typeKeyExtractor}
+                renderItem={renderTypeItem}
                 emptyText="Aucun type disponible"
             />
 
-            {/* BottomSheet de sélection nombre de voyageurs */}
             <BottomSheet
                 visible={modals.passenger}
                 onClose={() => setModal('passenger', false)}
                 title="Nombre de voyageurs"
                 data={PASSENGER_OPTIONS}
                 loading={false}
-                keyExtractor={(item) => item.value.toString()}
-                renderItem={(item, onClose) => {
-                    const isSelected = numberOfPersons === item.value;
-                    return (
-                        <Pressable
-                            style={[styles.typeItem, { borderBottomColor: themeColors.borderColor }]}
-                            onPress={() => {
-                                handleSelectPassenger(item.value);
-                                onClose();
-                            }}
-                        >
-                            <Icon
-                                name={isSelected ? "check-circle" : "circle-outline"}
-                                size={24}
-                                color={isSelected ? themeColors.tintColor : themeColors.iconColor}
-                            />
-                            <Text style={[
-                                styles.typeItemText,
-                                { color: isSelected ? themeColors.tintColor : themeColors.textColor }
-                            ]}>
-                                {item.label}
-                            </Text>
-                        </Pressable>
-                    );
-                }}
+                keyExtractor={passengerKeyExtractor}
+                renderItem={renderPassengerItem}
                 emptyText="Aucune option disponible"
             />
 
-            {/* DatePicker pour la date de départ - iOS */}
+            {/* DatePickers iOS */}
             <DatePickerModal
                 visible={modals.datePicker && Platform.OS === 'ios'}
                 title="Date de départ"
                 value={tempDepartureDate}
                 minimumDate={new Date()}
-                onConfirm={(date) => {
-                    setDepartureDate(date);
-                    setTempDepartureDate(date);
-                    setModal('datePicker', false);
-                }}
+                onConfirm={handleDepartureDateConfirm}
                 onCancel={() => setModal('datePicker', false)}
                 backgroundColor={themeColors.datePickerBackgroundColor}
                 borderColor={themeColors.borderColor}
@@ -736,30 +897,13 @@ const TripSearch = () => {
                 colorScheme={colorScheme}
             />
 
-            {/* DatePicker pour la date de départ - Android */}
-            {Platform.OS === 'android' && modals.datePicker && (
-                <DateTimePicker
-                    value={departureDate || new Date()}
-                    mode="date"
-                    display="default"
-                    onChange={handleDateChange}
-                    minimumDate={new Date()}
-                    themeVariant={colorScheme}
-                />
-            )}
-
-            {/* DatePicker pour la date de retour - iOS */}
             {typeDeparture === 'ROUND_TRIP' && (
                 <DatePickerModal
                     visible={modals.returnDatePicker && Platform.OS === 'ios'}
                     title="Date de retour"
                     value={tempReturnDate}
                     minimumDate={departureDate || new Date()}
-                    onConfirm={(date) => {
-                        setReturnDate(date);
-                        setTempReturnDate(date);
-                        setModal('returnDatePicker', false);
-                    }}
+                    onConfirm={handleReturnDateConfirm}
                     onCancel={() => setModal('returnDatePicker', false)}
                     backgroundColor={themeColors.datePickerBackgroundColor}
                     borderColor={themeColors.borderColor}
@@ -771,7 +915,18 @@ const TripSearch = () => {
                 />
             )}
 
-            {/* DatePicker pour la date de retour - Android */}
+            {/* DatePickers Android */}
+            {Platform.OS === 'android' && modals.datePicker && (
+                <DateTimePicker
+                    value={departureDate || new Date()}
+                    mode="date"
+                    display="default"
+                    onChange={handleDateChange}
+                    minimumDate={new Date()}
+                    themeVariant={colorScheme}
+                />
+            )}
+
             {typeDeparture === 'ROUND_TRIP' && Platform.OS === 'android' && modals.returnDatePicker && (
                 <DateTimePicker
                     value={returnDate || departureDate || new Date()}
@@ -785,6 +940,12 @@ const TripSearch = () => {
         </View>
     );
 };
+
+/**
+ * =================================================================
+ * STYLES
+ * =================================================================
+ */
 
 const styles = StyleSheet.create({
     container: {
@@ -827,6 +988,7 @@ const styles = StyleSheet.create({
         gap: 12,
         marginVertical: 3,
         width: '100%',
+        overflow: 'hidden',
     },
     fieldText: {
         flex: 1,
@@ -870,6 +1032,12 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontFamily: 'Ubuntu_Medium',
     },
+    datePickerContent: {
+        height: 216,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingVertical: 8,
+    },
     searchButtonContainer: {
         marginTop: 10,
     },
@@ -881,6 +1049,10 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
+        overflow: 'hidden',
+    },
+    searchButtonLoading: {
+        opacity: 0.7,
     },
     cityItem: {
         flexDirection: 'row',
@@ -892,6 +1064,7 @@ const styles = StyleSheet.create({
     cityItemText: {
         fontSize: 16,
         fontFamily: 'Ubuntu_Medium',
+        flex: 1,
     },
     typeItem: {
         flexDirection: 'row',
@@ -903,12 +1076,7 @@ const styles = StyleSheet.create({
     typeItemText: {
         fontSize: 16,
         fontFamily: 'Ubuntu_Regular',
-    },
-    datePickerContent: {
-        height: 216,
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingVertical: 8,
+        flex: 1,
     },
 });
 
