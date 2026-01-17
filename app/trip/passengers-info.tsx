@@ -14,7 +14,7 @@ import { useThemeColor } from '@/hooks/use-theme-color';
 import { SearchParams, Trip } from '@/types';
 import { getAuthToken, getUserId } from '@/utils/storage';
 import { CommonActions, useNavigation, useRoute } from '@react-navigation/native';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -31,23 +31,32 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 /**
- * Retire le préfixe +225 d'un numéro de téléphone si présent
- * @param phone - Le numéro de téléphone avec ou sans préfixe
- * @returns Le numéro de téléphone sans le préfixe +225
+ * =================================================================
+ * TYPES & INTERFACES
+ * =================================================================
  */
-const removePhonePrefix = (phone: string | null | undefined): string => {
-    if (!phone) return '';
-    // Retirer le préfixe +225 s'il existe
-    const cleaned = phone.replace(/^\+225/, '').trim();
-    return cleaned;
-};
 
-/**
- * Composant pour le bouton de sélection de sièges
- */
+interface Passenger {
+    firstName: string;
+    lastName: string;
+    phone: string;
+    email: string;
+    seatNumber: number | null;
+    seatNumberReturn: number | null;
+    passengerType: string;
+}
+
+interface EmergencyContactData {
+    firstName: string;
+    lastName: string;
+    phone: string;
+    email: string;
+    relationship: string;
+}
+
 interface SeatSelectionButtonProps {
     leg: 'OUTBOUND' | 'RETURN';
-    passengers: Array<{ seatNumber: number | null; seatNumberReturn: number | null }>;
+    passengers: Passenger[];
     onPress: (leg: 'OUTBOUND' | 'RETURN') => void;
     cardBackgroundColor: string;
     borderColor: string;
@@ -58,7 +67,49 @@ interface SeatSelectionButtonProps {
     style?: any;
 }
 
-const SeatSelectionButton = React.memo(({
+interface SelectedSeatsDisplayProps {
+    passengers: Passenger[];
+    textColor: string;
+    secondaryTextColor: string;
+}
+
+/**
+ * =================================================================
+ * UTILITAIRES
+ * =================================================================
+ */
+
+/**
+ * Retire le préfixe +225 d'un numéro de téléphone
+ */
+const removePhonePrefix = (phone: string | null | undefined): string => {
+    if (!phone) return '';
+    return phone.replace(/^\+225/, '').trim();
+};
+
+/**
+ * Crée un passager vide
+ */
+const createEmptyPassenger = (): Passenger => ({
+    firstName: '',
+    lastName: '',
+    phone: '',
+    email: '',
+    seatNumber: null,
+    seatNumberReturn: null,
+    passengerType: 'adult',
+});
+
+/**
+ * =================================================================
+ * COMPOSANTS MÉMORISÉS
+ * =================================================================
+ */
+
+/**
+ * Bouton de sélection de sièges
+ */
+const SeatSelectionButton = memo<SeatSelectionButtonProps>(({
     leg,
     passengers,
     onPress,
@@ -69,7 +120,7 @@ const SeatSelectionButton = React.memo(({
     secondaryTextColor,
     iconColor,
     style
-}: SeatSelectionButtonProps) => {
+}) => {
     const seatCount = useMemo(() => {
         return leg === 'OUTBOUND'
             ? passengers.filter(p => p.seatNumber).length
@@ -85,6 +136,7 @@ const SeatSelectionButton = React.memo(({
         <Pressable
             style={[styles.seatSelectionButton, { backgroundColor: cardBackgroundColor, borderColor }, style]}
             onPress={() => onPress(leg)}
+            android_ripple={{ color: 'rgba(0, 0, 0, 0.1)' }}
         >
             <View style={styles.seatSelectionButtonContent}>
                 <Icon name="seat" size={20} color={tintColor} />
@@ -102,20 +154,16 @@ const SeatSelectionButton = React.memo(({
     );
 });
 
-/**
- * Composant pour l'affichage des sièges sélectionnés
- */
-interface SelectedSeatsDisplayProps {
-    passengers: Array<{ seatNumber: number | null; seatNumberReturn: number | null }>;
-    textColor: string;
-    secondaryTextColor: string;
-}
+SeatSelectionButton.displayName = 'SeatSelectionButton';
 
-const SelectedSeatsDisplay = React.memo(({
+/**
+ * Affichage des sièges sélectionnés
+ */
+const SelectedSeatsDisplay = memo<SelectedSeatsDisplayProps>(({
     passengers,
     textColor,
     secondaryTextColor
-}: SelectedSeatsDisplayProps) => {
+}) => {
     const hasSelectedSeats = useMemo(() => {
         return passengers.some(p => p.seatNumber) || passengers.some(p => p.seatNumberReturn);
     }, [passengers]);
@@ -149,23 +197,177 @@ const SelectedSeatsDisplay = React.memo(({
     );
 });
 
+SelectedSeatsDisplay.displayName = 'SelectedSeatsDisplay';
+
 /**
- * Écran de vérification et paiement (Étape 2 sur 3)
- * Permet de compléter les informations des passagers et sélectionner la méthode de paiement
+ * Header de l'écran
  */
+interface HeaderProps {
+    onBack: () => void;
+    trip: Trip;
+    returnTrip?: Trip;
+    isRoundTrip: boolean;
+    isKeyboardVisible: boolean;
+    paddingTop: number;
+    backgroundColor: string;
+    borderColor: string;
+    iconColor: string;
+    tintColor: string;
+    secondaryTextColor: string;
+}
+
+const Header = memo<HeaderProps>(({
+    onBack,
+    trip,
+    returnTrip,
+    isRoundTrip,
+    isKeyboardVisible,
+    paddingTop,
+    backgroundColor,
+    borderColor,
+    iconColor,
+    tintColor,
+    secondaryTextColor
+}) => (
+    <View style={[
+        styles.header,
+        isKeyboardVisible && styles.headerReduced,
+        { paddingTop, backgroundColor, borderBottomColor: borderColor }
+    ]}>
+        <Pressable
+            onPress={onBack}
+            style={styles.backButton}
+            android_ripple={{ color: 'rgba(0, 0, 0, 0.1)', borderless: true, radius: 25 }}
+        >
+            <Icon name="arrow-left" size={isKeyboardVisible ? 20 : 25} color={iconColor} />
+        </Pressable>
+
+        <View style={styles.routeBadge}>
+            <Text style={[
+                styles.routeBadgeText,
+                isKeyboardVisible && styles.routeBadgeTextReduced,
+                { color: tintColor }
+            ]} numberOfLines={1}>
+                {trip.departureCity} <Icon name="chevron-right" size={isKeyboardVisible ? 12 : 15} color={tintColor} /> {trip.arrivalCity}
+                {isRoundTrip && returnTrip && (
+                    <> <Icon name="chevron-right" size={isKeyboardVisible ? 12 : 15} color={tintColor} /> {returnTrip.arrivalCity}</>
+                )}
+            </Text>
+        </View>
+
+        {!isKeyboardVisible && (
+            <Text style={[styles.stepIndicator, { color: secondaryTextColor }]}>
+                Étape 2/3
+            </Text>
+        )}
+    </View>
+));
+
+Header.displayName = 'Header';
+
+/**
+ * Barre de progression
+ */
+interface ProgressBarProps {
+    textColor: string;
+    secondaryTextColor: string;
+    backgroundColor: string;
+    barBackgroundColor: string;
+    tintColor: string;
+}
+
+const ProgressBar = memo<ProgressBarProps>(({
+    textColor,
+    secondaryTextColor,
+    backgroundColor,
+    barBackgroundColor,
+    tintColor
+}) => (
+    <>
+        <View style={[styles.progressContainer, { backgroundColor }]}>
+            <Text style={[styles.progressTitle, { color: textColor }]}>
+                Vérifier et payer
+            </Text>
+            <View style={styles.progressBarContainer}>
+                <View style={[styles.progressBar, { backgroundColor: barBackgroundColor }]}>
+                    <View style={[styles.progressFill, { width: '67%', backgroundColor: tintColor }]} />
+                </View>
+                <Text style={[styles.progressText, { color: secondaryTextColor }]}>
+                    67%
+                </Text>
+            </View>
+        </View>
+
+        <View style={[styles.progressIndicators, { backgroundColor }]}>
+            <View style={[styles.progressDot, styles.progressDotCompleted]}>
+                <Icon name="check" size={12} color="#FFFFFF" />
+            </View>
+            <View style={[styles.progressDot, { backgroundColor: tintColor }]} />
+            <View style={[styles.progressDot, { backgroundColor: barBackgroundColor }]} />
+        </View>
+    </>
+));
+
+ProgressBar.displayName = 'ProgressBar';
+
+/**
+ * Bouton de confirmation fixe
+ */
+interface FixedButtonProps {
+    onPress: () => void;
+    loading: boolean;
+    backgroundColor: string;
+    borderColor: string;
+    paddingBottom: number;
+}
+
+const FixedButton = memo<FixedButtonProps>(({
+    onPress,
+    loading,
+    backgroundColor,
+    borderColor,
+    paddingBottom
+}) => (
+    <View style={[
+        styles.fixedButtonContainer,
+        { paddingBottom: paddingBottom + 8, backgroundColor, borderTopColor: borderColor }
+    ]}>
+        <Pressable
+            style={[styles.confirmButton, styles.confirmButtonWidth]}
+            onPress={onPress}
+            disabled={loading}
+            android_ripple={{ color: 'rgba(255, 255, 255, 0.3)' }}
+        >
+            {loading ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+                <Text style={styles.confirmButtonText}>Confirmer et payer</Text>
+            )}
+        </Pressable>
+    </View>
+));
+
+FixedButton.displayName = 'FixedButton';
+
+/**
+ * =================================================================
+ * COMPOSANT PRINCIPAL
+ * =================================================================
+ */
+
 const PassengersInfo = () => {
     const route = useRoute();
     const navigation = useNavigation();
     const insets = useSafeAreaInsets();
     const colorScheme = useColorScheme() ?? 'light';
 
-    // Couleurs dynamiques basées sur le thème
+    // Hooks de couleurs AVANT useMemo
     const backgroundColor = useThemeColor({}, 'background');
     const textColor = useThemeColor({}, 'text');
     const iconColor = useThemeColor({}, 'icon');
     const tintColor = useThemeColor({}, 'tint');
 
-    // Couleurs spécifiques pour l'écran - mémorisées pour éviter les recalculs
+    // Couleurs thématiques mémorisées
     const themeColors = useMemo(() => ({
         cardBackgroundColor: colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF',
         borderColor: colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0',
@@ -176,19 +378,8 @@ const PassengersInfo = () => {
         progressBarBackgroundColor: colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0',
         progressDotBackgroundColor: colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0',
     }), [colorScheme]);
-    
-    const {
-        cardBackgroundColor,
-        borderColor,
-        secondaryTextColor,
-        headerBackgroundColor,
-        headerBorderColor,
-        scrollBackgroundColor,
-        progressBarBackgroundColor,
-        progressDotBackgroundColor
-    } = themeColors;
 
-    // Récupération des données passées en paramètre
+    // Paramètres de route mémorisés
     const routeParams = useMemo(() => (route.params as {
         trip?: Trip,
         returnTrip?: Trip,
@@ -199,76 +390,45 @@ const PassengersInfo = () => {
     const numberOfPersons = useMemo(() => searchParams?.numberOfPersons || 1, [searchParams?.numberOfPersons]);
     const isRoundTrip = useMemo(() => !!returnTrip, [returnTrip]);
 
-    // États pour les informations des passagers
-    const [passengers, setPassengers] = useState(() => {
-        const initial = [];
-        for (let i = 0; i < numberOfPersons; i++) {
-            initial.push({
-                firstName: i === 0 ? '' : '',
-                lastName: i === 0 ? '' : '',
-                phone: i === 0 ? '' : '',
-                email: i === 0 ? '' : '',
-                seatNumber: null as number | null, // Siège pour l'aller (ou unique si aller simple)
-                seatNumberReturn: null as number | null, // Siège pour le retour (si aller-retour)
-                passengerType: 'adult' as string, // Type de passager par défaut
-            });
-        }
-        return initial;
-    });
-
-    // États pour les informations de contact
+    // États du composant
+    const [passengers, setPassengers] = useState<Passenger[]>(() => 
+        Array.from({ length: numberOfPersons }, () => createEmptyPassenger())
+    );
     const [contactPhone, setContactPhone] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-
-    // États pour le contact d'urgence
-    const [emergencyContact, setEmergencyContact] = useState({
+    const [emergencyContact, setEmergencyContact] = useState<EmergencyContactData>({
         firstName: '',
         lastName: '',
         phone: '',
         email: '',
         relationship: ''
     });
-
-    // État pour la méthode de paiement
     const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string | null>(null);
-
-    // États pour les informations de paiement
     const [cardName, setCardName] = useState('');
     const [cardNumber, setCardNumber] = useState('');
     const [cardCvv, setCardCvv] = useState('');
     const [expirationDate, setExpirationDate] = useState('');
     const [paymentNumber, setPaymentNumber] = useState('');
-
-    // État pour le bottom sheet de sélection
     const [showSelectionBottomSheet, setShowSelectionBottomSheet] = useState(false);
     const [selectionType, setSelectionType] = useState<'passengerType' | 'relation' | null>(null);
     const [selectionTitle, setSelectionTitle] = useState('');
     const [selectionOptions, setSelectionOptions] = useState<Array<{ value: string, label: string }>>([]);
     const [currentSelectionValue, setCurrentSelectionValue] = useState<string>('');
     const [onSelectionCallback, setOnSelectionCallback] = useState<((value: string) => void) | null>(null);
-
-    // État pour le modal d'erreur
     const [showErrorModal, setShowErrorModal] = useState(false);
     const [validationErrors, setValidationErrors] = useState<string[]>([]);
-    
-    // État pour suivre si l'attribution automatique a déjà été effectuée
     const [seatsAutoAssigned, setSeatsAutoAssigned] = useState(false);
-
-    // État pour suivre la visibilité du clavier
     const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 
-    if (!trip) {
-        return (
-            <View style={[styles.container, { backgroundColor: scrollBackgroundColor }]}>
-                <Text style={{ color: textColor }}>Erreur : Aucun trajet sélectionné</Text>
-            </View>
-        );
-    }
+    // Refs
+    const hasLoadedUserInfo = useRef(false);
 
     /**
-     * Calcule le prix total pour tous les voyageurs
-     * Inclut le prix du voyage retour si c'est un aller-retour
+     * =================================================================
+     * CALCULS MÉMORISÉS
+     * =================================================================
      */
+
     const totalPrice = useMemo(() => {
         if (!trip) return 0;
         const outboundPrice = trip.price * numberOfPersons;
@@ -276,9 +436,6 @@ const PassengersInfo = () => {
         return outboundPrice + returnPrice;
     }, [trip?.price, returnTrip?.price, numberOfPersons]);
 
-    /**
-     * Calcule les frais et montants totaux
-     */
     const pricing = useMemo(() => {
         const fees = 500;
         const taxes = 0;
@@ -286,12 +443,13 @@ const PassengersInfo = () => {
         const totalAmountWithoutFees = totalPrice + taxes;
         return { fees, taxes, totalAmount, totalAmountWithoutFees };
     }, [totalPrice]);
-    
-    const { fees, taxes, totalAmount, totalAmountWithoutFees } = pricing;
 
     /**
-     * Met à jour les informations d'un passager
+     * =================================================================
+     * HANDLERS
+     * =================================================================
      */
+
     const updatePassenger = useCallback((index: number, field: string, value: string | number) => {
         setPassengers(prev => {
             const updated = [...prev];
@@ -302,11 +460,20 @@ const PassengersInfo = () => {
         });
     }, []);
 
+    const updateEmergencyContact = useCallback((field: string, value: string) => {
+        setEmergencyContact(prev => ({ ...prev, [field]: value }));
+    }, []);
+
+    const handleGoBack = useCallback(() => {
+        navigation.goBack();
+    }, [navigation]);
+
     /**
-     * Attribue automatiquement les sièges aux passagers
-     * @param leg - La légende du trajet (OUTBOUND ou RETURN)
-     * @returns true si des sièges ont été attribués, false sinon
+     * =================================================================
+     * SIÈGES
+     * =================================================================
      */
+
     const assignSeatsAutomatically = useCallback(async (leg: 'OUTBOUND' | 'RETURN' = 'OUTBOUND'): Promise<boolean> => {
         const currentTripForLeg = leg === 'OUTBOUND' ? trip : returnTrip;
         
@@ -349,7 +516,6 @@ const PassengersInfo = () => {
                     });
                 }
 
-                // Attribution automatique après le dernier siège réservé
                 let seatsAssigned = false;
                 
                 setPassengers(currentPassengers => {
@@ -370,15 +536,14 @@ const PassengersInfo = () => {
                     
                     for (let index = 0; index < currentPassengers.length; index++) {
                         const passenger = currentPassengers[index];
-                        const passengerHasSeat = Array.from(initialSelections.values()).includes(index);
                         const passengerSeatNumber = leg === 'OUTBOUND' 
                             ? passenger?.seatNumber 
                             : passenger?.seatNumberReturn;
                         
-                        if (!passengerSeatNumber && !passengerHasSeat) {
+                        if (!passengerSeatNumber) {
                             while (nextAvailableSeatNumber <= totalSeatsCount) {
                                 const seat = seatsArray.find(s => s.number === nextAvailableSeatNumber);
-                                if (seat && seat.available && !seat.booked && !seat.locked && !seat.blocked && !initialSelections.has(seat.number)) {
+                                if (seat && seat.available && !initialSelections.has(seat.number)) {
                                     initialSelections.set(seat.number, index);
                                     nextAvailableSeatNumber++;
                                     break;
@@ -388,7 +553,6 @@ const PassengersInfo = () => {
                         }
                     }
 
-                    // Mettre à jour les passagers avec les sièges attribués
                     if (initialSelections.size > 0) {
                         seatsAssigned = true;
                         const updatedPassengers = [...currentPassengers];
@@ -411,38 +575,29 @@ const PassengersInfo = () => {
             }
             return false;
         } catch (error: any) {
-            console.error('Erreur lors de l\'attribution automatique des sièges:', error);
-            // Ne pas afficher d'alerte, l'utilisateur pourra sélectionner manuellement
+            console.error('Erreur attribution automatique sièges:', error);
             return false;
         }
-    }, [trip, returnTrip]);
+    }, [trip, returnTrip, passengers]);
 
-    /**
-     * Ouvre l'écran de sélection de sièges
-     * La sélection est fonction du nombre de passagers
-     */
     const openSeatSelection = useCallback((leg: 'OUTBOUND' | 'RETURN' = 'OUTBOUND') => {
-        // Vérifier qu'il y a des passagers
         if (!passengers || passengers.length === 0) {
             Alert.alert('Erreur', 'Aucun passager à assigner');
             return;
         }
 
-        // Préparer les passagers avec les sièges appropriés selon la légende
         const passengersForLeg = passengers.map(p => ({
             ...p,
             seatNumber: leg === 'OUTBOUND' ? p.seatNumber : p.seatNumberReturn
         }));
 
-        // Passer explicitement le nombre de passagers pour garantir la cohérence
         navigation.navigate('trip/seat-selection' as any, {
             trip,
             returnTrip,
             passengers: passengersForLeg,
-            numberOfPassengers: passengers.length, // Nombre explicite de passagers
+            numberOfPassengers: passengers.length,
             currentLeg: leg,
             onSeatsSelected: (seatsData: Array<{ passengerIndex: number; seatNumber: number; leg: 'OUTBOUND' | 'RETURN' }>) => {
-                // Mettre à jour les sièges sélectionnés pour chaque passager selon la légende
                 const updatedPassengers = [...passengers];
                 seatsData.forEach(({ passengerIndex, seatNumber }) => {
                     if (updatedPassengers[passengerIndex]) {
@@ -459,184 +614,80 @@ const PassengersInfo = () => {
     }, [trip, returnTrip, passengers, navigation]);
 
     /**
-     * Met à jour le contact d'urgence
+     * =================================================================
+     * VALIDATION & SOUMISSION
+     * =================================================================
      */
-    const updateEmergencyContact = useCallback((field: string, value: string) => {
-        setEmergencyContact(prev => ({ ...prev, [field]: value }));
-    }, []);
 
-    /**
-     * Valide tous les champs requis du formulaire
-     * @returns {string[]|null} Tableau contenant les erreurs ou null si tout est valide
-     */
     const validateForm = useCallback(() => {
         const errors: string[] = [];
 
-        // Validation des passagers
         passengers.forEach((passenger, index) => {
             const passengerNumber = passengers.length > 1 ? ` ${index + 1}` : '';
 
-            // Validation du prénom
-            if (!passenger.firstName || passenger.firstName.trim() === '') {
+            if (!passenger.firstName?.trim()) {
                 errors.push(`Le prénom du passager${passengerNumber} est requis`);
             }
 
-            // Validation du nom
-            if (!passenger.lastName || passenger.lastName.trim() === '') {
+            if (!passenger.lastName?.trim()) {
                 errors.push(`Le nom du passager${passengerNumber} est requis`);
             }
 
-            // Validation du téléphone
             const phoneTrimmed = passenger.phone?.trim() || '';
             if (!phoneTrimmed) {
                 errors.push(`Le téléphone du passager${passengerNumber} est requis`);
             } else if (!isValidPhone(phoneTrimmed)) {
-                errors.push(`Le format du téléphone du passager${passengerNumber} est invalide (Ex: 0123456789)`);
+                errors.push(`Format téléphone invalide pour passager${passengerNumber}`);
             }
 
-            // Validation de l'email si renseigné
             const emailTrimmed = passenger.email?.trim() || '';
             if (emailTrimmed && !isValidEmail(emailTrimmed)) {
-                errors.push(`Le format de l'email du passager${passengerNumber} est invalide`);
+                errors.push(`Format email invalide pour passager${passengerNumber}`);
+            }
+
+            if (!passenger.passengerType?.trim()) {
+                errors.push(`Type de passager${passengerNumber} requis`);
+            }
+
+            if (!passenger.seatNumber) {
+                errors.push(`Siège aller requis pour passager${passengerNumber}`);
+            }
+
+            if (isRoundTrip && returnTrip && !passenger.seatNumberReturn) {
+                errors.push(`Siège retour requis pour passager${passengerNumber}`);
             }
         });
 
-        // Validation du type de passager pour chaque passager
-        passengers.forEach((passenger, index) => {
-            const passengerNumber = passengers.length > 1 ? ` ${index + 1}` : '';
-            if (!passenger.passengerType || passenger.passengerType.trim() === '') {
-                errors.push(`Le type de passager${passengerNumber} est requis`);
-            }
-        });
-
-        // Validation des emails distincts entre les passagers
-        const emailMap = new Map<string, number[]>();
-        passengers.forEach((passenger, index) => {
-            const email = passenger.email?.trim();
-            if (email && email !== '') {
-                if (!emailMap.has(email)) {
-                    emailMap.set(email, []);
-                }
-                emailMap.get(email)!.push(index);
-            }
-        });
-
-        // Vérifier s'il y a des emails en double
-        emailMap.forEach((indices, email) => {
-            if (indices.length > 1) {
-                const passengerNumbers = indices.map(i => passengers.length > 1 ? ` ${i + 1}` : '').join(', ');
-                errors.push(`L'email "${email}" est utilisé par plusieurs passagers (${passengerNumbers})`);
-            }
-        });
-
-        // Validation de la sélection des sièges
-        passengers.forEach((passenger, index) => {
-            const passengerNumber = passengers.length > 1 ? ` ${index + 1}` : '';
-            
-            // Vérifier le siège pour l'aller (obligatoire pour tous les trajets)
-            if (passenger.seatNumber === null || passenger.seatNumber === undefined || typeof passenger.seatNumber !== 'number' || passenger.seatNumber <= 0) {
-                errors.push(`Veuillez sélectionner un siège valide pour le passager${passengerNumber} (trajet aller)`);
-            }
-            
-            // Vérifier le siège pour le retour (obligatoire uniquement pour les aller-retour)
-            if (isRoundTrip && returnTrip) {
-                if (passenger.seatNumberReturn === null || passenger.seatNumberReturn === undefined || typeof passenger.seatNumberReturn !== 'number' || passenger.seatNumberReturn <= 0) {
-                    errors.push(`Veuillez sélectionner un siège valide pour le passager${passengerNumber} (trajet retour)`);
-                }
-            }
-        });
-
-        // Validation du contact d'urgence
-        // const emergencyFirstNameTrimmed = emergencyContact.firstName?.trim() || '';
-        // if (!emergencyFirstNameTrimmed) {
-        //     errors.push('Le prénom du contact d\'urgence est requis');
-        // }
-
-        // const emergencyLastNameTrimmed = emergencyContact.lastName?.trim() || '';
-        // if (!emergencyLastNameTrimmed) {
-        //     errors.push('Le nom du contact d\'urgence est requis');
-        // }
-
-        // const emergencyPhoneTrimmed = emergencyContact.phone?.trim() || '';
-        // if (!emergencyPhoneTrimmed) {
-        //     errors.push('Le téléphone du contact d\'urgence est requis');
-        // } else if (!isValidPhone(emergencyPhoneTrimmed)) {
-        //     errors.push('Le format du téléphone du contact d\'urgence est invalide (Ex: 0123456789)');
-        // }
-
-        // if (!emergencyContact.relationship || emergencyContact.relationship.trim() === '') {
-        //     errors.push('La relation avec le contact d\'urgence est requise');
-        // }
-
-        // Validation de l'email du contact d'urgence si renseigné
-        // const emergencyEmailTrimmed = emergencyContact.email?.trim() || '';
-        // if (emergencyEmailTrimmed && !isValidEmail(emergencyEmailTrimmed)) {
-        //     errors.push('Le format de l\'email du contact d\'urgence est invalide');
-        // }
-
-        // Validation de la méthode de paiement
         if (!selectedPaymentMethod) {
-            errors.push('La méthode de paiement est requise');
+            errors.push('Méthode de paiement requise');
         }
 
-        // Validation des informations de paiement selon la méthode sélectionnée
         if (selectedPaymentMethod === 'credit-card') {
-            // Validation pour carte bancaire
-            const cardNameTrimmed = cardName?.trim() || '';
-            if (!cardNameTrimmed) {
-                errors.push('Le nom sur la carte est requis');
+            if (!cardName?.trim()) {
+                errors.push('Nom sur la carte requis');
             }
 
             const cleanedCardNumber = cardNumber.replace(/\s/g, '');
-            if (!cardNumber || cleanedCardNumber.length !== 16) {
-                errors.push('Le numéro de carte doit contenir 16 chiffres');
-            } else if (!/^\d+$/.test(cleanedCardNumber)) {
-                errors.push('Le numéro de carte doit contenir uniquement des chiffres');
+            if (cleanedCardNumber.length !== 16 || !/^\d+$/.test(cleanedCardNumber)) {
+                errors.push('Numéro de carte invalide (16 chiffres)');
             }
 
-            const expirationDateTrimmed = expirationDate?.trim() || '';
-            if (!expirationDateTrimmed) {
-                errors.push('La date d\'expiration est requise');
-            } else {
-                // Validation du format MM/YY
-                const datePattern = /^(0[1-9]|1[0-2])\/\d{2}$/;
-                if (!datePattern.test(expirationDateTrimmed)) {
-                    errors.push('La date d\'expiration doit être au format MM/YY');
-                } else {
-                    // Validation que la date n'est pas expirée
-                    const [month, year] = expirationDateTrimmed.split('/');
-                    const expiryDate = new Date(2000 + parseInt(year, 10), parseInt(month, 10) - 1);
-                    const today = new Date();
-                    today.setHours(0, 0, 0, 0);
-                    if (expiryDate < today) {
-                        errors.push('La date d\'expiration de la carte est dépassée');
-                    }
-                }
+            if (!expirationDate?.trim() || !/^(0[1-9]|1[0-2])\/\d{2}$/.test(expirationDate)) {
+                errors.push('Date expiration invalide (MM/YY)');
             }
 
-            if (!cardCvv || cardCvv.length !== 3) {
-                errors.push('Le CVV doit contenir 3 chiffres');
-            } else if (!/^\d+$/.test(cardCvv)) {
-                errors.push('Le CVV doit contenir uniquement des chiffres');
+            if (cardCvv.length !== 3 || !/^\d+$/.test(cardCvv)) {
+                errors.push('CVV invalide (3 chiffres)');
             }
         } else if (selectedPaymentMethod && selectedPaymentMethod !== 'credit-card') {
-            // Validation pour les autres méthodes de paiement (mobile money)
-            const paymentNumberTrimmed = paymentNumber?.trim() || '';
-            if (!paymentNumberTrimmed) {
-                errors.push('Le numéro de paiement est requis');
-            } else if (!isValidPhone(paymentNumberTrimmed)) {
-                errors.push('Le format du numéro de paiement est invalide (Ex: 0123456789)');
+            if (!paymentNumber?.trim() || !isValidPhone(paymentNumber)) {
+                errors.push('Numéro de paiement invalide');
             }
         }
 
         return errors.length > 0 ? errors : null;
-    }, [passengers, emergencyContact, selectedPaymentMethod, cardName, cardNumber, expirationDate, cardCvv, paymentNumber, isRoundTrip, returnTrip]);
+    }, [passengers, selectedPaymentMethod, cardName, cardNumber, expirationDate, cardCvv, paymentNumber, isRoundTrip, returnTrip]);
 
-    /**
-     * Mappe la méthode de paiement sélectionnée vers le format API
-     * @param method - La méthode de paiement sélectionnée
-     * @returns Un objet avec method et provider
-     */
     const mapPaymentMethod = useCallback((method: string | null): { method: string; provider: string | null } => {
         switch (method) {
             case 'credit-card':
@@ -652,12 +703,7 @@ const PassengersInfo = () => {
         }
     }, []);
 
-    /**
-     * Gère la soumission du formulaire
-     * Formate les données selon le format attendu par l'API de réservation
-     */
     const handleConfirmAndPay = useCallback(async () => {
-        // Validation des champs requis
         const validationErrors = validateForm();
 
         if (validationErrors) {
@@ -669,10 +715,8 @@ const PassengersInfo = () => {
         try {
             setIsLoading(true);
 
-            // Détermination du type de trajet
             const tripType = isRoundTrip ? 'ROUND_TRIP' : 'ONE_WAY';
 
-            // Formatage du contact d'urgence
             const contact = {
                 firstName: emergencyContact.firstName.trim() || '',
                 lastName: emergencyContact.lastName.trim() || '',
@@ -681,50 +725,33 @@ const PassengersInfo = () => {
                 relationship: emergencyContact.relationship.trim().toLowerCase() || 'autre'
             };
 
-            // Formatage des passagers selon le type de trajet
-            const passengersData: Array<{
-                seatNumber: number | null;
-                firstName: string;
-                lastName: string;
-                email: string;
-                phone: string;
-                passengerType: string;
-                isMainPassenger: boolean;
-                userId: string | null;
-                price: number;
-                leg: 'OUTBOUND' | 'RETURN';
-            }> = [];
+            const passengersData: Array<any> = [];
 
-            // Pour chaque passager, créer les entrées nécessaires
             passengers.forEach((passenger, index) => {
                 const isMainPassenger = index === 0;
-                const passengerEmail = passenger.email?.trim() || '';
-                const passengerPhone = passenger.phone.trim();
-
-                // Passager pour le trajet aller (OUTBOUND)
+                
                 passengersData.push({
                     seatNumber: passenger.seatNumber,
                     firstName: passenger.firstName.trim(),
                     lastName: passenger.lastName.trim(),
-                    email: passengerEmail,
-                    phone: passengerPhone,
+                    email: passenger.email?.trim() || '',
+                    phone: passenger.phone.trim(),
                     passengerType: passenger.passengerType,
-                    isMainPassenger: isMainPassenger,
+                    isMainPassenger,
                     userId: null,
                     price: trip.price,
                     leg: 'OUTBOUND'
                 });
 
-                // Si c'est un aller-retour, ajouter aussi le passager pour le retour (RETURN)
                 if (isRoundTrip && returnTrip) {
                     passengersData.push({
-                        seatNumber: passenger.seatNumberReturn || passenger.seatNumber, // Utilise le siège retour si disponible, sinon le siège aller
+                        seatNumber: passenger.seatNumberReturn || passenger.seatNumber,
                         firstName: passenger.firstName.trim(),
                         lastName: passenger.lastName.trim(),
-                        email: passengerEmail,
-                        phone: passengerPhone,
+                        email: passenger.email?.trim() || '',
+                        phone: passenger.phone.trim(),
                         passengerType: passenger.passengerType,
-                        isMainPassenger: isMainPassenger,
+                        isMainPassenger,
                         userId: null,
                         price: returnTrip.price,
                         leg: 'RETURN'
@@ -732,47 +759,40 @@ const PassengersInfo = () => {
                 }
             });
 
-            // Formatage des données pour l'API de réservation
             const bookingData = {
                 companyId: trip.companyId,
                 departureId: trip.id,
                 ...(isRoundTrip && returnTrip ? { returnDepartureId: returnTrip.id } : {}),
                 type: tripType,
                 channel: 'MOBILE_APP',
-                contact: contact,
+                contact,
                 passengers: passengersData,
-                totalAmount: totalAmountWithoutFees
+                totalAmount: pricing.totalAmountWithoutFees
             };
 
             const token = await getAuthToken();
             
-            // Vérifier que le token est disponible
-            if (!token || token.trim() === '') {
-                throw new Error('Token d\'authentification manquant. Veuillez vous reconnecter.');
+            if (!token?.trim()) {
+                throw new Error('Token manquant');
             }
 
-            // Création de la réservation
             const bookingResponse = await createBooking(bookingData, token);
 
             if (bookingResponse.status === 200 || bookingResponse.status === 201) {
                 const bookingId = bookingResponse.data?.bookingId || bookingResponse.data?.id;
 
                 if (!bookingId) {
-                    throw new Error('Booking ID non trouvé dans la réponse');
+                    throw new Error('Booking ID non trouvé');
                 }
 
-                // Mapper la méthode de paiement
                 const { method: paymentMethod, provider } = mapPaymentMethod(selectedPaymentMethod);
-
-                // Récupérer le numéro de téléphone (priorité au passager principal, sinon contact d'urgence)
                 const phoneNumber = passengers[0]?.phone?.trim() || emergencyContact.phone.trim();
 
-                // Formatage des données de paiement
                 const paymentData = {
-                    bookingId: bookingId,
+                    bookingId,
                     method: paymentMethod,
-                    provider: provider,
-                    amount: totalAmount,
+                    provider,
+                    amount: pricing.totalAmount,
                     channel: 'MOBILE_APP',
                     currency: trip.currency || 'XOF',
                     rawPayload: {
@@ -784,50 +804,45 @@ const PassengersInfo = () => {
                     }
                 };
 
-                // Création du paiement
                 const paymentResponse = await createBookingPayment(paymentData, token);
 
                 if (paymentResponse.status === 200 || paymentResponse.status === 201) {
-                    // Rediriger vers l'écran de confirmation avec les données de réservation
-                    // Utilisation de reset pour empêcher le retour en arrière
                     navigation.dispatch(
                         CommonActions.reset({
                             index: 0,
-                            routes: [
-                                {
-                                    name: 'trip/booking-confirmation' as any,
-                                    params: {
-                                        bookingResponse,
-                                        paymentResponse,
-                                        trip,
-                                        returnTrip,
-                                        passengers,
-                                        searchParams
-                                    }
+                            routes: [{
+                                name: 'trip/booking-confirmation' as any,
+                                params: {
+                                    bookingResponse,
+                                    paymentResponse,
+                                    trip,
+                                    returnTrip,
+                                    passengers,
+                                    searchParams
                                 }
-                            ]
+                            }]
                         })
                     );
                 } else {
-                    throw new Error('Erreur lors du paiement');
+                    throw new Error('Erreur paiement');
                 }
             } else {
-                throw new Error('Erreur lors de la création de la réservation');
+                throw new Error('Erreur réservation');
             }
         } catch (error: any) {
-            console.error('Erreur lors de la création de la réservation:', error);
-            Alert.alert(
-                'Erreur',
-                error?.response?.data?.message || error?.message || 'Une erreur est survenue lors de la création de la réservation'
-            );
+            console.error('Erreur réservation:', error);
+            Alert.alert('Erreur', error?.response?.data?.message || error?.message || 'Erreur lors de la réservation');
         } finally {
             setIsLoading(false);
         }
-    }, [validateForm, isRoundTrip, returnTrip, trip, emergencyContact, passengers, selectedPaymentMethod, cardName, cardNumber, expirationDate, cardCvv, paymentNumber, totalAmount, totalAmountWithoutFees, mapPaymentMethod, navigation, searchParams]);
+    }, [validateForm, isRoundTrip, returnTrip, trip, emergencyContact, passengers, selectedPaymentMethod, cardName, cardNumber, expirationDate, cardCvv, paymentNumber, pricing, mapPaymentMethod, navigation, searchParams]);
 
     /**
-     * Ouvre le bottom sheet de sélection
+     * =================================================================
+     * BOTTOM SHEET
+     * =================================================================
      */
+
     const openSelectionBottomSheet = useCallback((
         type: 'passengerType' | 'relation',
         title: string,
@@ -843,9 +858,6 @@ const PassengersInfo = () => {
         setShowSelectionBottomSheet(true);
     }, []);
 
-    /**
-     * Ferme le bottom sheet de sélection
-     */
     const closeSelectionBottomSheet = useCallback(() => {
         setShowSelectionBottomSheet(false);
         setSelectionType(null);
@@ -855,9 +867,6 @@ const PassengersInfo = () => {
         setOnSelectionCallback(null);
     }, []);
 
-    /**
-     * Gère la sélection d'une valeur
-     */
     const handleSelection = useCallback((value: string) => {
         if (onSelectionCallback) {
             onSelectionCallback(value);
@@ -866,42 +875,39 @@ const PassengersInfo = () => {
     }, [onSelectionCallback, closeSelectionBottomSheet]);
 
     /**
-     * Gère le retour en arrière
+     * =================================================================
+     * EFFETS
+     * =================================================================
      */
-    const handleGoBack = useCallback(() => {
-        navigation.goBack();
-    }, [navigation]);
 
-    /**
-     * Vérifie la session utilisateur
-     */
-    const userCheckSession = useCallback(async () => {
+    // Chargement des infos utilisateur
+    const loadUserInfo = useCallback(async () => {
         const token = await getAuthToken();
         const userId = await getUserId();
 
-        if (token && userId) {
+        if (token && userId && !hasLoadedUserInfo.current) {
             try {
                 setIsLoading(true);
+                hasLoadedUserInfo.current = true;
+                
                 const response = await authGetUserInfo(userId, token);
+                
                 if (response.status === 200) {
-                    // Mettre à jour uniquement les informations du passager principal (index 0) avec les informations de l'utilisateur
                     setPassengers(prev => {
-                        const updated = prev.map((passenger, index) => {
-                            if (index === 0) {
-                                return {
-                                    firstName: response?.data?.firstName || '',
-                                    lastName: response?.data?.lastName || '',
-                                    phone: removePhonePrefix(response?.data?.phones[0]?.digits) || '',
-                                    email: response?.data?.email || '',
-                                    passengerType: 'adult',
-                                    seatNumber: null,
-                                    seatNumberReturn: null
-                                };
-                            }
-                            return { ...passenger };
-                        });
+                        const updated = [...prev];
+                        if (updated[0]) {
+                            updated[0] = {
+                                ...updated[0],
+                                firstName: response?.data?.firstName || '',
+                                lastName: response?.data?.lastName || '',
+                                phone: removePhonePrefix(response?.data?.phones[0]?.digits) || '',
+                                email: response?.data?.email || '',
+                                passengerType: 'adult',
+                            };
+                        }
                         return updated;
                     });
+                    
                     setContactPhone(removePhonePrefix(response?.data?.phones[0]?.digits) || '');
                     setEmergencyContact({
                         firstName: response?.data?.contactUrgent?.firstName || '',
@@ -910,40 +916,30 @@ const PassengersInfo = () => {
                         email: response?.data?.email || '',
                         relationship: response?.data?.contactUrgent?.relationship || 'Autre'
                     });
-                    setIsLoading(false);
-                    return false;
                 }
-
-                setIsLoading(false);
             } catch (error) {
-                console.error('Erreur lors de la récupération des informations de l\'utilisateur:', error);
+                console.error('Erreur chargement user info:', error);
+            } finally {
                 setIsLoading(false);
             }
         }
     }, []);
 
     useEffect(() => {
-        userCheckSession();
-    }, [userCheckSession]);
+        loadUserInfo();
+    }, [loadUserInfo]);
 
-    /**
-     * Attribue automatiquement les sièges après le chargement des informations utilisateur
-     */
+    // Attribution automatique des sièges
     useEffect(() => {
         if (passengers && passengers.length > 0 && trip && !seatsAutoAssigned) {
-            // Vérifier si des sièges ont déjà été attribués
             const hasSeatsAssigned = passengers.some(p => 
-                (p.seatNumber !== null && p.seatNumber !== undefined) || 
-                (p.seatNumberReturn !== null && p.seatNumberReturn !== undefined)
+                p.seatNumber !== null || p.seatNumberReturn !== null
             );
             
             if (!hasSeatsAssigned) {
-                // Attendre un peu pour que les données soient bien chargées
                 const timer = setTimeout(async () => {
-                    // Attribuer les sièges pour l'aller
                     const outboundAssigned = await assignSeatsAutomatically('OUTBOUND');
                     
-                    // Si c'est un aller-retour, attribuer aussi les sièges pour le retour
                     if (isRoundTrip && returnTrip) {
                         await assignSeatsAutomatically('RETURN');
                     }
@@ -960,11 +956,8 @@ const PassengersInfo = () => {
         }
     }, [passengers, trip, seatsAutoAssigned, assignSeatsAutomatically, isRoundTrip, returnTrip]);
 
-    /**
-     * Réinitialise les champs de paiement quand la méthode change
-     */
+    // Reset champs paiement
     useEffect(() => {
-        // Réinitialiser les champs quand on change de méthode de paiement
         setCardName('');
         setCardNumber('');
         setCardCvv('');
@@ -972,22 +965,16 @@ const PassengersInfo = () => {
         setPaymentNumber('');
     }, [selectedPaymentMethod]);
 
-    /**
-     * Écoute les événements du clavier pour ajuster l'interface
-     */
+    // Écoute du clavier
     useEffect(() => {
         const keyboardWillShow = Keyboard.addListener(
             Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-            () => {
-                setIsKeyboardVisible(true);
-            }
+            () => setIsKeyboardVisible(true)
         );
 
         const keyboardWillHide = Keyboard.addListener(
             Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-            () => {
-                setIsKeyboardVisible(false);
-            }
+            () => setIsKeyboardVisible(false)
         );
 
         return () => {
@@ -996,12 +983,25 @@ const PassengersInfo = () => {
         };
     }, []);
 
+    /**
+     * =================================================================
+     * RENDER
+     * =================================================================
+     */
+
+    if (!trip) {
+        return (
+            <View style={[styles.container, { backgroundColor: themeColors.scrollBackgroundColor }]}>
+                <Text style={{ color: textColor }}>Erreur : Aucun trajet sélectionné</Text>
+            </View>
+        );
+    }
 
     return (
         <KeyboardAvoidingView
-            style={[styles.container, { backgroundColor: scrollBackgroundColor }]}
+            style={[styles.container, { backgroundColor: themeColors.scrollBackgroundColor }]}
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+            keyboardVerticalOffset={0}
         >
             {isLoading && (
                 <View style={styles.loadingContainer}>
@@ -1009,63 +1009,28 @@ const PassengersInfo = () => {
                 </View>
             )}
 
-            {/* Header */}
-            <View style={[
-                styles.header,
-                isKeyboardVisible && styles.headerReduced,
-                {
-                    paddingTop: insets.top,
-                    backgroundColor: headerBackgroundColor,
-                    borderBottomColor: headerBorderColor
-                }
-            ]}>
-                <Pressable
-                    onPress={handleGoBack}
-                    style={styles.backButton}
-                >
-                    <Icon name="arrow-left" size={isKeyboardVisible ? 20 : 25} color={iconColor} />
-                </Pressable>
+            <Header
+                onBack={handleGoBack}
+                trip={trip}
+                returnTrip={returnTrip}
+                isRoundTrip={isRoundTrip}
+                isKeyboardVisible={isKeyboardVisible}
+                paddingTop={insets.top}
+                backgroundColor={themeColors.headerBackgroundColor}
+                borderColor={themeColors.headerBorderColor}
+                iconColor={iconColor}
+                tintColor={tintColor}
+                secondaryTextColor={themeColors.secondaryTextColor}
+            />
 
-                <View style={[styles.routeBadge, { width: '200' }]}>
-                    <Text style={[
-                        styles.routeBadgeText,
-                        isKeyboardVisible && styles.routeBadgeTextReduced,
-                        { color: tintColor }
-                    ]}>
-                        {trip.departureCity} <Icon name="chevron-right" size={isKeyboardVisible ? 12 : 15} color={tintColor} /> {trip.arrivalCity}
-                        {isRoundTrip && returnTrip && (
-                            <> <Icon name="chevron-right" size={isKeyboardVisible ? 12 : 15} color={tintColor} /> {returnTrip.arrivalCity}</>
-                        )}
-                    </Text>
-                </View>
-
-                {!isKeyboardVisible && (
-                    <Text style={[styles.stepIndicator, { color: secondaryTextColor }]}>Étape 2 sur 3</Text>
-                )}
-            </View>
-
-            {/* Barre de progression */}
             {!isKeyboardVisible && (
-                <View style={[styles.progressContainer, { backgroundColor: headerBackgroundColor }]}>
-                    <Text style={[styles.progressTitle, { color: textColor }]}>Vérifier et payer</Text>
-                    <View style={styles.progressBarContainer}>
-                        <View style={[styles.progressBar, { backgroundColor: progressBarBackgroundColor }]}>
-                            <View style={[styles.progressFill, { width: '67%', backgroundColor: tintColor }]} />
-                        </View>
-                        <Text style={[styles.progressText, { color: secondaryTextColor }]}>67%</Text>
-                    </View>
-                </View>
-            )}
-
-            {/* Indicateurs de progression */}
-            {!isKeyboardVisible && (
-                <View style={[styles.progressIndicators, { backgroundColor: headerBackgroundColor }]}>
-                    <View style={[styles.progressDot, { backgroundColor: '#4CAF50' }]}>
-                        <Icon name="check" size={12} color="#FFFFFF" />
-                    </View>
-                    <View style={[styles.progressDot, { backgroundColor: tintColor }]} />
-                    <View style={[styles.progressDot, { backgroundColor: progressDotBackgroundColor }]} />
-                </View>
+                <ProgressBar
+                    textColor={textColor}
+                    secondaryTextColor={themeColors.secondaryTextColor}
+                    backgroundColor={themeColors.headerBackgroundColor}
+                    barBackgroundColor={themeColors.progressBarBackgroundColor}
+                    tintColor={tintColor}
+                />
             )}
 
             <ScrollView
@@ -1074,7 +1039,6 @@ const PassengersInfo = () => {
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
             >
-                {/* Titre principal */}
                 <View style={[styles.titleSection, isKeyboardVisible && styles.titleSectionReduced]}>
                     <Text style={[
                         styles.mainTitle,
@@ -1084,79 +1048,71 @@ const PassengersInfo = () => {
                         Vérifier et payer
                     </Text>
                     {!isKeyboardVisible && (
-                        <Text style={[styles.subtitle, { color: secondaryTextColor }]}>
+                        <Text style={[styles.subtitle, { color: themeColors.secondaryTextColor }]}>
                             Complétez vos informations et procédez au paiement
                         </Text>
                     )}
                 </View>
 
-                {/* Carte principale */}
-                <View style={[styles.mainCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
-                    {/* Section 1 : Informations du passager */}
+                <View style={[styles.mainCard, { backgroundColor: themeColors.cardBackgroundColor, borderColor: themeColors.borderColor }]}>
                     <PassengersInfoBlock
                         passengers={passengers}
                         onUpdatePassenger={updatePassenger}
                         onOpenBottomSheet={openSelectionBottomSheet}
                     />
 
-                    {/* Section 1.5 : Sélection des sièges */}
-                    <View style={[styles.seatSelectionSection, { borderTopColor: borderColor, borderBottomColor: borderColor }]}>
+                    <View style={[styles.seatSelectionSection, { borderBottomColor: themeColors.borderColor }]}>
                         <View style={styles.seatSelectionHeader}>
                             <View>
                                 <Text style={[styles.seatSelectionTitle, { color: textColor }]}>
                                     Sélection des sièges
                                 </Text>
-                                <Text style={[styles.seatSelectionSubtitle, { color: secondaryTextColor }]}>
+                                <Text style={[styles.seatSelectionSubtitle, { color: themeColors.secondaryTextColor }]}>
                                     Choisissez les sièges pour chaque passager
                                 </Text>
                             </View>
                         </View>
 
-                        {/* Bouton pour sélectionner les sièges aller */}
                         <SeatSelectionButton
                             leg="OUTBOUND"
                             passengers={passengers}
                             onPress={openSeatSelection}
-                            cardBackgroundColor={cardBackgroundColor}
-                            borderColor={borderColor}
+                            cardBackgroundColor={themeColors.cardBackgroundColor}
+                            borderColor={themeColors.borderColor}
                             tintColor={tintColor}
                             textColor={textColor}
-                            secondaryTextColor={secondaryTextColor}
+                            secondaryTextColor={themeColors.secondaryTextColor}
                             iconColor={iconColor}
                         />
 
-                        {/* Bouton pour sélectionner les sièges retour (si aller-retour) */}
                         {isRoundTrip && returnTrip && (
                             <SeatSelectionButton
                                 leg="RETURN"
                                 passengers={passengers}
                                 onPress={openSeatSelection}
-                                cardBackgroundColor={cardBackgroundColor}
-                                borderColor={borderColor}
+                                cardBackgroundColor={themeColors.cardBackgroundColor}
+                                borderColor={themeColors.borderColor}
                                 tintColor={tintColor}
                                 textColor={textColor}
-                                secondaryTextColor={secondaryTextColor}
+                                secondaryTextColor={themeColors.secondaryTextColor}
                                 iconColor={iconColor}
-                                style={{ marginTop: 12 }}
+                                style={styles.seatSelectionButtonSpacing}
                             />
                         )}
 
-                        {/* Affichage des sièges sélectionnés */}
                         <SelectedSeatsDisplay
                             passengers={passengers}
                             textColor={textColor}
-                            secondaryTextColor={secondaryTextColor}
+                            secondaryTextColor={themeColors.secondaryTextColor}
                         />
                     </View>
 
-                    {/* Section 2 : Contact d'urgence */}
                     <EmergencyContactBlock
                         emergencyContact={emergencyContact}
                         onUpdateEmergencyContact={updateEmergencyContact}
                         onOpenBottomSheet={openSelectionBottomSheet}
                     />
 
-                    {/* Section 3 : Méthode de paiement */}
                     <PaymentMethodBlock
                         selectedPaymentMethod={selectedPaymentMethod}
                         onSelectPaymentMethod={setSelectedPaymentMethod}
@@ -1173,38 +1129,22 @@ const PassengersInfo = () => {
                     />
                 </View>
 
-                {/* Récapitulatif */}
                 <SummaryBlock
                     totalPrice={totalPrice}
-                    taxes={taxes}
-                    fees={fees}
-                    totalAmount={totalAmount}
+                    taxes={pricing.taxes}
+                    fees={pricing.fees}
+                    totalAmount={pricing.totalAmount}
                 />
             </ScrollView>
 
-            {/* Bouton fixe en bas de l'écran */}
-            <View style={[
-                styles.fixedButtonContainer,
-                {
-                    paddingBottom: insets.bottom + 8,
-                    paddingTop: 15,
-                    backgroundColor: headerBackgroundColor,
-                    borderTopColor: headerBorderColor
-                }
-            ]}>
-                <Pressable
-                    style={[styles.confirmButton, { width: '60%', alignSelf: 'center' }]}
-                    onPress={handleConfirmAndPay}
-                >
-                    {isLoading ? (
-                        <ActivityIndicator size="small" color={'#FFFFFF'} />
-                    ) : (
-                        <Text style={styles.confirmButtonText}>Confirmer et payer</Text>
-                    )}
-                </Pressable>
-            </View>
+            <FixedButton
+                onPress={handleConfirmAndPay}
+                loading={isLoading}
+                backgroundColor={themeColors.headerBackgroundColor}
+                borderColor={themeColors.headerBorderColor}
+                paddingBottom={insets.bottom}
+            />
 
-            {/* Bottom sheet de sélection */}
             <SelectionBottomSheet
                 visible={showSelectionBottomSheet}
                 title={selectionTitle}
@@ -1214,7 +1154,6 @@ const PassengersInfo = () => {
                 onClose={closeSelectionBottomSheet}
             />
 
-            {/* Modal d'erreur de validation */}
             <ErrorModal
                 visible={showErrorModal}
                 title="Attention !"
@@ -1224,6 +1163,12 @@ const PassengersInfo = () => {
         </KeyboardAvoidingView>
     );
 };
+
+/**
+ * =================================================================
+ * STYLES
+ * =================================================================
+ */
 
 const styles = StyleSheet.create({
     container: {
@@ -1244,6 +1189,7 @@ const styles = StyleSheet.create({
         padding: 8,
     },
     routeBadge: {
+        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
@@ -1308,12 +1254,15 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
+    progressDotCompleted: {
+        backgroundColor: '#4CAF50',
+    },
     scrollView: {
         flex: 1,
     },
     scrollContent: {
         padding: 16,
-        paddingBottom: 100, // Espace pour le bouton fixe en bas
+        paddingBottom: 100,
     },
     titleSection: {
         marginBottom: 20,
@@ -1346,13 +1295,10 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         paddingHorizontal: 16,
-        paddingTop: 12,
+        paddingTop: 15,
         borderTopWidth: 1,
         shadowColor: '#000',
-        shadowOffset: {
-            width: 0,
-            height: -2,
-        },
+        shadowOffset: { width: 0, height: -2 },
         shadowOpacity: 0.1,
         shadowRadius: 4,
         elevation: 5,
@@ -1363,6 +1309,11 @@ const styles = StyleSheet.create({
         paddingVertical: 14,
         alignItems: 'center',
         justifyContent: 'center',
+        overflow: 'hidden',
+    },
+    confirmButtonWidth: {
+        width: '60%',
+        alignSelf: 'center',
     },
     confirmButtonText: {
         fontSize: 16,
@@ -1372,9 +1323,7 @@ const styles = StyleSheet.create({
     seatSelectionSection: {
         marginTop: 24,
         marginBottom: 24,
-        // paddingTop: 24,
         paddingBottom: 24,
-        // borderTopWidth: 1,
         borderBottomWidth: 1,
     },
     seatSelectionHeader: {
@@ -1393,6 +1342,10 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         borderWidth: 1,
         padding: 16,
+        overflow: 'hidden',
+    },
+    seatSelectionButtonSpacing: {
+        marginTop: 12,
     },
     seatSelectionButtonContent: {
         flexDirection: 'row',
