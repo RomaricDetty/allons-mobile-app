@@ -24,7 +24,7 @@ const Stepper = ({ currentStep, totalSteps }: { currentStep: number; totalSteps:
                 const stepNumber = index + 1;
                 const isCompleted = stepNumber < currentStep;
                 const isActive = stepNumber === currentStep;
-                
+
                 return (
                     <React.Fragment key={stepNumber}>
                         <View style={styles.stepperStep}>
@@ -218,7 +218,7 @@ export default function ForgotPasswordScreen() {
         try {
             const response = await forgotPasswordApi({ emailOrPhone: accountIdentifier.trim() });
             console.log('Réponse de la demande de réinitialisation : ', response);
-            
+
             if (response && response.status === 200 && response.data) {
                 if (response.data.accountFound && response.data.options) {
                     setAccountData(response.data);
@@ -231,9 +231,9 @@ export default function ForgotPasswordScreen() {
             }
         } catch (error: any) {
             console.error('Erreur lors de la recherche de compte : ', error);
-            
+
             let errorMessage = 'Une erreur est survenue lors de la recherche. Veuillez réessayer.';
-            
+
             if (error?.response) {
                 if (error.response.data?.message) {
                     errorMessage = error.response.data.message;
@@ -241,7 +241,7 @@ export default function ForgotPasswordScreen() {
             } else if (error?.message) {
                 errorMessage = error.message;
             }
-            
+
             Alert.alert('Attention !', errorMessage);
         } finally {
             setIsLoading(false);
@@ -275,13 +275,13 @@ export default function ForgotPasswordScreen() {
             }
         } catch (error: any) {
             console.error('Erreur lors de l\'envoi du code : ', error);
-            
+
             let errorMessage = 'Une erreur est survenue lors de l\'envoi du code. Veuillez réessayer.';
-            
+
             if (error?.response?.data?.message) {
                 errorMessage = error.response.data.message;
             }
-            
+
             Alert.alert('Attention !', errorMessage);
         } finally {
             setIsLoading(false);
@@ -305,24 +305,36 @@ export default function ForgotPasswordScreen() {
                 code: verificationCode.trim(),
             });
 
-            if (response && response.status === 200) {
+            if (response && response.status === 200 && response.data?.verified) {
                 // Sauvegarder le verificationToken pour l'étape suivante
                 if (response.data?.verificationToken) {
                     setVerificationToken(response.data.verificationToken);
                 }
                 setCurrentStep(4);
             } else {
-                Alert.alert('Attention !', 'Le code de vérification est incorrect. Veuillez réessayer.');
+                // Alert.alert('Attention !', response.data?.message || 'Le code de vérification est incorrect. Veuillez réessayer.' + ' ' + response.data?.remainingAttempts + ' tentatives restantes.');
+                if (response.data?.remainingAttempts === 0 && response.data?.verified === false) {
+                    Alert.alert('Attention !', 'Vous avez atteint le nombre maximum de tentatives. Veuillez réessayer svp.');
+                    router.back();
+                } else {
+                    Alert.alert(
+                        'Attention !',
+                        response.data?.message ? response.data?.message + '. ' + response.data?.remainingAttempts + ' tentatives restantes.'
+                        :
+                        'Le code de vérification est incorrect. Veuillez réessayer. ' + response.data?.remainingAttempts + ' tentatives restantes.'
+                    );
+                    setCurrentStep(3);
+                }
             }
         } catch (error: any) {
             console.error('Erreur lors de la vérification du code : ', error);
-            
+
             let errorMessage = 'Le code de vérification est incorrect. Veuillez réessayer.';
-            
+
             if (error?.response?.data?.message) {
                 errorMessage = error.response.data.message;
             }
-            
+
             Alert.alert('Attention !', errorMessage);
         } finally {
             setIsLoading(false);
@@ -347,7 +359,7 @@ export default function ForgotPasswordScreen() {
             if (response && response.status === 200) {
                 setResetToken(response.data.resetToken);
                 Alert.alert('Succès !', 'Un nouveau code a été envoyé.');
-            } 
+            }
         } catch (error: any) {
             console.error('Erreur lors du renvoi du code : ', error);
             Alert.alert('Attention !', 'Une erreur est survenue lors du renvoi du code.');
@@ -384,7 +396,7 @@ export default function ForgotPasswordScreen() {
                 confirmPassword: confirmPassword.trim(),
             });
             console.log("Response réinitialisation de mot de passe ==>, ", response?.data)
-            
+
             if (response && response.status === 200 && response.data) {
                 if (response.data.success === true) {
                     Alert.alert(
@@ -408,13 +420,13 @@ export default function ForgotPasswordScreen() {
             }
         } catch (error: any) {
             console.error('Erreur lors de la réinitialisation : ', error);
-            
+
             let errorMessage = 'Une erreur est survenue lors de la réinitialisation. Veuillez réessayer.';
-            
+
             if (error?.response?.data?.message) {
                 errorMessage = error.response.data.message;
             }
-            
+
             Alert.alert('Attention !', errorMessage);
         } finally {
             setIsLoading(false);
@@ -455,7 +467,7 @@ export default function ForgotPasswordScreen() {
      */
     const getVerificationInstruction = () => {
         if (!selectedMethod) return '';
-        
+
         switch (selectedMethod) {
             case 'email':
                 return 'Entrez le code à 6 chiffres que vous avez reçu par e-mail.';
@@ -550,9 +562,9 @@ export default function ForgotPasswordScreen() {
         const { options } = accountData;
 
         // Vérifier si au moins une option est disponible
-        const hasAvailableOption = 
-            options.email?.available || 
-            options.sms?.available || 
+        const hasAvailableOption =
+            options.email?.available ||
+            options.sms?.available ||
             options.whatsapp?.available;
 
         if (!hasAvailableOption) {
@@ -898,7 +910,7 @@ export default function ForgotPasswordScreen() {
                 keyboardShouldPersistTaps="handled"
             >
                 <Logo />
-                
+
                 {/* En-tête avec titre et stepper */}
                 <View style={styles.headerWithStepper}>
                     {/* <View style={styles.headerTitleRow}>

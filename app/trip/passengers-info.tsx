@@ -178,12 +178,12 @@ const SelectedSeatsDisplay = memo<SelectedSeatsDisplayProps>(({
             {passengers.map((passenger, index) => {
                 const hasOutboundSeat = passenger.seatNumber !== null;
                 const hasReturnSeat = passenger.seatNumberReturn !== null;
-                
+
                 if (hasOutboundSeat || hasReturnSeat) {
                     return (
                         <View key={index} style={styles.selectedSeatItem}>
                             <Text style={[styles.selectedSeatText, { color: secondaryTextColor }]}>
-                                Passager {index + 1}: 
+                                Passager {index + 1}:
                                 {hasOutboundSeat && ` Aller: Siège ${passenger.seatNumber}`}
                                 {hasOutboundSeat && hasReturnSeat && ' |'}
                                 {hasReturnSeat && ` Retour: Siège ${passenger.seatNumberReturn}`}
@@ -385,13 +385,13 @@ const PassengersInfo = () => {
         returnTrip?: Trip,
         searchParams?: SearchParams
     }) || {}, [route.params]);
-    
+
     const { trip, returnTrip, searchParams } = routeParams;
     const numberOfPersons = useMemo(() => searchParams?.numberOfPersons || 1, [searchParams?.numberOfPersons]);
     const isRoundTrip = useMemo(() => !!returnTrip, [returnTrip]);
 
     // États du composant
-    const [passengers, setPassengers] = useState<Passenger[]>(() => 
+    const [passengers, setPassengers] = useState<Passenger[]>(() =>
         Array.from({ length: numberOfPersons }, () => createEmptyPassenger())
     );
     const [contactPhone, setContactPhone] = useState('');
@@ -476,18 +476,18 @@ const PassengersInfo = () => {
 
     const assignSeatsAutomatically = useCallback(async (leg: 'OUTBOUND' | 'RETURN' = 'OUTBOUND'): Promise<boolean> => {
         const currentTripForLeg = leg === 'OUTBOUND' ? trip : returnTrip;
-        
+
         if (!currentTripForLeg?.id || !passengers || passengers.length === 0) {
             return false;
         }
 
         try {
             const response = await getDepartureAvailableSeats(currentTripForLeg.id);
-            
+
             if (response.status === 200 && response.data) {
                 const seatsData = response.data.seats || response.data || [];
                 const totalSeatsCount = response.data.totalSeats || currentTripForLeg.totalSeats || 50;
-                
+
                 const seatsArray: Array<{
                     number: number;
                     available: boolean;
@@ -495,18 +495,18 @@ const PassengersInfo = () => {
                     blocked: boolean;
                     locked: boolean;
                 }> = [];
-                
+
                 for (let i = 1; i <= totalSeatsCount; i++) {
-                    const seatData = Array.isArray(seatsData) 
+                    const seatData = Array.isArray(seatsData)
                         ? seatsData.find((s: any) => s.number === i || s.seatNumber === i)
                         : seatsData[i];
-                    
+
                     const seatStatus = seatData?.status?.toUpperCase() || 'AVAILABLE';
                     const isAvailable = seatStatus === 'AVAILABLE';
                     const isBooked = seatStatus === 'BOOKED';
                     const isLocked = seatStatus === 'LOCKED';
                     const isBlocked = seatStatus === 'BLOCKED';
-                    
+
                     seatsArray.push({
                         number: i,
                         available: isAvailable,
@@ -517,15 +517,15 @@ const PassengersInfo = () => {
                 }
 
                 let seatsAssigned = false;
-                
+
                 setPassengers(currentPassengers => {
                     if (currentPassengers.length === 0) {
                         return currentPassengers;
                     }
-                    
+
                     const initialSelections = new Map<number, number>();
                     let lastBookedSeatNumber = 0;
-                    
+
                     seatsArray.forEach(seat => {
                         if (seat.booked && seat.number > lastBookedSeatNumber) {
                             lastBookedSeatNumber = seat.number;
@@ -533,13 +533,13 @@ const PassengersInfo = () => {
                     });
 
                     let nextAvailableSeatNumber = lastBookedSeatNumber + 1;
-                    
+
                     for (let index = 0; index < currentPassengers.length; index++) {
                         const passenger = currentPassengers[index];
-                        const passengerSeatNumber = leg === 'OUTBOUND' 
-                            ? passenger?.seatNumber 
+                        const passengerSeatNumber = leg === 'OUTBOUND'
+                            ? passenger?.seatNumber
                             : passenger?.seatNumberReturn;
-                        
+
                         if (!passengerSeatNumber) {
                             while (nextAvailableSeatNumber <= totalSeatsCount) {
                                 const seat = seatsArray.find(s => s.number === nextAvailableSeatNumber);
@@ -567,10 +567,10 @@ const PassengersInfo = () => {
                         });
                         return updatedPassengers;
                     }
-                    
+
                     return currentPassengers;
                 });
-                
+
                 return seatsAssigned;
             }
             return false;
@@ -729,7 +729,7 @@ const PassengersInfo = () => {
 
             passengers.forEach((passenger, index) => {
                 const isMainPassenger = index === 0;
-                
+
                 passengersData.push({
                     seatNumber: passenger.seatNumber,
                     firstName: passenger.firstName.trim(),
@@ -759,8 +759,13 @@ const PassengersInfo = () => {
                 }
             });
 
+
+            const userId = await getUserId() || null;
+            console.log('userId ==> ', userId);
+
             const bookingData = {
                 companyId: trip.companyId,
+                customerId: userId,
                 departureId: trip.id,
                 ...(isRoundTrip && returnTrip ? { returnDepartureId: returnTrip.id } : {}),
                 type: tripType,
@@ -771,7 +776,7 @@ const PassengersInfo = () => {
             };
 
             const token = await getAuthToken();
-            
+
             if (!token?.trim()) {
                 throw new Error('Token manquant');
             }
@@ -889,9 +894,9 @@ const PassengersInfo = () => {
             try {
                 setIsLoading(true);
                 hasLoadedUserInfo.current = true;
-                
+
                 const response = await authGetUserInfo(userId, token);
-                
+
                 if (response.status === 200) {
                     setPassengers(prev => {
                         const updated = [...prev];
@@ -907,7 +912,7 @@ const PassengersInfo = () => {
                         }
                         return updated;
                     });
-                    
+
                     setContactPhone(removePhonePrefix(response?.data?.phones[0]?.digits) || '');
                     setEmergencyContact({
                         firstName: response?.data?.contactUrgent?.firstName || '',
@@ -932,23 +937,23 @@ const PassengersInfo = () => {
     // Attribution automatique des sièges
     useEffect(() => {
         if (passengers && passengers.length > 0 && trip && !seatsAutoAssigned) {
-            const hasSeatsAssigned = passengers.some(p => 
+            const hasSeatsAssigned = passengers.some(p =>
                 p.seatNumber !== null || p.seatNumberReturn !== null
             );
-            
+
             if (!hasSeatsAssigned) {
                 const timer = setTimeout(async () => {
                     const outboundAssigned = await assignSeatsAutomatically('OUTBOUND');
-                    
+
                     if (isRoundTrip && returnTrip) {
                         await assignSeatsAutomatically('RETURN');
                     }
-                    
+
                     if (outboundAssigned) {
                         setSeatsAutoAssigned(true);
                     }
                 }, 500);
-                
+
                 return () => clearTimeout(timer);
             } else {
                 setSeatsAutoAssigned(true);
