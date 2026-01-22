@@ -8,7 +8,7 @@ import { geocodingService } from '@/services/geocodingService';
 import { routingService } from '@/services/routingService';
 import { PassengerLocation } from '@/types/tracking';
 import { Ionicons } from '@expo/vector-icons';
-import Mapbox, { Camera, LineLayer, MapView, MarkerView, PointAnnotation, ShapeSource } from '@rnmapbox/maps';
+import { Camera, LineLayer, MapView, MarkerView, PointAnnotation, ShapeSource } from '@rnmapbox/maps';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -27,7 +27,6 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Initialisation de Mapbox avec le token
-Mapbox.setAccessToken('sk.eyJ1IjoiZGV0dHktcm9tYXJpYyIsImEiOiJjbWtxMzRmbzkwam5pM2dzOTkxbDBxOHF0In0.FTLTCaKPMw8mPG_9CvIhiw');
 // Import des images
 const busImage = require('@/assets/images/bus.png');
 const flagStartImage = require('@/assets/images/flag-start.png');
