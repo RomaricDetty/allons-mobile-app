@@ -3,7 +3,7 @@ import { Civility, PhoneType } from "@/types";
 export interface ContactUrgent {
     firstName: string;
     lastName: string;
-    phone: string;
+    phone: PhoneNumber;
     relationship?: string;
 }
 
@@ -103,6 +103,7 @@ export interface SignUpFormData {
     emergencyContactFirstName: string;
     emergencyContactLastName: string;
     emergencyContactPhone: string;
+    emergencyContactCountryCode?: string;
     emergencyContactRelation: string;
     agreeToTerms: boolean;
 }
@@ -146,4 +147,17 @@ export interface RegisterData {
 export interface PhoneNumber {
     type: PhoneType;
     digits: string;
-}   
+    countryCode: string;
+}
+
+export interface CountryCode {
+    code: string;
+    label: string;
+}
+
+export const COUNTRY_CODES: CountryCode[] = [
+    { code: '+225', label: '🇨🇮 + 225' },
+    { code: '+226', label: '🇧🇫 + 226' },
+    { code: '+223', label: '🇲🇱 + 223' },
+    { code: '+227', label: '🇳🇪 + 227' },
+];

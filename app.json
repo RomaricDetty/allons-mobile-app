@@ -61,6 +61,13 @@
                     "locationAlwaysPermission": "Permettre à $(PRODUCT_NAME) d'accéder à votre localisation en arrière-plan pour le suivi de votre trajet.",
                     "locationWhenInUsePermission": "Permettre à $(PRODUCT_NAME) d'accéder à votre localisation pour afficher votre position sur la carte."
                 }
+            ],
+            [
+                "@rnmapbox/maps",
+                {
+                    "RNMAPBOX_MAPS_DOWNLOAD_TOKEN": "sk.eyJ1IjoiZGV0dHktcm9tYXJpYyIsImEiOiJjbWtxMzRmbzkwam5pM2dzOTkxbDBxOHF0In0.FTLTCaKPMw8mPG_9CvIhiw",
+                    "RNMapboxMapsVersion": "10.20.0"
+                }
             ]
         ],
         "experiments": {

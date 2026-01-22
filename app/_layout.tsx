@@ -155,6 +155,9 @@ function RootContent() {
                     <Stack.Screen name="trip/ticket-qr" options={{ headerShown: false }} />
                     <Stack.Screen name="trip/live-tracking" options={{ headerShown: false }} />
                     <Stack.Screen name="trip/route-viewer" options={{ headerShown: false }} />
+                    <Stack.Screen name="trip/luggage-list" options={{ headerShown: false }} />
+                    <Stack.Screen name="trip/luggage-claim" options={{ headerShown: false }} />
+                    <Stack.Screen name="trip/luggage-claim-details" options={{ headerShown: false }} />
                     <Stack.Screen name="auth/forgot-password" options={{ headerShown: false }} />
                 </Stack>
                 <StatusBar 

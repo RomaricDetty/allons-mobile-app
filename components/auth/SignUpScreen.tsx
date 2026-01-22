@@ -9,8 +9,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { authRegister } from '../../api/auth_register';
 import { isValidEmail, isValidPhone } from '../../constants/functions';
-import { FormErrors, RegisterData, SignUpFormData, SignUpScreenProps } from '../../interfaces';
+import { COUNTRY_CODES, FormErrors, RegisterData, SignUpFormData, SignUpScreenProps } from '../../interfaces';
 import { Civility, PhoneType } from '../../types';
+import { SelectField } from '../passengers/SelectField';
 import { SelectionBottomSheet } from '../passengers/SelectionBottomSheet';
 import { AuthFormField } from './AuthFormField';
 import { Checkbox } from './Checkbox';
@@ -31,9 +32,13 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
     // Couleurs spécifiques pour l'écran
     const scrollBackgroundColor = colorScheme === 'dark' ? '#000000' : '#F3F3F7';
     const secondaryTextColor = colorScheme === 'dark' ? '#9BA1A6' : '#666';
-    const inputBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#FFFFFF';
-    const inputBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
-    const placeholderColor = colorScheme === 'dark' ? '#9BA1A6' : '#A6A6AA';
+    // const inputBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#FFFFFF';
+    // const inputBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
+    // const placeholderColor = colorScheme === 'dark' ? '#9BA1A6' : '#A6A6AA';
+
+    const inputBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#F5F5F5';
+    const inputBorderColor = colorScheme === 'dark' ? '#3A3A3C' : 'transparent';
+    const placeholderColor = colorScheme === 'dark' ? '#9BA1A6' : '#999999';
     const separatorLineColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
     const linkColor = tintColor === '#fff' ? '#1776BA' : tintColor;
     const modalBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
@@ -54,12 +59,16 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
         dateOfBirth: null,
         civility: 'MR',
         email: '',
+        phoneType: 'mobile',
         phone: '',
+        phoneCountryCode: '+225',
         password: '',
         confirmPassword: '',
         emergencyContactFirstName: '',
         emergencyContactLastName: '',
+        emergencyContactPhoneType: 'mobile',
         emergencyContactPhone: '',
+        emergencyContactCountryCode: '+225',
         emergencyContactRelation: '',
         agreeToTerms: false,
     });
@@ -72,6 +81,12 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [showCivilityPicker, setShowCivilityPicker] = useState(false);
     const [showRelationPicker, setShowRelationPicker] = useState(false);
+    const [showCountryCodePicker, setShowCountryCodePicker] = useState(false);
+    const [selectedCountryCode, setSelectedCountryCode] = useState<CountryCode | null>(null);
+    const [countryCodeSelectionCallback, setCountryCodeSelectionCallback] = useState<((value: string) => void) | null>(null);
+    const [countryCodeSelectionTitle, setCountryCodeSelectionTitle] = useState('');
+    const [countryCodeSelectionOptions, setCountryCodeSelectionOptions] = useState<Array<{ value: string, label: string }>>([]);
+    const [countryCodeCurrentValue, setCountryCodeCurrentValue] = useState('');
 
     // Valeurs animées pour réduire le header quand le clavier apparaît
     const headerScale = useRef(new Animated.Value(1)).current;
@@ -124,6 +139,16 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
             keyboardWillHide.remove();
         };
     }, [headerScale, headerTranslateY]);
+
+    /**
+     * Initialise le code pays par défaut à +225 au chargement
+     */
+    useEffect(() => {
+        const defaultCountry = COUNTRY_CODES.find(country => country.code === '+225');
+        if (defaultCountry) {
+            setSelectedCountryCode(defaultCountry);
+        }
+    }, []);
 
     // Options pour la civilité
     const civilityOptions = [
@@ -311,6 +336,56 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
     };
 
     /**
+     * Convertit les codes pays en format compatible avec SelectField
+     */
+    const countryCodeOptions = COUNTRY_CODES.map(country => ({
+        value: country.code,
+        label: country.label
+    }));
+
+    /**
+     * Ouvre le bottom sheet pour le code pays
+     */
+    const handleOpenCountryCodePicker = (
+        type: 'passengerType' | 'relation' | 'countryCode',
+        title: string,
+        options: Array<{ value: string, label: string }>,
+        currentValue: string,
+        onSelect: (value: string) => void
+    ) => {
+        setCountryCodeSelectionTitle(title);
+        setCountryCodeSelectionOptions(options);
+        setCountryCodeCurrentValue(currentValue);
+        setCountryCodeSelectionCallback(() => onSelect);
+        setShowCountryCodePicker(true);
+    };
+
+    /**
+     * Ferme le bottom sheet pour le code pays
+     */
+    const handleCloseCountryCodePicker = () => {
+        setShowCountryCodePicker(false);
+        setCountryCodeSelectionCallback(null);
+        setCountryCodeSelectionTitle('');
+        setCountryCodeSelectionOptions([]);
+        setCountryCodeCurrentValue('');
+    };
+
+    /**
+     * Gère la sélection du code pays
+     */
+    const handleSelectCountryCode = (value: string) => {
+        const selectedCountry = COUNTRY_CODES.find(country => country.code === value);
+        if (selectedCountry) {
+            setSelectedCountryCode(selectedCountry);
+        }
+        if (countryCodeSelectionCallback) {
+            countryCodeSelectionCallback(value);
+        }
+        handleCloseCountryCodePicker();
+    };
+
+    /**
      * Gère la soumission du formulaire
      */
     const handleSignUp = async () => {
@@ -340,12 +415,12 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
                     ? {
                         firstName: formData.emergencyContactFirstName,
                         lastName: formData.emergencyContactLastName,
-                        phone: formData.emergencyContactPhone,
+                        phone: { type: formData.emergencyContactPhoneType as PhoneType, digits: formData.emergencyContactPhone, countryCode: formData.emergencyContactCountryCode || '+225' },
                         relationship: formData.emergencyContactRelation || undefined,
                     }
                     : undefined,
                 email: formData.email,
-                phones: [{ type: PhoneType.MOBILE, digits: formData.phone }],
+                phones: [{ type: formData.phoneType as PhoneType, digits: formData.phone, countryCode: formData.phoneCountryCode || '+225' }],
                 password: formData.password,
                 civility: formData.civility as Civility,
                 dateOfBirth: formData.dateOfBirth ? formData.dateOfBirth.toISOString() : '',
@@ -460,9 +535,9 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
                     errorMessage = apiError;
                 }
                 console.log('Erreur API : ', apiError);
+                Alert.alert('Attention !', errorMessage);
             }
 
-            Alert.alert('Attention !', errorMessage);
             setIsLoading(false);
             return;
         }
@@ -533,7 +608,7 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
                         keyboardShouldPersistTaps="handled"
                     >
 
-                        <Animated.View 
+                        <Animated.View
                             style={[
                                 styles.header,
                                 { paddingTop: insets.top },
@@ -557,384 +632,436 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
                             </View>
                         </Animated.View>
 
-                    <View style={styles.form}>
-                        {/* Section 1: Informations personnelles */}
-                        <View style={[styles.sectionCard, { backgroundColor: cardBackgroundColor, borderColor: cardBorderColor }]}>
-                            <Text style={[styles.sectionTitle, { color: textColor }]}>Informations personnelles</Text>
+                        <View style={styles.form}>
+                            {/* Section 1: Informations personnelles */}
+                            <View style={[styles.sectionCard, { backgroundColor: cardBackgroundColor, borderColor: cardBorderColor }]}>
+                                <Text style={[styles.sectionTitle, { color: textColor }]}>Informations personnelles</Text>
 
-                            {/* Prénom */}
-                            <View>
-                                {/* {touchedFields.has('firstName') && errors.firstName && (
-                                    <Text style={styles.errorText}>{errors.firstName}</Text>
-                                )} */}
-                                <AuthFormField
-                                    label="Prénom"
-                                    value={formData.firstName}
-                                    onChangeText={(text) => updateField('firstName', text)}
-                                    onBlur={() => handleFieldBlur('firstName')}
-                                    placeholder="Votre prénom"
-                                    required
-                                    errors={errors.firstName}
-                                    touchedFields={touchedFields.has('firstName')}
-                                />
-                            </View>
+                                {/* Prénom */}
+                                <View>
+                                    <AuthFormField
+                                        label="Prénom"
+                                        value={formData.firstName}
+                                        onChangeText={(text) => updateField('firstName', text)}
+                                        onBlur={() => handleFieldBlur('firstName')}
+                                        placeholder="Votre prénom"
+                                        required
+                                        errors={errors.firstName}
+                                        touchedFields={touchedFields.has('firstName')}
+                                    />
+                                </View>
 
-                            {/* Nom */}
-                            <View>
-                                {/* {touchedFields.has('lastName') && errors.lastName && (
-                                    <Text style={styles.errorText}>{errors.lastName}</Text>
-                                )} */}
-                                <AuthFormField
-                                    label="Nom"
-                                    value={formData.lastName}
-                                    onChangeText={(text) => updateField('lastName', text)}
-                                    onBlur={() => handleFieldBlur('lastName')}
-                                    placeholder="Votre nom"
-                                    required
-                                    errors={errors.lastName}
-                                    touchedFields={touchedFields.has('lastName')}
-                                />
-                            </View>
+                                {/* Nom */}
+                                <View>
+                                    <AuthFormField
+                                        label="Nom"
+                                        value={formData.lastName}
+                                        onChangeText={(text) => updateField('lastName', text)}
+                                        onBlur={() => handleFieldBlur('lastName')}
+                                        placeholder="Votre nom"
+                                        required
+                                        errors={errors.lastName}
+                                        touchedFields={touchedFields.has('lastName')}
+                                    />
+                                </View>
 
-                            {/* Nom d'utilisateur */}
-                            <View>
-                                {/* {touchedFields.has('username') && errors.username && (
-                                    <Text style={styles.errorText}>{errors.username}</Text>
-                                )} */}
-                                <AuthFormField
-                                    label="Nom d'utilisateur"
-                                    value={formData.username}
-                                    onChangeText={(text) => updateField('username', text)}
-                                    onBlur={() => handleFieldBlur('username')}
-                                    placeholder="Votre nom d'utilisateur"
-                                    required
-                                    errors={errors.username}
-                                    touchedFields={touchedFields.has('username')}
-                                />
-                            </View>
+                                {/* Nom d'utilisateur */}
+                                <View>
+                                    <AuthFormField
+                                        label="Nom d'utilisateur"
+                                        value={formData.username}
+                                        onChangeText={(text) => updateField('username', text)}
+                                        onBlur={() => handleFieldBlur('username')}
+                                        placeholder="Votre nom d'utilisateur"
+                                        required
+                                        errors={errors.username}
+                                        touchedFields={touchedFields.has('username')}
+                                    />
+                                </View>
 
-                            {/* Date de naissance */}
-                            <View style={styles.formField}>
-                                {/* {touchedFields.has('dateOfBirth') && errors.dateOfBirth && (
-                                    <Text style={styles.errorText}>{errors.dateOfBirth}</Text>
-                                )} */}
-                                <Text style={[styles.formLabel, { color: textColor }]}>
-                                    Date de naissance <Text style={{ color: inputBorderColor }}>*</Text>
-                                </Text>
-                                {/* errors.dateOfBirth && touchedFields.has('dateOfBirth') 
+                                {/* Date de naissance */}
+                                <View style={styles.formField}>
+                                    <Text style={[styles.formLabel, { color: textColor }]}>
+                                        Date de naissance <Text style={{ color: inputBorderColor }}>*</Text>
+                                    </Text>
+                                    {/* errors.dateOfBirth && touchedFields.has('dateOfBirth') 
                                                 ? '#FF0000' 
                                                 : inputBorderColor */}
-                                <Pressable
-                                    style={[
-                                        styles.dateInput,
-                                        {
-                                            backgroundColor: inputBackgroundColor,
-                                            borderColor: errors.dateOfBirth && touchedFields.has('dateOfBirth')
-                                                ? '#FF0000'
-                                                : inputBorderColor
-                                        }
-                                    ]}
-                                    onPress={() => {
-                                        setShowDatePicker(true);
-                                        markFieldAsTouched('dateOfBirth');
-                                    }}
-                                >
-                                    <Text style={[
-                                        styles.dateInputText,
-                                        { color: formData.dateOfBirth ? textColor : placeholderColor }
-                                    ]}>
-                                        {formData.dateOfBirth ? formatDateOfBirth() : 'jj / mm / aaaa'}
-                                    </Text>
-                                    <MaterialCommunityIcons name="calendar" size={20} color={placeholderColor} />
-                                </Pressable>
-                            </View>
+                                    <Pressable
+                                        style={[
+                                            styles.dateInput,
+                                            {
+                                                backgroundColor: inputBackgroundColor,
+                                                borderColor: errors.dateOfBirth && touchedFields.has('dateOfBirth')
+                                                    ? '#FF0000'
+                                                    : inputBorderColor
+                                            }
+                                        ]}
+                                        onPress={() => {
+                                            setShowDatePicker(true);
+                                            markFieldAsTouched('dateOfBirth');
+                                        }}
+                                    >
+                                        <Text style={[
+                                            styles.dateInputText,
+                                            { color: formData.dateOfBirth ? textColor : placeholderColor }
+                                        ]}>
+                                            {formData.dateOfBirth ? formatDateOfBirth() : 'jj / mm / aaaa'}
+                                        </Text>
+                                        <MaterialCommunityIcons name="calendar" size={20} color={placeholderColor} />
+                                    </Pressable>
+                                </View>
 
-                            {/* Civilité */}
-                            <View style={styles.formField}>
-                                {/* {touchedFields.has('civility') && errors.civility && (
+                                {/* Civilité */}
+                                <View style={styles.formField}>
+                                    {/* {touchedFields.has('civility') && errors.civility && (
                                     <Text style={styles.errorText}>{errors.civility}</Text>
                                 )} */}
-                                <Text style={[styles.formLabel, { color: textColor }]}>
-                                    Civilité <Text style={{ color: inputBorderColor }}>*</Text>
-                                </Text>
-                                <Pressable
-                                    style={[
-                                        styles.selectInput,
-                                        {
-                                            backgroundColor: inputBackgroundColor,
-                                            borderColor: errors.civility && touchedFields.has('civility')
-                                                ? '#FF0000'
-                                                : inputBorderColor
-                                        }
-                                    ]}
-                                    onPress={() => {
-                                        handleOpenCivilityPicker();
-                                        markFieldAsTouched('civility');
-                                    }}
-                                >
-                                    <Text style={[
-                                        styles.selectText,
-                                        { color: formData.civility ? textColor : placeholderColor }
-                                    ]}>
-                                        {selectedCivility ? selectedCivility.label : ''}
+                                    <Text style={[styles.formLabel, { color: textColor }]}>
+                                        Civilité <Text style={{ color: inputBorderColor }}>*</Text>
                                     </Text>
-                                    <MaterialCommunityIcons name="chevron-down" size={20} color={iconColor} />
-                                </Pressable>
+                                    <Pressable
+                                        style={[
+                                            styles.selectInput,
+                                            {
+                                                backgroundColor: inputBackgroundColor,
+                                                borderColor: errors.civility && touchedFields.has('civility')
+                                                    ? '#FF0000'
+                                                    : inputBorderColor
+                                            }
+                                        ]}
+                                        onPress={() => {
+                                            handleOpenCivilityPicker();
+                                            markFieldAsTouched('civility');
+                                        }}
+                                    >
+                                        <Text style={[
+                                            styles.selectText,
+                                            { color: formData.civility ? textColor : placeholderColor }
+                                        ]}>
+                                            {selectedCivility ? selectedCivility.label : ''}
+                                        </Text>
+                                        <MaterialCommunityIcons name="chevron-down" size={20} color={iconColor} />
+                                    </Pressable>
+                                </View>
                             </View>
-                        </View>
 
-                        {/* Section 2: Informations de connexion */}
-                        <View style={[styles.sectionCard, { backgroundColor: cardBackgroundColor, borderColor: cardBorderColor }]}>
-                            <Text style={[styles.sectionTitle, { color: textColor }]}>Informations de connexion</Text>
-                            {/* Email */}
-                            <View>
-                                {/* {touchedFields.has('email') && errors.email && (
+                            {/* Section 2: Informations de connexion */}
+                            <View style={[styles.sectionCard, { backgroundColor: cardBackgroundColor, borderColor: cardBorderColor }]}>
+                                <Text style={[styles.sectionTitle, { color: textColor }]}>Informations de connexion</Text>
+                                {/* Email */}
+                                <View>
+                                    {/* {touchedFields.has('email') && errors.email && (
                                     <Text style={styles.errorText}>{errors.email}</Text>
                                 )} */}
-                                <AuthFormField
-                                    label="Adresse email"
-                                    value={formData.email}
-                                    onChangeText={(text) => updateField('email', text)}
-                                    onBlur={() => handleFieldBlur('email')}
-                                    placeholder="votre@email.com"
-                                    keyboardType="email-address"
-                                    required
-                                    errors={errors.email}
-                                    touchedFields={touchedFields.has('email')}
-                                />
-                            </View>
+                                    <AuthFormField
+                                        label="Adresse email"
+                                        value={formData.email}
+                                        onChangeText={(text) => updateField('email', text)}
+                                        onBlur={() => handleFieldBlur('email')}
+                                        placeholder="votre@email.com"
+                                        keyboardType="email-address"
+                                        required
+                                        errors={errors.email}
+                                        touchedFields={touchedFields.has('email')}
+                                    />
+                                </View>
 
-                            {/* Téléphone */}
-                            <View>
-                                {/* {touchedFields.has('phone') && errors.phone && (
-                                    <Text style={styles.errorText}>{errors.phone}</Text>
-                                )} */}
-                                <AuthFormField
-                                    label="Numéro de téléphone"
-                                    value={formData.phone}
-                                    onChangeText={(text) => updateField('phone', text)}
-                                    onBlur={() => handleFieldBlur('phone')}
-                                    placeholder="Ex: 0123456789"
-                                    keyboardType="phone-pad"
-                                    required
-                                    errors={errors.phone}
-                                    touchedFields={touchedFields.has('phone')}
-                                />
-                            </View>
-
-                            {/* Mot de passe */}
-                            <View>
-                                {/* {touchedFields.has('password') && errors.password && (
-                                    <Text style={styles.errorText}>{errors.password}</Text>
-                                )} */}
-                                <PasswordField
-                                    label="Mot de passe"
-                                    value={formData.password}
-                                    onChangeText={(text) => updateField('password', text)}
-                                    onBlur={() => handleFieldBlur('password')}
-                                    placeholder="Entrez votre mot de passe"
-                                    required
-                                    errors={errors.password}
-                                    touchedFields={touchedFields.has('password')}
-                                />
-                            </View>
-
-                            {/* Confirmer le mot de passe */}
-                            <View>
-                                {/* {touchedFields.has('confirmPassword') && errors.confirmPassword && (
-                                    <Text style={styles.errorText}>{errors.confirmPassword}</Text>
-                                )} */}
-                                <PasswordField
-                                    label="Confirmer le mot de passe"
-                                    value={formData.confirmPassword}
-                                    onChangeText={(text) => updateField('confirmPassword', text)}
-                                    onBlur={() => handleFieldBlur('confirmPassword')}
-                                    placeholder="Confirmer le mot de passe"
-                                    required
-                                    errors={errors.confirmPassword}
-                                    touchedFields={touchedFields.has('confirmPassword')}
-                                />
-                            </View>
-                        </View>
-
-                        {/* Section 3: Contact d'urgence */}
-                        <View style={[styles.sectionCard, { backgroundColor: cardBackgroundColor, borderColor: cardBorderColor }]}>
-                            <Text style={[styles.sectionTitle, { color: textColor }]}>Contact d'urgence (optionnel)</Text>
-
-                            {/* Contact d'urgence - Prénom */}
-                            <View>
-                                <AuthFormField
-                                    label="Prénom(s) du contact urgent"
-                                    value={formData.emergencyContactFirstName}
-                                    onChangeText={(text) => updateField('emergencyContactFirstName', text)}
-                                    onBlur={() => handleFieldBlur('emergencyContactFirstName')}
-                                    placeholder="Prénom du contact urgent"
-                                />
-                            </View>
-
-                            {/* Contact d'urgence - Nom */}
-                            <View>
-                                <AuthFormField
-                                    label="Nom du contact urgent"
-                                    value={formData.emergencyContactLastName}
-                                    onChangeText={(text) => updateField('emergencyContactLastName', text)}
-                                    onBlur={() => handleFieldBlur('emergencyContactLastName')}
-                                    placeholder="Nom(s) du contact urgent"
-                                />
-                            </View>
-
-                            {/* Contact d'urgence - Téléphone */}
-                            <View>
-                                <AuthFormField
-                                    label="Numéro de téléphone du contact urgent"
-                                    value={formData.emergencyContactPhone}
-                                    onChangeText={(text) => updateField('emergencyContactPhone', text)}
-                                    onBlur={() => handleFieldBlur('emergencyContactPhone')}
-                                    placeholder="Ex: 0123456789"
-                                    keyboardType="phone-pad"
-                                />
-                            </View>
-
-                            {/* Contact d'urgence - Relation */}
-                            <View style={styles.formField}>
-                                <Text style={[styles.formLabel, { color: textColor }]}>
-                                    Relation
-                                </Text>
-                                <Pressable
-                                    style={[
-                                        styles.selectInput,
-                                        {
-                                            backgroundColor: inputBackgroundColor,
-                                            borderColor: inputBorderColor
-                                        }
-                                    ]}
-                                    onPress={() => {
-                                        handleOpenRelationPicker();
-                                        markFieldAsTouched('emergencyContactRelation');
-                                    }}
-                                >
-                                    <Text style={[
-                                        styles.selectText,
-                                        { color: formData.emergencyContactRelation ? textColor : placeholderColor }
-                                    ]}>
-                                        {formData.emergencyContactRelation
-                                            ? relationOptions.find(opt => opt.value === formData.emergencyContactRelation)?.label || ''
-                                            : 'Sélectionner une relation'}
+                                {/* Téléphone */}
+                                <View style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                                    <Text
+                                        style={[
+                                            styles.formLabel,
+                                            { 
+                                                color: textColor, 
+                                                marginBottom: 0,
+                                            }
+                                        ]}
+                                    >
+                                        Numéro de téléphone
                                     </Text>
-                                    <MaterialCommunityIcons name="chevron-down" size={20} color={iconColor} />
-                                </Pressable>
+                                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 5 }}>
+                                        <View style={{ flex: 0.4 }}>
+                                            <SelectField
+                                                label=""
+                                                value={formData.phoneCountryCode || ''}
+                                                placeholder="Sélectionner"
+                                                selectionType="countryCode"
+                                                options={countryCodeOptions}
+                                                onSelect={(value) => {
+                                                    const selectedCountry = COUNTRY_CODES.find(country => country.code === value);
+                                                    if (selectedCountry) {
+                                                        setSelectedCountryCode(selectedCountry);
+                                                    }
+                                                    updateField('phoneCountryCode', value);
+                                                }}
+                                                onOpenBottomSheet={handleOpenCountryCodePicker}
+                                            />
+                                        </View>
+                                        <View style={{ flex: 0.6 }}>
+                                            <AuthFormField
+                                                label=""
+                                                value={formData.phone}
+                                                onChangeText={(text) => updateField('phone', text)}
+                                                onBlur={() => handleFieldBlur('phone')}
+                                                placeholder="Ex: 0123456789"
+                                                keyboardType="phone-pad"
+                                            />
+                                        </View>
+                                    </View>
+                                </View>
+
+                                {/* Mot de passe */}
+                                <View>
+                                    
+                                    <PasswordField
+                                        label="Mot de passe"
+                                        value={formData.password}
+                                        onChangeText={(text) => updateField('password', text)}
+                                        onBlur={() => handleFieldBlur('password')}
+                                        placeholder="Entrez votre mot de passe"
+                                        required
+                                        errors={errors.password}
+                                        touchedFields={touchedFields.has('password')}
+                                    />
+                                </View>
+
+                                {/* Confirmer le mot de passe */}
+                                <View>
+                                    
+                                    <PasswordField
+                                        label="Confirmer le mot de passe"
+                                        value={formData.confirmPassword}
+                                        onChangeText={(text) => updateField('confirmPassword', text)}
+                                        onBlur={() => handleFieldBlur('confirmPassword')}
+                                        placeholder="Confirmer le mot de passe"
+                                        required
+                                        errors={errors.confirmPassword}
+                                        touchedFields={touchedFields.has('confirmPassword')}
+                                    />
+                                </View>
+                            </View>
+
+                            {/* Section 3: Contact d'urgence */}
+                            <View style={[styles.sectionCard, { backgroundColor: cardBackgroundColor, borderColor: cardBorderColor }]}>
+                                <Text style={[styles.sectionTitle, { color: textColor }]}>Contact d'urgence (optionnel)</Text>
+
+                                {/* Contact d'urgence - Prénom */}
+                                <View>
+                                    <AuthFormField
+                                        label="Prénom(s) du contact urgent"
+                                        value={formData.emergencyContactFirstName}
+                                        onChangeText={(text) => updateField('emergencyContactFirstName', text)}
+                                        onBlur={() => handleFieldBlur('emergencyContactFirstName')}
+                                        placeholder="Prénom du contact urgent"
+                                    />
+                                </View>
+
+                                {/* Contact d'urgence - Nom */}
+                                <View>
+                                    <AuthFormField
+                                        label="Nom du contact urgent"
+                                        value={formData.emergencyContactLastName}
+                                        onChangeText={(text) => updateField('emergencyContactLastName', text)}
+                                        onBlur={() => handleFieldBlur('emergencyContactLastName')}
+                                        placeholder="Nom(s) du contact urgent"
+                                    />
+                                </View>
+
+                                {/* Contact d'urgence - Téléphone */}
+                                <View style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                                    <Text
+                                        style={[
+                                            styles.formLabel,
+                                            { 
+                                                color: textColor, 
+                                                marginBottom: 0,
+                                            }
+                                        ]}
+                                    >
+                                        Numéro de téléphone
+                                    </Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 5 }}>
+                                        <View style={{ flex: 0.4 }}>
+                                            <SelectField
+                                                label=""
+                                                value={formData.emergencyContactCountryCode || ''}
+                                                placeholder="Sélectionner"
+                                                selectionType="countryCode"
+                                                options={countryCodeOptions}
+                                                onSelect={(value) => {
+                                                    const selectedCountry = COUNTRY_CODES.find(country => country.code === value);
+                                                    if (selectedCountry) {
+                                                        setSelectedCountryCode(selectedCountry);
+                                                    }
+                                                    updateField('emergencyContactCountryCode', value);
+                                                }}
+                                                onOpenBottomSheet={handleOpenCountryCodePicker}
+                                            />
+                                        </View>
+                                        <View style={{ flex: 0.6 }}>
+                                            <AuthFormField
+                                                label=""
+                                                value={formData.emergencyContactPhone}
+                                                onChangeText={(text) => updateField('emergencyContactPhone', text)}
+                                                onBlur={() => handleFieldBlur('emergencyContactPhone')}
+                                                placeholder="Ex: 0123456789"
+                                                keyboardType="phone-pad"
+                                            />
+                                        </View>
+                                    </View>
+                                </View>
+
+                                {/* Contact d'urgence - Relation */}
+                                <View style={styles.formField}>
+                                    <Text style={[styles.formLabel, { color: textColor }]}>
+                                        Relation
+                                    </Text>
+                                    <Pressable
+                                        style={[
+                                            styles.selectInput,
+                                            {
+                                                backgroundColor: inputBackgroundColor,
+                                                borderColor: inputBorderColor
+                                            }
+                                        ]}
+                                        onPress={() => {
+                                            handleOpenRelationPicker();
+                                            markFieldAsTouched('emergencyContactRelation');
+                                        }}
+                                    >
+                                        <Text style={[
+                                            styles.selectText,
+                                            { color: formData.emergencyContactRelation ? textColor : placeholderColor }
+                                        ]}>
+                                            {formData.emergencyContactRelation
+                                                ? relationOptions.find(opt => opt.value === formData.emergencyContactRelation)?.label || ''
+                                                : 'Sélectionner une relation'}
+                                        </Text>
+                                        <MaterialCommunityIcons name="chevron-down" size={20} color={iconColor} />
+                                    </Pressable>
+                                </View>
+                            </View>
+
+                            {/* Checkbox conditions d'utilisation */}
+                            <View style={styles.checkboxContainer}>
+                                {touchedFields.has('agreeToTerms') && errors.agreeToTerms && (
+                                    <Text style={styles.errorText}>{errors.agreeToTerms}</Text>
+                                )}
+                                <Checkbox
+                                    label="J'accepte les conditions d'utilisation et la politique de confidentialité"
+                                    checked={formData.agreeToTerms}
+                                    onToggle={() => {
+                                        updateField('agreeToTerms', !formData.agreeToTerms);
+                                        markFieldAsTouched('agreeToTerms');
+                                    }}
+                                />
                             </View>
                         </View>
 
-                        {/* Checkbox conditions d'utilisation */}
-                        <View style={styles.checkboxContainer}>
-                            {touchedFields.has('agreeToTerms') && errors.agreeToTerms && (
-                                <Text style={styles.errorText}>{errors.agreeToTerms}</Text>
-                            )}
-                            <Checkbox
-                                label="J'accepte les conditions d'utilisation et la politique de confidentialité"
-                                checked={formData.agreeToTerms}
-                                onToggle={() => {
-                                    updateField('agreeToTerms', !formData.agreeToTerms);
-                                    markFieldAsTouched('agreeToTerms');
-                                }}
-                            />
-                        </View>
-                    </View>
+                        <Pressable style={styles.primaryButton} onPress={handleSignUp}>
+                            <Text style={styles.primaryButtonText}>Inscription</Text>
+                        </Pressable>
 
-                    <Pressable style={styles.primaryButton} onPress={handleSignUp}>
-                        <Text style={styles.primaryButtonText}>Inscription</Text>
-                    </Pressable>
-
-                    {/* <View style={styles.separator}>
+                        {/* <View style={styles.separator}>
                         <View style={[styles.separatorLine, { backgroundColor: separatorLineColor }]} />
                         <Text style={[styles.separatorText, { color: secondaryTextColor }]}>OU</Text>
                         <View style={[styles.separatorLine, { backgroundColor: separatorLineColor }]} />
                     </View> */}
 
-                    {/* <View style={styles.footer}>
+                        {/* <View style={styles.footer}>
                         <Text style={[styles.footerText, { color: secondaryTextColor }]}>Vous avez déjà un compte? </Text>
                         <Pressable onPress={onSwitchToSignIn}>
                             <Text style={[styles.footerLink, { color: linkColor }]}>Se connecter</Text>
                         </Pressable>
                     </View> */}
 
-                    {/* Date Picker Modal */}
-                    {showDatePicker && (
-                        <>
-                            {Platform.OS === 'ios' && (
-                                <Modal
-                                    visible={showDatePicker}
-                                    transparent={true}
-                                    animationType="slide"
-                                    onRequestClose={() => setShowDatePicker(false)}
-                                >
-                                    <Pressable
-                                        style={styles.modalOverlay}
-                                        onPress={() => setShowDatePicker(false)}
+                        {/* Date Picker Modal */}
+                        {showDatePicker && (
+                            <>
+                                {Platform.OS === 'ios' && (
+                                    <Modal
+                                        visible={showDatePicker}
+                                        transparent={true}
+                                        animationType="slide"
+                                        onRequestClose={() => setShowDatePicker(false)}
                                     >
-                                        <View
-                                            style={[
-                                                styles.datePickerContainer,
-                                                {
-                                                    backgroundColor: modalBackgroundColor,
-                                                    paddingBottom: insets.bottom + 20
-                                                }
-                                            ]}
-                                            onStartShouldSetResponder={() => true}
+                                        <Pressable
+                                            style={styles.modalOverlay}
+                                            onPress={() => setShowDatePicker(false)}
                                         >
-                                            <View style={[styles.datePickerHeader, { borderBottomColor: modalBorderColor }]}>
-                                                <Text style={[styles.datePickerTitle, { color: textColor }]}>Date de naissance</Text>
-                                                <Pressable onPress={() => setShowDatePicker(false)}>
-                                                    <MaterialCommunityIcons name="close" size={24} color={iconColor} />
-                                                </Pressable>
+                                            <View
+                                                style={[
+                                                    styles.datePickerContainer,
+                                                    {
+                                                        backgroundColor: modalBackgroundColor,
+                                                        paddingBottom: insets.bottom + 20
+                                                    }
+                                                ]}
+                                                onStartShouldSetResponder={() => true}
+                                            >
+                                                <View style={[styles.datePickerHeader, { borderBottomColor: modalBorderColor }]}>
+                                                    <Text style={[styles.datePickerTitle, { color: textColor }]}>Date de naissance</Text>
+                                                    <Pressable onPress={() => setShowDatePicker(false)}>
+                                                        <MaterialCommunityIcons name="close" size={24} color={iconColor} />
+                                                    </Pressable>
+                                                </View>
+                                                <View style={styles.datePickerContent}>
+                                                    <DateTimePicker
+                                                        value={formData.dateOfBirth || new Date()}
+                                                        mode="date"
+                                                        display="spinner"
+                                                        onChange={handleDateChange}
+                                                        maximumDate={new Date()}
+                                                        locale="fr-FR"
+                                                        themeVariant={colorScheme === 'dark' ? 'dark' : 'light'}
+                                                    />
+                                                </View>
                                             </View>
-                                            <View style={styles.datePickerContent}>
-                                                <DateTimePicker
-                                                    value={formData.dateOfBirth || new Date()}
-                                                    mode="date"
-                                                    display="spinner"
-                                                    onChange={handleDateChange}
-                                                    maximumDate={new Date()}
-                                                    locale="fr-FR"
-                                                    themeVariant={colorScheme === 'dark' ? 'dark' : 'light'}
-                                                />
-                                            </View>
-                                        </View>
-                                    </Pressable>
-                                </Modal>
-                            )}
-                            {Platform.OS === 'android' && (
-                                <DateTimePicker
-                                    value={formData.dateOfBirth || new Date()}
-                                    mode="date"
-                                    display="default"
-                                    onChange={handleDateChange}
-                                    maximumDate={new Date()}
-                                />
-                            )}
-                        </>
-                    )}
+                                        </Pressable>
+                                    </Modal>
+                                )}
+                                {Platform.OS === 'android' && (
+                                    <DateTimePicker
+                                        value={formData.dateOfBirth || new Date()}
+                                        mode="date"
+                                        display="default"
+                                        onChange={handleDateChange}
+                                        maximumDate={new Date()}
+                                    />
+                                )}
+                            </>
+                        )}
 
-                    {/* Civilité Bottom Sheet */}
-                    <SelectionBottomSheet
-                        visible={showCivilityPicker}
-                        title="Civilité"
-                        options={civilityOptions}
-                        currentValue={formData.civility}
-                        onSelect={handleSelectCivility}
-                        onClose={() => setShowCivilityPicker(false)}
-                    />
+                        {/* Civilité Bottom Sheet */}
+                        <SelectionBottomSheet
+                            visible={showCivilityPicker}
+                            title="Civilité"
+                            options={civilityOptions}
+                            currentValue={formData.civility}
+                            onSelect={handleSelectCivility}
+                            onClose={() => setShowCivilityPicker(false)}
+                        />
 
-                    {/* Relation Bottom Sheet */}
-                    <SelectionBottomSheet
-                        visible={showRelationPicker}
-                        title="Relation"
-                        options={relationOptions}
-                        currentValue={formData.emergencyContactRelation}
-                        onSelect={handleSelectRelation}
-                        onClose={() => setShowRelationPicker(false)}
-                    />
+                        {/* Relation Bottom Sheet */}
+                        <SelectionBottomSheet
+                            visible={showRelationPicker}
+                            title="Relation"
+                            options={relationOptions}
+                            currentValue={formData.emergencyContactRelation}
+                            onSelect={handleSelectRelation}
+                            onClose={() => setShowRelationPicker(false)}
+                        />
+
+                        {/* Code pays Bottom Sheet */}
+                        <SelectionBottomSheet
+                            visible={showCountryCodePicker}
+                            title={countryCodeSelectionTitle || "Code pays"}
+                            options={countryCodeSelectionOptions.length > 0 ? countryCodeSelectionOptions : countryCodeOptions}
+                            currentValue={countryCodeCurrentValue || formData.emergencyContactCountryCode || ''}
+                            onSelect={handleSelectCountryCode}
+                            onClose={handleCloseCountryCodePicker}
+                        />
                     </ScrollView>
                 </KeyboardAvoidingView>
             )}
@@ -993,6 +1120,7 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontFamily: 'Ubuntu_Regular',
         borderWidth: 0,
+        height: 50,
     },
     dateInputText: {
         fontSize: 14,
@@ -1012,6 +1140,7 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontFamily: 'Ubuntu_Regular',
         borderWidth: 0,
+        height: 50,
     },
     selectText: {
         fontSize: 14,

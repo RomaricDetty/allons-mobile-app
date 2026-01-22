@@ -3,28 +3,26 @@ import { useThemeColor } from '@/hooks/use-theme-color';
 import React from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
-interface FormFieldProps {
+interface TextAreaFieldProps {
     label: string;
     value: string;
     onChangeText: (text: string) => void;
     placeholder?: string;
     required?: boolean;
-    keyboardType?: 'default' | 'numeric' | 'email-address' | 'phone-pad';
-    editable?: boolean;
+    numberOfLines?: number;
 }
 
 /**
- * Composant pour un champ de formulaire standard
+ * Composant pour un champ de texte multi-ligne (textarea)
  */
-export const FormField = ({
+export const TextAreaField = ({
     label,
     value,
     onChangeText,
     placeholder,
     required = false,
-    keyboardType = 'default',
-    editable = true
-}: FormFieldProps) => {
+    numberOfLines = 4
+}: TextAreaFieldProps) => {
     const colorScheme = useColorScheme() ?? 'light';
 
     // Couleurs dynamiques basées sur le thème
@@ -35,8 +33,6 @@ export const FormField = ({
     const inputBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#F3F3F7';
     const inputBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
     const placeholderColor = colorScheme === 'dark' ? '#9BA1A6' : '#A6A6AA';
-    const inputDisabledBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#F5F5F5';
-    const inputDisabledTextColor = colorScheme === 'dark' ? '#9BA1A6' : '#666';
 
     return (
         <View style={styles.formField}>
@@ -45,23 +41,20 @@ export const FormField = ({
             </Text>
             <TextInput
                 style={[
-                    styles.formInput,
+                    styles.textAreaInput,
                     {
                         backgroundColor: inputBackgroundColor,
                         borderColor: inputBorderColor,
                         color: textColor
-                    },
-                    !editable && {
-                        backgroundColor: inputDisabledBackgroundColor,
-                        color: inputDisabledTextColor
                     }
                 ]}
                 value={value}
                 onChangeText={onChangeText}
                 placeholder={placeholder}
                 placeholderTextColor={placeholderColor}
-                keyboardType={keyboardType}
-                editable={editable}
+                multiline={true}
+                numberOfLines={numberOfLines}
+                textAlignVertical="top"
             />
         </View>
     );
@@ -79,20 +72,13 @@ const styles = StyleSheet.create({
     required: {
         color: '#FF0000',
     },
-    formInput: {
+    textAreaInput: {
         borderRadius: 16,
         paddingHorizontal: 16,
         paddingVertical: 12,
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
         borderWidth: 0,
-        height: 50,
-    },
-    formInputDisabled: {
-        // Styles gérés dynamiquement
+        minHeight: 100,
     },
 });
-
-
-
-

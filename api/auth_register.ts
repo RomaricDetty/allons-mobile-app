@@ -10,7 +10,7 @@ import { baseUrl } from "./config";
  * @returns AxiosResponse<any>
  */
 export const authRegister = async (data: any): Promise<AxiosResponse<any>> => {
-    return await axios.post(`${baseUrl}/auth/register/customer`, data, 
+    return await axios.post(`${baseUrl}/auth/register/customer`, data,
         {
             headers: {
                 'Content-Type': 'application/json',
@@ -27,7 +27,7 @@ export const authRegister = async (data: any): Promise<AxiosResponse<any>> => {
  * @returns AxiosResponse<any>
  */
 export const authLogin = async (data: any): Promise<AxiosResponse<any>> => {
-    return await axios.post(`${baseUrl}/auth/login`, data, 
+    return await axios.post(`${baseUrl}/auth/login`, data,
         {
             headers: {
                 'Content-Type': 'application/json',
@@ -47,16 +47,16 @@ export const authGetUserInfo = async (userId: string, token: string): Promise<Ax
     if (!token || token.trim() === '') {
         throw new Error('Token d\'authentification manquant ou invalide');
     }
-    
+
     if (!userId || userId.trim() === '') {
         throw new Error('ID utilisateur manquant ou invalide');
     }
-    
+
     return await axios.get(`${baseUrl}/customers/${userId}`, {
-            headers: {
-                Authorization: `Bearer ${token}`,
-            },
-        }
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    }
     );
 }
 
@@ -71,11 +71,11 @@ export const bookingListInfo = async (userId: string, token: string): Promise<Ax
     if (!token || token.trim() === '') {
         throw new Error('Token d\'authentification manquant ou invalide');
     }
-    
+
     if (!userId || userId.trim() === '') {
         throw new Error('ID utilisateur manquant ou invalide');
     }
-    
+
     return await axios.get(`${baseUrl}/customers/bookings?createdById=${userId}`, {
         headers: {
             Authorization: `Bearer ${token}`,
@@ -104,11 +104,11 @@ export const updateUserInfo = async (userId: string, data: any, token: string): 
     if (!token || token.trim() === '') {
         throw new Error('Token d\'authentification manquant ou invalide');
     }
-    
+
     if (!userId || userId.trim() === '') {
         throw new Error('ID utilisateur manquant ou invalide');
     }
-    
+
     return await axios.patch(`${baseUrl}/customers/${userId}`, data, {
         headers: {
             Authorization: `Bearer ${token}`,
@@ -172,6 +172,18 @@ export const verifyResetCodeApi = async (data: any): Promise<AxiosResponse<any>>
  */
 export const resetPasswordApi = async (data: any): Promise<AxiosResponse<any>> => {
     return await axios.post(`${baseUrl}/auth/forgot-password/reset`, data, {
+        headers: {
+            'Content-Type': 'application/json'
+        },
+    });
+}
+
+/**
+ * Recuperation de la liste des pays
+ * @returns AxiosResponse<any>
+ */
+export const getCountryList = async (): Promise<AxiosResponse<any>> => {
+    return await axios.get(`${baseUrl}/customers/countries`, {
         headers: {
             'Content-Type': 'application/json'
         },

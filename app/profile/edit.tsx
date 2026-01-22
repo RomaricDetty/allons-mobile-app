@@ -1,17 +1,16 @@
 // @ts-nocheck
-import { authGetUserInfo, updateUserInfo } from '@/api/auth_register';
+import { authGetUserInfo, getCountryList, updateUserInfo } from '@/api/auth_register';
 import { FormField } from '@/components/passengers/FormField';
-import { PhoneField } from '@/components/passengers/PhoneField';
 import { SectionHeader } from '@/components/passengers/SectionHeader';
 import { SelectField } from '@/components/passengers/SelectField';
 import { SelectionBottomSheet } from '@/components/passengers/SelectionBottomSheet';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
-import { User } from '@/interfaces';
+import { COUNTRY_CODES, User } from '@/interfaces';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -28,17 +27,26 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 /**
+ * Type pour les pays
+ */
+interface Country {
+    id: string;
+    name: string;
+}
+
+
+/**
  * Écran de modification des informations du profil utilisateur
  */
 export default function EditProfileScreen() {
     const insets = useSafeAreaInsets();
     const colorScheme = useColorScheme() ?? 'light';
-    
+
     // Couleurs dynamiques basées sur le thème
     const textColor = useThemeColor({}, 'text');
     const iconColor = useThemeColor({}, 'icon');
     const tintColor = useThemeColor({}, 'tint');
-    
+
     // Couleurs spécifiques pour l'écran
     const scrollBackgroundColor = colorScheme === 'dark' ? '#000000' : '#F5F5F5';
     const cardBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
@@ -60,14 +68,22 @@ export default function EditProfileScreen() {
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [showDatePicker, setShowDatePicker] = useState(false);
-    
+    const [userDataLoaded, setUserDataLoaded] = useState(false);
+
     // États pour le bottom sheet de sélection
     const [showSelectionBottomSheet, setShowSelectionBottomSheet] = useState(false);
-    const [selectionType, setSelectionType] = useState<'passengerType' | 'relation' | null>(null);
+    const [selectionType, setSelectionType] = useState<'passengerType' | 'relation' | 'countryCode' | null>(null);
     const [selectionTitle, setSelectionTitle] = useState('');
     const [selectionOptions, setSelectionOptions] = useState<Array<{ value: string, label: string }>>([]);
     const [currentSelectionValue, setCurrentSelectionValue] = useState<string>('');
     const [onSelectionCallback, setOnSelectionCallback] = useState<((value: string) => void) | null>(null);
+    const [countryList, setCountryList] = useState<Array<Country>>([]);
+
+    // Options pour les codes pays
+    const countryCodeOptions = COUNTRY_CODES.map(country => ({
+        value: country.code,
+        label: country.label
+    }));
 
     // États pour les champs du formulaire
     const [formData, setFormData] = useState({
@@ -76,13 +92,16 @@ export default function EditProfileScreen() {
         email: '',
         dateOfBirth: '',
         phone: '',
+        phoneCountryCode: '+225',
         street: '',
         city: '',
         postalCode: '',
+        country: { id: '', name: '' },
         emergencyContactFirstName: '',
         emergencyContactName: '',
         emergencyContactFullName: '',
         emergencyContactPhone: '',
+        emergencyContactCountryCode: '+225',
         emergencyContactRelation: '',
     });
 
@@ -111,6 +130,7 @@ export default function EditProfileScreen() {
             const token = await AsyncStorage.getItem('token');
             const userId = await AsyncStorage.getItem('user_id');
             const response = await authGetUserInfo(userId, token);
+            console.log('response user', response.data);
             if (response.status === 200) {
                 return response.data;
             } else {
@@ -124,6 +144,24 @@ export default function EditProfileScreen() {
         }
     };
 
+    const getCustomerCountries = useCallback(async () => {
+        try {
+            const response = await getCountryList();
+            if (response.status === 200) {
+                setCountryList(response.data);
+            }
+        }
+        catch (error) {
+            console.error('Erreur lors de la récupération de la liste des pays:', error);
+            Alert.alert('Erreur', 'Une erreur est survenue lors de la récupération de la liste des pays');
+            return null;
+        }
+    }, []);
+
+    useEffect(() => {
+        getCustomerCountries();
+    }, [getCustomerCountries]);
+
     /**
      * Initialise les données du formulaire avec les informations de l'utilisateur
      */
@@ -134,26 +172,51 @@ export default function EditProfileScreen() {
                 const userData = await getUserInfo();
                 if (userData) {
                     setUser(userData);
-                    
-                    // Extraire le numéro de téléphone (sans le code pays)
+
+                    // Extraire le numéro de téléphone et le code pays
                     let phoneNumber = userData.phones?.[0]?.digits || '';
-                    if (phoneNumber.startsWith('+225')) {
-                        phoneNumber = phoneNumber.replace('+225', '');
+                    let phoneCountryCode = userData.phones?.[0]?.countryCode || '+225';
+                    // Si le numéro contient le code pays, le retirer
+                    if (phoneNumber.startsWith('+225') || phoneNumber.startsWith('+226') || phoneNumber.startsWith('+223') || phoneNumber.startsWith('+227')) {
+                        // Extraire le code pays du début du numéro
+                        const codeMatch = phoneNumber.match(/^(\+225|\+226|\+223|\+227)/);
+                        if (codeMatch) {
+                            phoneCountryCode = codeMatch[1];
+                            phoneNumber = phoneNumber.replace(codeMatch[1], '');
+                        }
                     }
-                    
+
                     // Extraire la rue et la ville de l'adresse si elle existe
                     // Le format de address est un objet : { city: "Abidjan", country: { id, name } }
-                    const street = ''; // La rue n'est pas disponible dans le format actuel
-                    const city = typeof userData.address === 'object' && userData.address !== null
-                        ? userData.address.city || ''
+                    const street = userData.address?.street || ''; // La rue n'est pas disponible dans le format actuel
+                    const city = userData.address?.city || '';
+                    // Récupérer le pays : peut être un objet { id, name } ou juste un nom (chaîne)
+                    const countryName = typeof userData.address?.country === 'string'
+                        ? userData.address.country
+                        : userData.address?.country?.name || '';
+                    const countryId = typeof userData.address?.country === 'object' && userData.address?.country?.id
+                        ? userData.address.country.id
                         : '';
-                    
-                    // Extraire le numéro du contact d'urgence (sans le code pays)
-                    let emergencyPhone = userData.contactUrgent?.phone || '';
-                    if (emergencyPhone.startsWith('+225')) {
-                        emergencyPhone = emergencyPhone.replace('+225', '');
+                    const postalCode = userData.address?.zipCode || '';
+
+                    // Extraire le numéro du contact d'urgence et le code pays
+                    let emergencyPhone = '';
+                    let emergencyCountryCode = '+225';
+                    if (userData.contactUrgent?.phone) {
+                        if (typeof userData.contactUrgent.phone === 'string') {
+                            emergencyPhone = userData.contactUrgent.phone;
+                            // Si le numéro contient le code pays, le retirer
+                            const codeMatch = emergencyPhone.match(/^(\+225|\+226|\+223|\+227)/);
+                            if (codeMatch) {
+                                emergencyCountryCode = codeMatch[1];
+                                emergencyPhone = emergencyPhone.replace(codeMatch[1], '');
+                            }
+                        } else if (typeof userData.contactUrgent.phone === 'object') {
+                            emergencyPhone = userData.contactUrgent.phone.digits || '';
+                            emergencyCountryCode = userData.contactUrgent.phone.countryCode || '+225';
+                        }
                     }
-                    
+
                     // Extraire le nom et prénom du contact d'urgence depuis fullName
                     const fullName = userData.contactUrgent?.firstName + ' ' + userData.contactUrgent?.lastName || '';
                     let emergencyFirstName = userData.contactUrgent?.firstName || '';
@@ -167,25 +230,31 @@ export default function EditProfileScreen() {
                     //         emergencyFirstName = fullName.trim();
                     //     }
                     // }
-                    
+
                     // Extraire la relation du contact d'urgence
                     const emergencyRelation = userData.contactUrgent?.relationship || '';
-                    
-                    setFormData({
+
+                    setFormData((prev) => ({
+                        ...prev,
                         firstName: userData.firstName || '',
                         lastName: userData.lastName || '',
                         email: userData.email || '',
                         dateOfBirth: userData.dateOfBirth ? formatDateForInput(userData.dateOfBirth) : '',
                         phone: phoneNumber,
+                        phoneCountryCode: phoneCountryCode,
                         street: street,
                         city: city,
-                        postalCode: '', // Non disponible dans l'interface User actuelle
+                        postalCode: postalCode,
                         emergencyContactFirstName: emergencyFirstName,
                         emergencyContactName: emergencyLastName,
                         emergencyContactFullName: fullName,
                         emergencyContactPhone: emergencyPhone,
+                        emergencyContactCountryCode: emergencyCountryCode,
                         emergencyContactRelation: emergencyRelation,
-                    });
+                    }));
+
+                    // Stocker les informations du pays pour la mise à jour ultérieure
+                    setUserDataLoaded(true);
                 }
             } catch (error) {
                 console.error('Erreur lors du chargement des données:', error);
@@ -195,6 +264,56 @@ export default function EditProfileScreen() {
         };
         loadUserData();
     }, []);
+
+    /**
+     * Met à jour le pays une fois que la liste des pays et les données utilisateur sont chargées
+     */
+    useEffect(() => {
+        if (userDataLoaded && user && countryList.length > 0) {
+            // Récupérer le pays depuis les données utilisateur
+            const countryName = typeof user.address?.country === 'string'
+                ? user.address.country
+                : user.address?.country?.name || '';
+            const countryId = typeof user.address?.country === 'object' && user.address?.country?.id
+                ? user.address.country.id
+                : '';
+
+            // Trouver le pays dans la liste des pays pour obtenir l'objet complet { id, name }
+            let countryObject = { id: '', name: '' };
+            if (countryName) {
+                const foundCountry = countryList.find(c =>
+                    c.name === countryName || c.id === countryId
+                );
+                if (foundCountry) {
+                    countryObject = { id: foundCountry.id, name: foundCountry.name };
+                }
+            }
+
+            // Si aucun pays n'est trouvé, sélectionner le premier pays de la liste par défaut
+            if (!countryObject.id && countryList.length > 0) {
+                const firstCountry = countryList[0];
+                countryObject = { id: firstCountry.id, name: firstCountry.name };
+            }
+
+            setFormData((prev) => ({
+                ...prev,
+                country: countryObject,
+            }));
+        }
+    }, [userDataLoaded, user, countryList]);
+
+    /**
+     * Sélectionne le premier pays par défaut si aucun pays n'est sélectionné et que la liste est disponible
+     */
+    useEffect(() => {
+        if (countryList.length > 0 && !formData.country.id) {
+            const firstCountry = countryList[0];
+            setFormData((prev) => ({
+                ...prev,
+                country: { id: firstCountry.id, name: firstCountry.name },
+            }));
+        }
+    }, [countryList, formData.country.id]);
 
     /**
      * Formate une date pour l'API (ISO string)
@@ -216,7 +335,7 @@ export default function EditProfileScreen() {
      * Ouvre le bottom sheet de sélection
      */
     const openSelectionBottomSheet = (
-        type: 'passengerType' | 'relation',
+        type: 'passengerType' | 'relation' | 'countryCode',
         title: string,
         options: Array<{ value: string, label: string }>,
         currentValue: string,
@@ -304,24 +423,26 @@ export default function EditProfileScreen() {
      * Sauvegarde les modifications
      */
     const handleSave = async () => {
+        console.log('formData address', countryList.find(country => country.id === formData.country));
+
         if (!validateForm()) return;
 
         setIsSaving(true);
         try {
             const token = await AsyncStorage.getItem('token');
             const userId = await AsyncStorage.getItem('user_id');
-            
+
             // Vérifier que le token et l'ID utilisateur sont disponibles
             if (!token || token.trim() === '') {
                 Alert.alert('Erreur', 'Token d\'authentification manquant. Veuillez vous reconnecter.');
                 return;
             }
-            
+
             if (!userId || userId.trim() === '') {
                 Alert.alert('Erreur', 'ID utilisateur manquant. Veuillez vous reconnecter.');
                 return;
             }
-            
+
             // Construire l'objet utilisateur mis à jour
             const updatedUser: Partial<User> = {
                 firstName: formData.firstName.trim(),
@@ -332,18 +453,25 @@ export default function EditProfileScreen() {
                     {
                         type: 'mobile',
                         digits: formData.phone.trim(),
+                        countryCode: formData.phoneCountryCode || '+225',
                     },
                 ],
-                address: formData.city.trim()
+                address: formData.country && formData.country.id
                     ? {
                         city: formData.city.trim(),
-                        country: user?.address?.country || {}
+                        street: formData.street.trim() || '',
+                        zipCode: formData.postalCode.trim() || '',
+                        country: formData.country.name || '',
                     }
-                    : user?.address || null,
+                    : null,
                 contactUrgent: {
                     firstName: formData.emergencyContactFirstName.trim(),
                     lastName: formData.emergencyContactName.trim(),
-                    phone: `+225${formData.emergencyContactPhone.trim()}`,
+                    phone: {
+                        type: 'mobile',
+                        digits: formData.emergencyContactPhone.trim(),
+                        countryCode: formData.emergencyContactPhone.trim() ? formData.emergencyContactCountryCode : '',
+                    },
                     relationship: formData.emergencyContactRelation.trim() || undefined,
                 },
             };
@@ -463,13 +591,44 @@ export default function EditProfileScreen() {
                                 keyboardType="email-address"
                             />
 
-                            <PhoneField
-                                label="Téléphone"
-                                value={formData.phone}
-                                onChangeText={(text) =>
-                                    setFormData((prev) => ({ ...prev, phone: text }))
-                                }
-                            />
+                            <View style={styles.formField}>
+                                <Text style={[styles.formLabel, { color: textColor, marginBottom: 0 }]}>
+                                    Téléphone
+                                </Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 5 }}>
+                                    <View
+                                        style={
+                                            {
+                                                flex: 0.4,
+                                                alignItems: 'center',
+                                                justifyContent: 'flex-start',
+                                            }
+                                        }>
+                                        <SelectField
+                                            label=""
+                                            value={formData.phoneCountryCode || ''}
+                                            placeholder="Sélectionner"
+                                            selectionType="countryCode"
+                                            options={countryCodeOptions}
+                                            onSelect={(value) =>
+                                                setFormData((prev) => ({ ...prev, phoneCountryCode: value }))
+                                            }
+                                            onOpenBottomSheet={openSelectionBottomSheet}
+                                        />
+                                    </View>
+                                    <View style={{ flex: 0.6 }}>
+                                        <FormField
+                                            label=""
+                                            value={formData.phone}
+                                            onChangeText={(text) =>
+                                                setFormData((prev) => ({ ...prev, phone: text }))
+                                            }
+                                            placeholder="Ex: 0123456789"
+                                            keyboardType="phone-pad"
+                                        />
+                                    </View>
+                                </View>
+                            </View>
 
                             <View style={styles.formField}>
                                 <Text style={[styles.formLabel, { color: textColor }]}>Date de naissance</Text>
@@ -498,26 +657,35 @@ export default function EditProfileScreen() {
                                     />
                                 </Pressable>
                             </View>
-
-                            <View style={styles.formField}>
-                                <Text style={[styles.formLabel, { color: textColor }]}>Pays</Text>
-                                <View style={[
-                                    styles.disabledInput,
-                                    {
-                                        backgroundColor: disabledInputBackgroundColor,
-                                        borderColor: borderColor
-                                    }
-                                ]}>
-                                    <Text style={[styles.disabledInputText, { color: disabledInputTextColor }]}>
-                                        Côte d'Ivoire
-                                    </Text>
-                                </View>
-                            </View>
                         </View>
 
                         {/* Section 2 : Adresse */}
                         <View style={[styles.section, { borderBottomColor: sectionBorderColor }]}>
                             <SectionHeader number={2} title="Adresse" />
+
+                            {/* <Text style={[styles.formLabel, { color: textColor }]}>Pays</Text> */}
+                            <SelectField
+                                label="Pays"
+                                value={formData.country.id || ''}
+                                placeholder="Sélectionner un pays"
+                                selectionType="country"
+                                options={countryList.map(country => ({
+                                    value: country.id,
+                                    label: country.name,
+                                    name: country.name
+                                }))}
+                                onSelect={(value) => {
+                                    // Trouver le pays correspondant dans la liste pour obtenir l'objet complet
+                                    const selectedCountry = countryList.find(c => c.id === value);
+                                    setFormData((prev) => ({
+                                        ...prev,
+                                        country: selectedCountry
+                                            ? { id: selectedCountry.id, name: selectedCountry.name }
+                                            : { id: '', name: '' }
+                                    }));
+                                }}
+                                onOpenBottomSheet={openSelectionBottomSheet}
+                            />
 
                             <FormField
                                 label="Rue"
@@ -604,30 +772,53 @@ export default function EditProfileScreen() {
                                 }
                             />
 
-                            <PhoneField
-                                label="Numéro de téléphone du contact d'urgence"
-                                value={formData.emergencyContactPhone}
-                                onChangeText={(text) =>
-                                    setFormData((prev) => ({
-                                        ...prev,
-                                        emergencyContactPhone: text,
-                                    }))
-                                }
-                            />
+                            <View style={styles.formField}>
+                                <Text style={[styles.formLabel, { color: textColor }]}>
+                                    Numéro de téléphone du contact d'urgence
+                                </Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 5 }}>
+                                    <View style={{ flex: 0.4 }}>
+                                        <SelectField
+                                            label=""
+                                            value={formData.emergencyContactCountryCode || ''}
+                                            placeholder="Sélectionner"
+                                            selectionType="countryCode"
+                                            options={countryCodeOptions}
+                                            onSelect={(value) =>
+                                                setFormData((prev) => ({ ...prev, emergencyContactCountryCode: value }))
+                                            }
+                                            onOpenBottomSheet={openSelectionBottomSheet}
+                                        />
+                                    </View>
+                                    <View style={{ flex: 0.6 }}>
+                                        <FormField
+                                            label=""
+                                            value={formData.emergencyContactPhone}
+                                            onChangeText={(text) =>
+                                                setFormData((prev) => ({
+                                                    ...prev,
+                                                    emergencyContactPhone: text,
+                                                }))
+                                            }
+                                            placeholder="Ex: 0123456789"
+                                            keyboardType="phone-pad"
+                                        />
+                                    </View>
+                                </View>
+                            </View>
 
                             <SelectField
                                 label="Relation"
                                 value={formData.emergencyContactRelation}
                                 placeholder="Sélectionner une relation"
-                                required
                                 selectionType="relation"
                                 options={[
-                                    {value: 'parent', label: 'Parent'},
-                                    {value: 'conjoint', label: 'Conjoint(e)'},
-                                    {value: 'enfant', label: 'Enfant'},
-                                    {value: 'frere-soeur', label: 'Frère/Sœur'},
-                                    {value: 'ami', label: 'Ami(e)'},
-                                    {value: 'autre', label: 'Autre'}
+                                    { value: 'parent', label: 'Parent' },
+                                    { value: 'conjoint', label: 'Conjoint(e)' },
+                                    { value: 'enfant', label: 'Enfant' },
+                                    { value: 'frere-soeur', label: 'Frère/Sœur' },
+                                    { value: 'ami', label: 'Ami(e)' },
+                                    { value: 'autre', label: 'Autre' }
                                 ]}
                                 onSelect={(value) =>
                                     setFormData((prev) => ({
@@ -787,23 +978,25 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     dateInput: {
-        borderRadius: 8,
+        borderRadius: 16,
         paddingHorizontal: 16,
         paddingVertical: 12,
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        borderWidth: 1,
+        borderWidth: 0,
+        height: 50,
     },
     dateInputText: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
     },
     disabledInput: {
-        borderRadius: 8,
+        borderRadius: 16,
         paddingHorizontal: 16,
         paddingVertical: 12,
         borderWidth: 1,
+        height: 50,
     },
     disabledInputText: {
         fontSize: 14,

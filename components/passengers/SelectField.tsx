@@ -10,13 +10,13 @@ interface SelectFieldProps {
     value: string;
     placeholder: string;
     required?: boolean;
-    selectionType: 'passengerType' | 'relation';
-    options: Array<{value: string, label: string}>;
+    selectionType: 'passengerType' | 'relation' | 'countryCode';
+    options: Array<{value: string, label: string, name: string}>;
     onSelect: (value: string) => void;
     onOpenBottomSheet: (
-        type: 'passengerType' | 'relation',
+        type: 'passengerType' | 'relation' | 'countryCode',
         title: string,
-        options: Array<{value: string, label: string}>,
+        options: Array<{value: string, label: string, name: string}>,
         currentValue: string,
         onSelect: (value: string) => void
     ) => void;
@@ -42,9 +42,9 @@ export const SelectField = ({
     const iconColor = useThemeColor({}, 'icon');
     
     // Couleurs spécifiques pour le champ select
-    const inputBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#F3F3F7';
-    const inputBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
-    const placeholderColor = colorScheme === 'dark' ? '#9BA1A6' : '#A6A6AA';
+    const inputBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#F5F5F5';
+    const inputBorderColor = colorScheme === 'dark' ? '#3A3A3C' : 'transparent';
+    const placeholderColor = colorScheme === 'dark' ? '#9BA1A6' : '#999999';
 
     const handlePress = () => {
         onOpenBottomSheet(selectionType, label, options, value, onSelect);
@@ -70,7 +70,7 @@ export const SelectField = ({
                     styles.selectText,
                     { color: value ? textColor : placeholderColor }
                 ]}>
-                    {selectedOption ? selectedOption.label : placeholder}
+                    {selectedOption ? selectedOption.label || selectedOption.name : placeholder}
                 </Text>
                 <Icon name="chevron-down" size={20} color={iconColor} />
             </Pressable>
@@ -91,13 +91,14 @@ const styles = StyleSheet.create({
         color: '#FF0000',
     },
     selectInput: {
-        borderRadius: 8,
+        borderRadius: 16,
         paddingHorizontal: 16,
-        paddingVertical: 12,
+        paddingVertical: 14,
+        fontFamily: 'Ubuntu_Regular',
+        borderWidth: 0,
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        borderWidth: 1,
     },
     selectText: {
         fontSize: 14,

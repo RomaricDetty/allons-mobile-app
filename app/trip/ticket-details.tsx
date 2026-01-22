@@ -62,6 +62,7 @@ interface TicketDetails {
         };
     };
     passengers: Array<{
+        id?: string; // ID du booking item (bookingItemId)
         firstName: string;
         lastName: string;
         email: string;
@@ -402,6 +403,7 @@ const TicketDetails = () => {
                             primaryBlue={themeColors.primaryBlue}
                             backgroundColor={themeColors.passengerCardBackground}
                             borderColor={themeColors.borderColor}
+                            bookingItemId={passenger.id}
                         />
                     ))}
                 </View>
@@ -430,7 +432,7 @@ const TicketDetails = () => {
                     />
                     <DetailRow
                         label="Méthode de paiement"
-                        value={ticketDerivedValues.formattedPaymentMethod}
+                        value={ticketDerivedValues.formattedPaymentMethod.replaceAll('_', ' ')}
                         textColor={textColor}
                         secondaryTextColor={themeColors.secondaryTextColor}
                     />

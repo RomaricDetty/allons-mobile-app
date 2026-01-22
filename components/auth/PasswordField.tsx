@@ -103,6 +103,7 @@ const styles = StyleSheet.create({
         paddingVertical: 14,
         fontSize: 16,
         fontFamily: 'Ubuntu_Regular',
+        height: 50,
     },
     eyeButton: {
         padding: 12,

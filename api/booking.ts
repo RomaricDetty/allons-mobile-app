@@ -75,11 +75,7 @@ export const getBookingByReference = async (referenceCode: string): Promise<Axio
  * @returns AxiosResponse<any>
  */
 export const getBookingQrCode = async (bookingId: string, token: string): Promise<AxiosResponse<any>> => {
-    // Vérifier que le token est valide
-    if (!token || token.trim() === '') {
-        throw new Error('Token d\'authentification manquant ou invalide');
-    }
-
+    
     // console.log('bookingId: ', bookingId);
     // console.log('token: ', token);
     // console.log('baseUrl: ', `${baseUrl}/bookings/${bookingId}/qrcode`);

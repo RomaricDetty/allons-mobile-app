@@ -437,11 +437,11 @@ const PassengersInfo = () => {
     }, [trip?.price, returnTrip?.price, numberOfPersons]);
 
     const pricing = useMemo(() => {
-        const fees = 500;
+        // const fees = 500;
         const taxes = 0;
-        const totalAmount = totalPrice + fees + taxes;
+        const totalAmount = totalPrice + taxes;
         const totalAmountWithoutFees = totalPrice + taxes;
-        return { fees, taxes, totalAmount, totalAmountWithoutFees };
+        return { taxes, totalAmount, totalAmountWithoutFees };
     }, [totalPrice]);
 
     /**
@@ -775,13 +775,13 @@ const PassengersInfo = () => {
                 totalAmount: pricing.totalAmountWithoutFees
             };
 
-            const token = await getAuthToken();
+            const token = await getAuthToken() || null;
 
-            if (!token?.trim()) {
-                throw new Error('Token manquant');
-            }
+            // if (!token?.trim()) {
+            //     throw new Error('Token manquant');
+            // }
 
-            const bookingResponse = await createBooking(bookingData, token);
+            const bookingResponse = await createBooking(bookingData, token || '');
 
             if (bookingResponse.status === 200 || bookingResponse.status === 201) {
                 const bookingId = bookingResponse.data?.bookingId || bookingResponse.data?.id;
@@ -1137,7 +1137,6 @@ const PassengersInfo = () => {
                 <SummaryBlock
                     totalPrice={totalPrice}
                     taxes={pricing.taxes}
-                    fees={pricing.fees}
                     totalAmount={pricing.totalAmount}
                 />
             </ScrollView>

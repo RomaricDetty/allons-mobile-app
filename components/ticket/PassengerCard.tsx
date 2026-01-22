@@ -1,5 +1,7 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 /**
  * Interface pour les données d'un passager
@@ -10,6 +12,7 @@ interface Passenger {
     email: string;
     phone: string;
     seatNumber: number;
+    id?: string; // ID du booking item (bookingItemId)
 }
 
 /**
@@ -22,6 +25,7 @@ interface PassengerCardProps {
     primaryBlue: string;
     backgroundColor: string;
     borderColor: string;
+    bookingItemId?: string; // ID du booking item pour récupérer les bagages
 }
 
 /**
@@ -34,27 +38,61 @@ export const PassengerCard: React.FC<PassengerCardProps> = ({
     primaryBlue,
     backgroundColor,
     borderColor,
+    bookingItemId,
 }) => {
+    /**
+     * Navigue vers l'écran de liste des bagages du passager
+     */
+    const handleBaggagePress = () => {
+        const itemId = bookingItemId || passenger.id;
+        if (!itemId) {
+            console.warn('bookingItemId non disponible pour ce passager');
+            return;
+        }
+
+        router.push({
+            pathname: '/trip/luggage-list',
+            params: {
+                bookingItemId: itemId,
+                passengerName: `${passenger.firstName} ${passenger.lastName}`,
+            },
+        });
+    };
+
     return (
-        <View style={[styles.passengerCard, { backgroundColor, borderColor }]}>
-            <View style={styles.passengerInfo}>
-                <Text style={[styles.passengerName, { color: textColor }]}>
-                    {passenger.firstName} {passenger.lastName}
-                </Text>
-                <Text style={[styles.passengerDetail, { color: secondaryTextColor }]}>
-                    {passenger.email}
-                </Text>
-                <Text style={[styles.passengerDetail, { color: secondaryTextColor }]}>
-                    {passenger.phone}
-                </Text>
+        <>
+            <View style={[styles.passengerCard, { backgroundColor, borderColor, flexDirection: 'column', alignItems: 'flex-start', gap: 15}]}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <View style={styles.passengerInfo}>
+                        <Text style={[styles.passengerName, { color: textColor }]}>
+                            {passenger.firstName} {passenger.lastName}
+                        </Text>
+                        <Text style={[styles.passengerDetail, { color: secondaryTextColor }]}>
+                            {passenger.email}
+                        </Text>
+                        <Text style={[styles.passengerDetail, { color: secondaryTextColor }]}>
+                            {passenger.phone}
+                        </Text>
+                    </View>
+                    <View style={styles.seatInfo}>
+                        <Text style={[styles.seatLabel, { color: secondaryTextColor }]}>Siège</Text>
+                        <Text style={[styles.seatNumber, { color: primaryBlue }]}>
+                            {passenger.seatNumber}
+                        </Text>
+                    </View>
+                </View>
+                <Pressable
+                    onPress={handleBaggagePress}
+                    style={styles.baggageButton}
+                >
+                    <Text style={[styles.baggageButtonText, { color: primaryBlue }]}>
+                        Bagages
+                    </Text>
+                    <MaterialCommunityIcons name="bag-suitcase" size={20} color={primaryBlue} />
+                </Pressable>
             </View>
-            <View style={styles.seatInfo}>
-                <Text style={[styles.seatLabel, { color: secondaryTextColor }]}>Siège</Text>
-                <Text style={[styles.seatNumber, { color: primaryBlue }]}>
-                    {passenger.seatNumber}
-                </Text>
-            </View>
-        </View>
+
+        </>
     );
 };
 
@@ -92,6 +130,26 @@ const styles = StyleSheet.create({
     seatNumber: {
         fontSize: 18,
         fontFamily: 'Ubuntu_Bold',
+    },
+    baggageButton: {
+        paddingHorizontal: 18,
+        paddingVertical: 12,
+        borderRadius: 8,
+        // padding: 12,
+        backgroundColor: 'rgba(23, 118, 186, 0.1)',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexDirection: 'row',
+        // width: '100%',
+        // height: '100%',
+    },
+    baggageButtonText: {
+        fontSize: 16,
+        fontFamily: 'Ubuntu_Regular',
+    },
+    baggageButtonIcon: {
+        fontSize: 14,
+        fontFamily: 'Ubuntu_Regular',
     },
 });
 

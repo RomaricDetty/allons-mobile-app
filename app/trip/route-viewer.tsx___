@@ -1,5 +1,4 @@
-// import TripRouteViewerMapbox from '@/components/TripRouteViewerMapbox';
-import TripRouteViewerMapbox from '@/components/TripRouteViewerMapbox';
+import TripRouteViewer from '@/components/TripRouteViewer';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { Booking } from '@/interfaces';
@@ -104,8 +103,7 @@ export default function RouteViewerScreen() {
         );
     }
 
-    // return <TripRouteViewer booking={bookingData} />;
-    return <TripRouteViewerMapbox booking={bookingData} />;
+    return <TripRouteViewer booking={bookingData} />;
 }
 
 const styles = StyleSheet.create({

@@ -116,3 +116,14 @@ export enum PhoneType {
  * Type pour la civilité
  */
 export type Civility = 'MR' | 'Mrs' | 'Miss';
+
+/**
+ * Enum pour les types de bagage
+ */
+export enum LuggageType {
+    CABIN = 'CABIN',
+    CHECKED = 'CHECKED',
+    OVERSIZED = 'OVERSIZED',
+    FRAGILE = 'FRAGILE',
+    SPORTS_EQUIPMENT = 'SPORTS_EQUIPMENT',
+}

@@ -163,16 +163,16 @@ const TripSummary = () => {
 
     // Mémorisation des calculs de prix
     const priceCalculations = useMemo(() => {
-        if (!trip) return { totalPrice: 0, fees: 500, taxes: 0, amountDue: 500 };
+        if (!trip) return { totalPrice: 0, taxes: 0, amountDue: 0 };
         
         const outboundPrice = trip.price * numberOfPersons;
         const returnPrice = returnTrip ? returnTrip.price * numberOfPersons : 0;
         const totalPrice = outboundPrice + returnPrice;
-        const fees = 500;
+        // const fees = 500;
         const taxes = 0;
-        const amountDue = totalPrice + fees + taxes;
+        const amountDue = totalPrice + taxes;
         
-        return { totalPrice, fees, taxes, amountDue };
+        return { totalPrice, taxes, amountDue };
     }, [trip, returnTrip, numberOfPersons]);
 
     // Mémorisation des cartes de passagers
@@ -365,12 +365,6 @@ const TripSummary = () => {
                             <Text style={[styles.priceLabel, { color: textColor }]}>Taxes</Text>
                             <Text style={[styles.priceValue, { color: textColor }]}>
                                 {formatPrice(priceCalculations.taxes)}
-                            </Text>
-                        </View>
-                        <View style={styles.priceRow}>
-                            <Text style={[styles.priceLabel, { color: textColor }]}>Frais</Text>
-                            <Text style={[styles.priceValue, { color: textColor }]}>
-                                {formatPrice(priceCalculations.fees)}
                             </Text>
                         </View>
                     </View>

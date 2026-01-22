@@ -5,7 +5,7 @@ import { formatBookingDate, formatStatus, getStatusColor } from '@/constants/fun
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Booking, ProfileScreenProps, User } from '@/interfaces';
+import { Booking, COUNTRY_CODES, ProfileScreenProps, User } from '@/interfaces';
 import { clearAuthData, getAuthToken } from '@/utils/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -166,6 +166,7 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
             }
 
             const response = await authGetUserInfo(userId, token);
+            console.log('response authGetUserInfo ==> ', response.data);
             if (response.status === 200) {
                 return response.data;
             } else {
@@ -282,7 +283,7 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                 scrollX.setValue(scrollPosition);
             }, 100);
         }
-    }, [isLoading]); 
+    }, [isLoading]);
 
     /**
      * Navigue vers l'écran de modification du profil
@@ -361,6 +362,14 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
     }, [toggleTheme]);
 
     /**
+     * Récupère le drapeau d'un pays à partir de son code pays
+     * Mémorisé avec useCallback pour éviter les recréations
+     */
+    const getFlagFromCountryCode = useCallback((countryCode: string) => {
+        return COUNTRY_CODES.find(country => country.code === countryCode)?.label;
+    }, [COUNTRY_CODES]);
+
+    /**
      * Rendu du contenu de l'onglet Mes informations
      */
     /**
@@ -383,21 +392,10 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
         >
             {/* Main Profile Card */}
             <View style={[styles.profileCard, { backgroundColor: themeColors.cardBackground, borderColor: themeColors.border }]}>
-                <View style={styles.profileCardHeader}>
+                {/* <View style={styles.profileCardHeader}>
                     <Text style={[styles.businessLabel, { color: themeColors.secondaryText }]}>Profil Utilisateur</Text>
-                    <View style={[
-                        styles.statusBadgeContainer,
-                        {
-                            backgroundColor: user?.active ? 'rgba(76, 175, 80, 0.1)' : 'rgba(158, 158, 158, 0.1)',
-                            borderColor: user?.active ? 'rgba(76, 175, 80, 0.3)' : 'rgba(158, 158, 158, 0.3)'
-                        }
-                    ]}>
-                        <View style={[styles.statusDot, { backgroundColor: user?.active ? '#4CAF50' : '#9E9E9E' }]} />
-                        <Text style={[styles.statusLabel, { color: user?.active ? '#4CAF50' : '#9E9E9E' }]}>
-                            {user?.active ? 'Actif' : 'Inactif'}
-                        </Text>
-                    </View>
-                </View>
+                    
+                </View> */}
 
                 <View style={styles.profileInfo}>
                     <View style={[
@@ -465,7 +463,7 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                         <View style={styles.detailContent}>
                             <Text style={[styles.detailLabel, { color: themeColors.text }]}>Téléphone</Text>
                             <Text style={[styles.detailValue, { color: themeColors.secondaryText }]}>
-                                +225 {user?.phones?.[0]?.digits ?? 'Non renseigné'}
+                                {getFlagFromCountryCode(user?.phones?.[0]?.countryCode ?? '')} {user?.phones?.[0]?.digits ?? 'Non renseigné'}
                             </Text>
                         </View>
                     </View>
@@ -487,8 +485,12 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                             </View>
                             <View style={styles.detailContent}>
                                 <Text style={[styles.detailLabel, { color: themeColors.text }]}>Adresse</Text>
-                                <Text style={[styles.detailValue, { color: themeColors.secondaryText }]} numberOfLines={2}>
-                                    {user.address.city ? `${user.address.city} ${user.address.country?.name ?? ''}`.trim() : 'Non renseigné'}
+                                <Text style={[styles.detailValue, { color: themeColors.secondaryText, flexWrap: 'wrap' }]} numberOfLines={2}>
+                                    {
+                                        user.address?.country
+                                            ? `${user.address.street}, ${user.address.city},  ${user.address.country ?? ''}`.trim()
+                                            : 'Non renseigné'
+                                    }
                                 </Text>
                             </View>
                         </View>
@@ -499,29 +501,33 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                 {user?.contactUrgent && (
                     <View style={[styles.emergencySection, { borderTopColor: themeColors.border }]}>
                         <View style={styles.emergencyHeader}>
-                            <MaterialCommunityIcons name="alert-circle-outline" size={18} color={themeColors.activeTab} />
+                            {/* <MaterialCommunityIcons name="alert-circle-outline" size={18} color={themeColors.activeTab} /> */}
                             <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Contact d'urgence</Text>
                         </View>
                         <View style={[styles.emergencyInfo, { backgroundColor: themeColors.emergencyInfoBackground }]}>
-                            <Text style={[styles.emergencyName, { color: themeColors.text }]}>
-                                {user.contactUrgent.firstName ?? 'Non renseigné'} {user.contactUrgent.lastName ?? 'Non renseigné'}
-                            </Text>
-                            <View style={styles.emergencyDetails}>
-                                <View style={styles.emergencyDetailItem}>
-                                    <MaterialCommunityIcons name="phone" size={14} color={themeColors.secondaryText} />
-                                    <Text style={[styles.emergencyPhone, { color: themeColors.secondaryText }]}>
-                                        {user.contactUrgent.phone ?? 'Non renseigné'}
-                                    </Text>
+                            {user?.contactUrgent?.firstName && user?.contactUrgent?.lastName && (
+                                <Text style={[styles.emergencyName, { color: themeColors.text }]}>
+                                    {user?.contactUrgent?.firstName ?? 'Non renseigné'} {user?.contactUrgent?.lastName ?? 'Non renseigné'}
+                                </Text>
+                            )}
+                            {user?.contactUrgent?.phone?.digits && (
+                                <View style={styles.emergencyDetails}>
+                                    <View style={styles.emergencyDetailItem}>
+                                        <MaterialCommunityIcons name="phone" size={14} color={themeColors.secondaryText} />
+                                        <Text style={[styles.emergencyPhone, { color: themeColors.secondaryText }]}>
+                                            {getFlagFromCountryCode(user?.contactUrgent?.phone?.countryCode ?? '')} {user?.contactUrgent?.phone?.digits ?? 'Non renseigné'}
+                                        </Text>
+                                    </View>
+                                    <View style={styles.emergencyDetailItem}>
+                                        <MaterialCommunityIcons name="account-heart" size={14} color={themeColors.secondaryText} />
+                                        <Text style={[styles.emergencyRelation, { color: themeColors.secondaryText }]}>
+                                            {user?.contactUrgent?.relationship
+                                                ? user?.contactUrgent?.relationship.charAt(0).toUpperCase() + user?.contactUrgent?.relationship.slice(1).toLowerCase()
+                                                : 'Non renseigné'}
+                                        </Text>
+                                    </View>
                                 </View>
-                                <View style={styles.emergencyDetailItem}>
-                                    <MaterialCommunityIcons name="account-heart" size={14} color={themeColors.secondaryText} />
-                                    <Text style={[styles.emergencyRelation, { color: themeColors.secondaryText }]}>
-                                        {user.contactUrgent.relationship
-                                            ? user.contactUrgent.relationship.charAt(0).toUpperCase() + user.contactUrgent.relationship.slice(1).toLowerCase()
-                                            : 'Non renseigné'}
-                                    </Text>
-                                </View>
-                            </View>
+                            )}
                         </View>
                     </View>
                 )}

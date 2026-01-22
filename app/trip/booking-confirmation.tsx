@@ -222,16 +222,9 @@ const BookingConfirmation = () => {
         
         setIsLoadingQrCode(true);
         try {
-            const token = await getAuthToken();
-            
-            // Vérifier que le token est disponible
-            if (!token || token.trim() === '') {
-                console.error('Token d\'authentification manquant');
-                setQrCode('');
-                return;
-            }
+            const token = await getAuthToken() || null;
 
-            const response = await getBookingQrCode(bookingData.id, token);
+            const response = await getBookingQrCode(bookingData.id, token || '');
             
             // Vérifier que la réponse est valide
             if (response && response.status === 200 && response.data) {

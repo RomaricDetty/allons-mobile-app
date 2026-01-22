@@ -91,6 +91,7 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontFamily: 'Ubuntu_Regular',
         borderWidth: 0,
+        height: 50,
     },
 });
 
