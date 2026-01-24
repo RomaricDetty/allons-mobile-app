@@ -1,33 +1,39 @@
-// @ts-nocheck
-import { Icon, Label, NativeTabs } from 'expo-router/unstable-native-tabs';
+import { MaterialIcons } from '@expo/vector-icons';
+import { Tabs } from 'expo-router';
 import React from 'react';
-import { Platform } from 'react-native';
 
 /**
  * Layout pour la navigation par onglets
- * ATTENTION : NativeTabs est une fonctionnalité ALPHA instable
- * L'API peut changer à tout moment et peut avoir des bugs
+ * Utilise la disposition standard d'Expo Router pour une meilleure stabilité
  */
 export default function TabLayout() {
     return (
-        <NativeTabs>
-            <NativeTabs.Trigger name="index">
-                <Label>Accueil</Label>
-                {Platform.OS === 'ios' ? (
-                    <Icon sf="house.fill" />
-                ) : (
-                    <Icon materialIcon="home" />
-                )}
-            </NativeTabs.Trigger>
+        <Tabs
+            screenOptions={{
+                headerShown: false,
+                tabBarActiveTintColor: '#1776BA',
+                tabBarInactiveTintColor: '#687076',
+            }}
+        >
+            <Tabs.Screen
+                name="index"
+                options={{
+                    title: 'Accueil',
+                    tabBarIcon: ({ color, size }) => (
+                        <MaterialIcons name="home" size={size} color={color} />
+                    ),
+                }}
+            />
             
-            <NativeTabs.Trigger name="profile">
-                <Label>Mon profil</Label>
-                {Platform.OS === 'ios' ? (
-                    <Icon sf="person.fill" />
-                ) : (
-                    <Icon materialIcon="person" />
-                )}
-            </NativeTabs.Trigger>
-        </NativeTabs>
+            <Tabs.Screen
+                name="profile"
+                options={{
+                    title: 'Mon profil',
+                    tabBarIcon: ({ color, size }) => (
+                        <MaterialIcons name="person" size={size} color={color} />
+                    ),
+                }}
+            />
+        </Tabs>
     );
 }
