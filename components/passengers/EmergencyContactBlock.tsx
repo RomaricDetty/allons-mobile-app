@@ -1,3 +1,4 @@
+import { COUNTRY_CODES } from '@/interfaces';
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { FormField } from './FormField';
@@ -11,13 +12,14 @@ interface EmergencyContact {
     phone: string;
     email: string;
     relationship: string;
+    countryCode: string;
 }
 
 interface EmergencyContactBlockProps {
     emergencyContact: EmergencyContact;
     onUpdateEmergencyContact: (field: string, value: string) => void;
     onOpenBottomSheet: (
-        type: 'passengerType' | 'relation',
+        type: 'passengerType' | 'relation' | 'countryCode',
         title: string,
         options: Array<{value: string, label: string}>,
         currentValue: string,
@@ -58,6 +60,16 @@ export const EmergencyContactBlock = ({
                 value={emergencyContact.phone}
                 onChangeText={(text) => onUpdateEmergencyContact('phone', text)}
                 required={false}
+                countryCode={emergencyContact.countryCode}
+                onCountryCodePress={() => {
+                    onOpenBottomSheet(
+                        'countryCode',
+                        'Sélectionner le code pays',
+                        COUNTRY_CODES.map(cc => ({ value: cc.code, label: cc.label })),
+                        emergencyContact.countryCode,
+                        (value) => onUpdateEmergencyContact('countryCode', value)
+                    );
+                }}
             />
 
             <FormField

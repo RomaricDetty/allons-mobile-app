@@ -10,9 +10,14 @@ interface Passenger {
     firstName: string;
     lastName: string;
     email: string;
-    phone: string;
+    phone: {
+        type: string;
+        countryCode: string;
+        digits: string;
+    };
     seatNumber: number;
     id?: string; // ID du booking item (bookingItemId)
+    status?: string; // Statut du passager (CONFIRMED, CANCELLED, etc.)
 }
 
 /**
@@ -59,20 +64,65 @@ export const PassengerCard: React.FC<PassengerCardProps> = ({
         });
     };
 
+    /**
+     * Retourne la couleur du badge de statut selon le statut du passager
+     */
+    const getStatusColor = (status?: string): string => {
+        switch (status?.toUpperCase()) {
+            case 'CONFIRMED':
+                return '#4CAF50'; // Vert
+            case 'CANCELLED':
+                return '#F44336'; // Rouge
+            case 'PENDING':
+                return '#FF9800'; // Orange
+            default:
+                return '#9E9E9E'; // Gris
+        }
+    };
+
+    /**
+     * Formate le libellé du statut
+     */
+    const getStatusLabel = (status?: string): string => {
+        switch (status?.toUpperCase()) {
+            case 'CONFIRMED':
+                return 'Confirmé';
+            case 'CANCELLED':
+                return 'Annulé';
+            case 'PENDING':
+                return 'En attente';
+            default:
+                return status || 'Inconnu';
+        }
+    };
+
     return (
         <>
             <View style={[styles.passengerCard, { backgroundColor, borderColor, flexDirection: 'column', alignItems: 'flex-start', gap: 15}]}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
                     <View style={styles.passengerInfo}>
-                        <Text style={[styles.passengerName, { color: textColor }]}>
-                            {passenger.firstName} {passenger.lastName}
-                        </Text>
-                        <Text style={[styles.passengerDetail, { color: secondaryTextColor }]}>
-                            {passenger.email}
-                        </Text>
-                        <Text style={[styles.passengerDetail, { color: secondaryTextColor }]}>
-                            {passenger.phone}
-                        </Text>
+                        <View style={styles.nameRow}>
+                            <Text style={[styles.passengerName, { color: textColor }]}>
+                                {passenger.firstName} {passenger.lastName}
+                            </Text>
+                            {passenger.status && (passenger.status.toUpperCase() === 'CANCELLED' || passenger.status.toUpperCase() === 'CANCELED') && (
+                                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(passenger.status) }]}>
+                                    <Text style={styles.statusText}>
+                                        {getStatusLabel(passenger.status)}
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
+                        {passenger.email && (
+                            <Text style={[styles.passengerDetail, { color: secondaryTextColor }]}>
+                                {passenger.email}
+                            </Text>
+                        )}
+                        {passenger.phone && (
+                            <Text style={[styles.passengerDetail, { color: secondaryTextColor }]}>
+                                {passenger.phone?.countryCode} {passenger.phone?.digits}
+                            </Text>
+                        )}
                     </View>
                     <View style={styles.seatInfo}>
                         <Text style={[styles.seatLabel, { color: secondaryTextColor }]}>Siège</Text>
@@ -109,10 +159,26 @@ const styles = StyleSheet.create({
     passengerInfo: {
         flex: 1,
     },
+    nameRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 4,
+        flexWrap: 'wrap',
+    },
     passengerName: {
         fontSize: 16,
         fontFamily: 'Ubuntu_Bold',
-        marginBottom: 4,
+    },
+    statusBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 12,
+    },
+    statusText: {
+        fontSize: 10,
+        fontFamily: 'Ubuntu_Bold',
+        color: '#FFFFFF',
     },
     passengerDetail: {
         fontSize: 12,

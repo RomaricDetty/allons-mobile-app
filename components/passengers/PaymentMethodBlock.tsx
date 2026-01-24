@@ -1,10 +1,12 @@
 // @ts-nocheck
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
+import { COUNTRY_CODES } from '@/interfaces';
 import React from 'react';
 import { Image, ImageSourcePropType, Pressable, StyleSheet, View } from 'react-native';
 import { SectionHeader } from './SectionHeader';
 import { FormField } from './FormField';
+import { PhoneField } from './PhoneField';
 
 interface PaymentMethodCardProps {
     name: string;
@@ -70,6 +72,15 @@ interface PaymentMethodBlockProps {
     onCardCvvChange?: (value: string) => void;
     paymentNumber?: string;
     onPaymentNumberChange?: (value: string) => void;
+    countryCode?: string;
+    onCountryCodeChange?: (value: string) => void;
+    onOpenBottomSheet?: (
+        type: 'passengerType' | 'relation' | 'countryCode',
+        title: string,
+        options: Array<{value: string, label: string}>,
+        currentValue: string,
+        onSelect: (value: string) => void
+    ) => void;
 }
 
 /**
@@ -87,7 +98,10 @@ export const PaymentMethodBlock = ({
     cardCvv = '',
     onCardCvvChange,
     paymentNumber = '',
-    onPaymentNumberChange
+    onPaymentNumberChange,
+    countryCode = '+225',
+    onCountryCodeChange,
+    onOpenBottomSheet
 }: PaymentMethodBlockProps) => {
     /**
      * Formate le numéro de carte pour afficher des espaces tous les 4 chiffres
@@ -164,7 +178,7 @@ export const PaymentMethodBlock = ({
 
     return (
         <>
-            <SectionHeader number={3} title="Méthode de paiement" />
+            <SectionHeader number={4} title="Méthode de paiement" />
 
             <View style={styles.paymentMethodsContainer}>
                 <PaymentMethodCard
@@ -239,13 +253,21 @@ export const PaymentMethodBlock = ({
 
             {selectedPaymentMethod && selectedPaymentMethod !== 'credit-card' && (
                 <View style={styles.paymentFieldsContainer}>
-                    <FormField
+                    <PhoneField
                         label={getPaymentNumberLabel()}
                         value={paymentNumber}
                         onChangeText={onPaymentNumberChange}
-                        placeholder="Entrez votre numéro"
                         required
-                        keyboardType="phone-pad"
+                        countryCode={countryCode}
+                        onCountryCodePress={onOpenBottomSheet ? () => {
+                            onOpenBottomSheet(
+                                'countryCode',
+                                'Sélectionner le code pays',
+                                COUNTRY_CODES.map(cc => ({ value: cc.code, label: cc.label })),
+                                countryCode,
+                                (value) => onCountryCodeChange?.(value)
+                            );
+                        } : undefined}
                     />
                 </View>
             )}

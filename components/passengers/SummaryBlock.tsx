@@ -8,6 +8,7 @@ interface SummaryBlockProps {
     totalPrice: number;
     taxes: number;
     totalAmount: number;
+    rebookingDiscount?: number;
 }
 
 /**
@@ -16,7 +17,8 @@ interface SummaryBlockProps {
 export const SummaryBlock = ({
     totalPrice,
     taxes,
-    totalAmount
+    totalAmount,
+    rebookingDiscount = 0
 }: SummaryBlockProps) => {
     const colorScheme = useColorScheme() ?? 'light';
     
@@ -28,6 +30,7 @@ export const SummaryBlock = ({
     const cardBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
     const borderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
     const separatorColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
+    const successColor = '#4CAF50';
     // Utilise #1776BA si tintColor est blanc en dark mode
     const totalValueColor = tintColor === '#fff' ? '#1776BA' : tintColor;
 
@@ -50,6 +53,12 @@ export const SummaryBlock = ({
                     <Text style={[styles.summaryLabel, { color: textColor }]}>Taxes</Text>
                     <Text style={[styles.summaryValue, { color: textColor }]}>{formatPrice(taxes)}</Text>
                 </View>
+                {rebookingDiscount > 0 && (
+                    <View style={styles.summaryRow}>
+                        <Text style={[styles.summaryLabel, { color: successColor }]}>Code rebooking</Text>
+                        <Text style={[styles.summaryValue, { color: successColor }]}>- {formatPrice(rebookingDiscount)}</Text>
+                    </View>
+                )}
             </View>
 
             <View style={[styles.summarySeparator, { backgroundColor: separatorColor }]} />

@@ -94,5 +94,24 @@ target 'AllOn' do
         end
       end
     end
+    
+    # Patch ViewAnnotationManager.swift pour Xcode 16.2+ et Swift 6.2.3+
+    # Fix pour l'erreur: "cannot convert value of type '[String : Any?]' to specified type '[UIView : ViewAnnotationOptions]'"
+    view_annotation_manager_path = File.join(installer.pods_project.project_dir, 'Pods/MapboxMaps/Sources/MapboxMaps/Annotations/ViewAnnotationManager.swift')
+    if File.exist?(view_annotation_manager_path)
+      puts "Patching ViewAnnotationManager.swift pour compatibilité Xcode 16.2+"
+      text = File.read(view_annotation_manager_path)
+      # Supprime le cast forcé erroné qui cause l'erreur de compilation
+      patched_text = text.gsub(
+        /idsByView\.compactMapValues \{ \[mapboxMap\] id in\n\s+try\? mapboxMap\.options\(forViewAnnotationWithId: id\)\n\s+\} as! \[String : Any\?\]/,
+        "idsByView.compactMapValues { [mapboxMap] id in\n            try? mapboxMap.options(forViewAnnotationWithId: id)\n        }"
+      )
+      if text != patched_text
+        File.write(view_annotation_manager_path, patched_text)
+        puts "✓ ViewAnnotationManager.swift patché avec succès"
+      else
+        puts "✓ ViewAnnotationManager.swift déjà patché"
+      end
+    end
   end
 end

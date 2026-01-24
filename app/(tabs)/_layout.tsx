@@ -1,44 +1,33 @@
 // @ts-nocheck
-import { Tabs } from 'expo-router';
+import { Icon, Label, NativeTabs } from 'expo-router/unstable-native-tabs';
 import React from 'react';
+import { Platform } from 'react-native';
 
-import { HapticTab } from '@/components/haptic-tab';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-
-
+/**
+ * Layout pour la navigation par onglets
+ * ATTENTION : NativeTabs est une fonctionnalité ALPHA instable
+ * L'API peut changer à tout moment et peut avoir des bugs
+ */
 export default function TabLayout() {
-    const colorScheme = useColorScheme();
-
     return (
-        <Tabs
-            screenOptions={{
-                tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-                headerShown: false,
-                tabBarButton: HapticTab,
-            }}>
-            <Tabs.Screen
-                name="index"
-                options={{
-                    title: 'Accueil',
-                    tabBarLabelStyle: {
-                        fontFamily: 'Ubuntu_Regular',
-                    },
-                    tabBarIcon: ({ color }) => <MaterialCommunityIcons size={28} name="home-outline" color={color} />,
-                }}
-            />
+        <NativeTabs>
+            <NativeTabs.Trigger name="index">
+                <Label>Accueil</Label>
+                {Platform.OS === 'ios' ? (
+                    <Icon sf="house.fill" />
+                ) : (
+                    <Icon materialIcon="home" />
+                )}
+            </NativeTabs.Trigger>
             
-            <Tabs.Screen
-                name="profile"
-                options={{
-                    title: 'Mon profil',
-                    tabBarLabelStyle: {
-                        fontFamily: 'Ubuntu_Regular',
-                    },
-                    tabBarIcon: ({ color }) => <MaterialCommunityIcons size={28} name="account-circle-outline" color={color} />,
-                }}
-            />
-        </Tabs>
+            <NativeTabs.Trigger name="profile">
+                <Label>Mon profil</Label>
+                {Platform.OS === 'ios' ? (
+                    <Icon sf="person.fill" />
+                ) : (
+                    <Icon materialIcon="person" />
+                )}
+            </NativeTabs.Trigger>
+        </NativeTabs>
     );
 }

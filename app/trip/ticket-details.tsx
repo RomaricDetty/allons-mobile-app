@@ -71,6 +71,7 @@ interface TicketDetails {
         isMainPassenger: boolean;
         passengerType: string;
         price: string;
+        status?: string; // Statut du passager (CONFIRMED, CANCELLED, etc.)
     }>;
     contact: {
         firstName: string;
@@ -91,7 +92,28 @@ const TicketDetails = () => {
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
     // Récupération des données du ticket
-    const ticket = route.params?.ticketDetails as TicketDetails | undefined;
+    const ticketParam = route.params?.ticketDetails;
+    const ticket = useMemo(() => {
+        if (!ticketParam) return undefined;
+        
+        try {
+            // Si c'est une string, parser le JSON
+            if (typeof ticketParam === 'string') {
+                return JSON.parse(ticketParam) as TicketDetails;
+            }
+            // Si c'est déjà un objet, le retourner directement
+            return ticketParam as TicketDetails;
+        } catch (error) {
+            console.error('Erreur lors du parsing du ticket:', error);
+            console.error('Valeur reçue:', ticketParam);
+            return undefined;
+        }
+    }, [ticketParam]);
+    
+    const refreshed = route.params?.refreshed;
+
+    console.log('ticket details informations:  ', ticket);
+    console.log('refreshed:', refreshed);
 
     // Hook personnalisé pour le QR code
     const { qrCode, isLoadingQrCode, error: qrCodeError, retry: retryQrCode } = useTicketQrCode(ticket?.id);
@@ -127,6 +149,47 @@ const TicketDetails = () => {
             passengerCountText: ticket.passengers.length > 1 ? 'Passagers' : 'Passager',
             formattedPaymentMethod: formatPaymentMethod(ticket.paymentProvider),
         };
+    }, [ticket]);
+
+    /**
+     * Vérifie si l'annulation est possible
+     * Retourne true si :
+     * - La date de départ n'est pas passée et qu'on est à plus de 24h avant
+     * - La réservation n'est pas déjà annulée
+     * - Tous les passagers ne sont pas annulés (au moins un passager actif)
+     */
+    const canCancelReservation = useMemo(() => {
+        if (!ticket) return false;
+
+        // Vérifier si la réservation elle-même est annulée
+        if (ticket.status && (ticket.status.toUpperCase() === 'CANCELLED' || ticket.status.toUpperCase() === 'CANCELED')) {
+            return false;
+        }
+
+        // Vérifier si tous les passagers sont annulés
+        const allPassengersCancelled = ticket.passengers.every(passenger => 
+            passenger.status && 
+            (passenger.status.toUpperCase() === 'CANCELLED' || passenger.status.toUpperCase() === 'CANCELED')
+        );
+
+        if (allPassengersCancelled) {
+            return false;
+        }
+
+        // Convertir la date de départ en objet Date
+        const departureDate = new Date(ticket.departureDateTime);
+        const now = new Date();
+
+        // Vérifier si la date de départ est passée
+        if (departureDate < now) {
+            return false;
+        }
+
+        // Calculer la différence en heures
+        const hoursUntilDeparture = (departureDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+        // L'annulation est possible si on est à plus de 24h avant le départ
+        return hoursUntilDeparture >= 24;
     }, [ticket]);
 
     /**
@@ -258,6 +321,16 @@ const TicketDetails = () => {
                 'Impossible de sauvegarder le billet. Veuillez réessayer.'
             );
         }
+    };
+
+    /**
+     * Navigue vers l'écran d'annulation de réservation
+     */
+    const handleCancelReservation = () => {
+        if (!ticket) return;
+        navigation.navigate('trip/cancel-reservation' as never, { 
+            ticketDetails: JSON.stringify(ticket) 
+        } as never);
     };
 
     return (
@@ -397,7 +470,18 @@ const TicketDetails = () => {
                     {ticket.passengers.map((passenger, index) => (
                         <PassengerCard
                             key={index}
-                            passenger={passenger}
+                            passenger={{
+                                ...passenger,
+                                phone: passenger.phone ? {
+                                    type: 'MOBILE',
+                                    countryCode: passenger.phone.countryCode,
+                                    digits: passenger.phone.digits,
+                                } : {
+                                    type: 'MOBILE',
+                                    countryCode: '',
+                                    digits: '',
+                                },
+                            }}
                             textColor={textColor}
                             secondaryTextColor={themeColors.secondaryTextColor}
                             primaryBlue={themeColors.primaryBlue}
@@ -462,6 +546,17 @@ const TicketDetails = () => {
                         </>
                     )}
                 </Pressable>
+                {canCancelReservation && (
+                    <Pressable
+                        style={[styles.actionButton, { backgroundColor: '#DC3545', marginTop: 12 }]}
+                        onPress={handleCancelReservation}
+                    >
+                        <Icon name="cancel" size={20} color={'#FFFFFF'} />
+                        <Text style={[styles.actionButtonText, { color: '#FFFFFF' }]}>
+                            Annuler la réservation
+                        </Text>
+                    </Pressable>
+                )}
                 {/* Bouton sauvegarder dans Photos/Galerie */}
                 {/* <Pressable
                     style={[styles.actionButton, { backgroundColor: primaryBlue, borderColor: primaryBlue, marginTop: 20 }]}

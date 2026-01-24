@@ -1,5 +1,6 @@
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
+import { COUNTRY_CODES } from '@/interfaces';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Badge } from './Badge';
@@ -15,13 +16,14 @@ interface Passenger {
     email: string;
     seatNumber: number | null;
     passengerType: string;
+    countryCode: string;
 }
 
 interface PassengersInfoBlockProps {
     passengers: Passenger[];
     onUpdatePassenger: (index: number, field: string, value: string | number) => void;
     onOpenBottomSheet: (
-        type: 'passengerType' | 'relation',
+        type: 'passengerType' | 'relation' | 'countryCode',
         title: string,
         options: Array<{value: string, label: string}>,
         currentValue: string,
@@ -88,6 +90,16 @@ export const PassengersInfoBlock = ({
                         value={passenger.phone}
                         onChangeText={(text) => onUpdatePassenger(index, 'phone', text)}
                         required
+                        countryCode={passenger.countryCode}
+                        onCountryCodePress={() => {
+                            onOpenBottomSheet(
+                                'countryCode',
+                                'Sélectionner le code pays',
+                                COUNTRY_CODES.map(cc => ({ value: cc.code, label: cc.label })),
+                                passenger.countryCode,
+                                (value) => onUpdatePassenger(index, 'countryCode', value)
+                            );
+                        }}
                     />
 
                     <FormField
