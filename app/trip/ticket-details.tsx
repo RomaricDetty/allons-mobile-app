@@ -531,7 +531,7 @@ const TicketDetails = () => {
 
                 {/* Section: Actions */}
                 <Pressable
-                    style={[styles.actionButton, { borderColor: themeColors.primaryBlue }]}
+                    style={[styles.actionButton, { borderColor: themeColors.primaryBlue, borderWidth: 1 }]}
                     onPress={handleDownloadTicket}
                     disabled={isGeneratingPDF}
                 >
@@ -664,7 +664,7 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         paddingHorizontal: 16,
         borderRadius: 8,
-        borderWidth: 1,
+        // borderWidth: 1,
         gap: 8,
     },
     actionButtonText: {
