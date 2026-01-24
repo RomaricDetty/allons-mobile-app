@@ -1,5 +1,5 @@
 import React, { memo, useMemo } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 interface Passenger {
     seatNumber: number | null;
@@ -40,9 +40,9 @@ export const SelectedSeatsDisplay = memo<SelectedSeatsDisplayProps>(({
                         <View key={index} style={styles.item}>
                             <Text style={[styles.text, { color: secondaryTextColor }]}>
                                 Passager {index + 1}:
-                                {hasOutboundSeat && ` Aller: Siège ${passenger.seatNumber}`}
+                                {hasOutboundSeat && ` Voyage aller • Siège ${passenger.seatNumber}`}
                                 {hasOutboundSeat && hasReturnSeat && ' |'}
-                                {hasReturnSeat && ` Retour: Siège ${passenger.seatNumberReturn}`}
+                                {hasReturnSeat && ` Voyage retour • Siège ${passenger.seatNumberReturn}`}
                             </Text>
                         </View>
                     );
@@ -59,8 +59,8 @@ const styles = StyleSheet.create({
     container: {
         marginTop: 16,
         paddingTop: 16,
-        borderTopWidth: 1,
-        borderTopColor: '#E0E0E0',
+        // borderTopWidth: 1,
+        // borderTopColor: '#E0E0E0',
     },
     title: {
         fontSize: 14,

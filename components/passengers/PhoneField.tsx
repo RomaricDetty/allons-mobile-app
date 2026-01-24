@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
         gap: 8,
     },
     countryCode: {
-        borderRadius: 8,
+        borderRadius: 16,
         paddingHorizontal: 12,
         paddingVertical: 12,
         flexDirection: 'row',
@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
     },
     phoneInput: {
         flex: 1,
-        borderRadius: 8,
+        borderRadius: 16,
         paddingHorizontal: 16,
         paddingVertical: 12,
         fontSize: 14,

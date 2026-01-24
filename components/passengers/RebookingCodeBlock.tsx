@@ -106,7 +106,7 @@ const styles = StyleSheet.create({
         marginBottom: 24,
     },
     infoContainer: {
-        borderRadius: 12,
+        borderRadius: 16,
         padding: 16,
         marginTop: 8,
     },
@@ -123,15 +123,15 @@ const styles = StyleSheet.create({
     },
     input: {
         flex: 1,
-        borderRadius: 8,
+        borderRadius: 16,
         paddingHorizontal: 16,
         paddingVertical: 12,
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        borderWidth: 2,
+        // borderWidth: 2,
     },
     verifyButton: {
-        borderRadius: 8,
+        borderRadius: 16,
         paddingHorizontal: 24,
         paddingVertical: 12,
         justifyContent: 'center',

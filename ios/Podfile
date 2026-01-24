@@ -30,10 +30,7 @@ target 'AllOn' do
     config_command = ['node', '-e', "process.argv=['', '', 'config'];require('@react-native-community/cli').run()"];
   else
     config_command = [
-      'node',
-      '--no-warnings',
-      '--eval',
-      'require(\'expo/bin/autolinking\')',
+      'npx',
       'expo-modules-autolinking',
       'react-native-config',
       '--json',
@@ -72,46 +69,5 @@ target 'AllOn' do
       :mac_catalyst_enabled => false,
       :ccache_enabled => ccache_enabled?(podfile_properties),
     )
-
-     # Add build settings fixes for Mapbox 11.15.2
-     installer.pods_project.targets.each do |target|
-      target.build_configurations.each do |config|
-        # Ensure consistent iOS deployment target
-        if config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'].to_f < 12.0
-          config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
-        end
-        
-        # Fix Swift compilation issues
-        config.build_settings['SWIFT_VERSION'] = '5.0'
-        config.build_settings['ENABLE_BITCODE'] = 'NO'
-        
-        # Fix modular headers
-        config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
-        
-        # Fix for newer Mapbox versions
-        if target.name.include?('Mapbox') || target.name.include?('Turf')
-          config.build_settings['CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER'] = 'NO'
-        end
-      end
-    end
-    
-    # Patch ViewAnnotationManager.swift pour Xcode 16.2+ et Swift 6.2.3+
-    # Fix pour l'erreur: "cannot convert value of type '[String : Any?]' to specified type '[UIView : ViewAnnotationOptions]'"
-    view_annotation_manager_path = File.join(installer.pods_project.project_dir, 'Pods/MapboxMaps/Sources/MapboxMaps/Annotations/ViewAnnotationManager.swift')
-    if File.exist?(view_annotation_manager_path)
-      puts "Patching ViewAnnotationManager.swift pour compatibilité Xcode 16.2+"
-      text = File.read(view_annotation_manager_path)
-      # Supprime le cast forcé erroné qui cause l'erreur de compilation
-      patched_text = text.gsub(
-        /idsByView\.compactMapValues \{ \[mapboxMap\] id in\n\s+try\? mapboxMap\.options\(forViewAnnotationWithId: id\)\n\s+\} as! \[String : Any\?\]/,
-        "idsByView.compactMapValues { [mapboxMap] id in\n            try? mapboxMap.options(forViewAnnotationWithId: id)\n        }"
-      )
-      if text != patched_text
-        File.write(view_annotation_manager_path, patched_text)
-        puts "✓ ViewAnnotationManager.swift patché avec succès"
-      else
-        puts "✓ ViewAnnotationManager.swift déjà patché"
-      end
-    end
   end
 end
