@@ -10,6 +10,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    Modal,
     Pressable,
     RefreshControl,
     ScrollView,
@@ -17,6 +18,7 @@ import {
     Text,
     View
 } from 'react-native';
+import QRCode from 'react-native-qrcode-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
@@ -36,8 +38,8 @@ const STATUS_COLOR_MAPPING: Record<string, { light: string; dark: string }> = {
  * Mapping des traductions des statuts en français
  */
 const STATUS_TRANSLATION: Record<string, string> = {
-    'REGISTERED': 'Enregistré au comptoir',
-    'CHECKED_IN': 'Enregistré',
+    'REGISTERED': 'Enregistré',
+    'CHECKED_IN': 'Vérifié',
     'LOADED': 'Chargé',
     'UNLOADED': 'Déchargé',
     'DELIVERED': 'Livré',
@@ -134,12 +136,13 @@ interface LuggageCardProps {
     colorScheme: 'light' | 'dark';
     onClaim: (luggageId: string) => void;
     onViewClaim: (luggageId: string, claim: Claim) => void;
+    onPressQrCode: (tag: string) => void;
 }
 
 /**
  * Composant pour afficher une carte de bagage
  */
-const LuggageCard = React.memo(({ luggage, index, themeColors, textColor, colorScheme, onClaim, onViewClaim }: LuggageCardProps) => {
+const LuggageCard = React.memo(({ luggage, index, themeColors, textColor, colorScheme, onClaim, onViewClaim, onPressQrCode }: LuggageCardProps) => {
     // Extraction et normalisation des données du bagage
     const tag = luggage.tag || luggage.luggageTag || luggage.tagNumber || '';
     const luggageTypeRaw = luggage.type || luggage.luggageType || luggage.luggage_type || 'CHECKED';
@@ -224,13 +227,26 @@ const LuggageCard = React.memo(({ luggage, index, themeColors, textColor, colorS
                 )}
             </View>
 
-            {/* Section NUMÉRO DE TAG */}
+            {/* Section NUMÉRO DE TAG et QR Code */}
             {tag && (
                 <View style={styles.section}>
                     <Text style={[styles.sectionTitle, { color: textColor }]}>NUMÉRO DE TAG</Text>
-                    <Text style={[styles.tagValue, { color: textColor }]}>
-                        {tag}
-                    </Text>
+                    <View style={styles.tagRow}>
+                        <Text style={[styles.tagValue, { color: textColor }]}>
+                            {tag}
+                        </Text>
+                        <Pressable
+                            style={styles.qrCodeWrapper}
+                            onPress={() => onPressQrCode(tag)}
+                        >
+                            <QRCode
+                                value={tag}
+                                size={80}
+                                color="#000000"
+                                backgroundColor="#FFFFFF"
+                            />
+                        </Pressable>
+                    </View>
                 </View>
             )}
 
@@ -288,6 +304,8 @@ const LuggageListScreen = () => {
     const [luggageList, setLuggageList] = useState<Luggage[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    /** Tag du bagage dont le QR code est affiché en grand (null = modal fermée) */
+    const [enlargedQrTag, setEnlargedQrTag] = useState<string | null>(null);
 
     // Couleurs dynamiques basées sur le thème
     const textColor = useThemeColor({}, 'text');
@@ -372,6 +390,13 @@ const LuggageListScreen = () => {
                 claimData: JSON.stringify(claim),
             },
         });
+    }, []);
+
+    /**
+     * Ouvre la modale pour afficher le QR code du bagage en grand
+     */
+    const handlePressQrCode = useCallback((tag: string) => {
+        setEnlargedQrTag(tag);
     }, []);
 
     useEffect(() => {
@@ -461,11 +486,51 @@ const LuggageListScreen = () => {
                                 colorScheme={colorScheme}
                                 onClaim={handleClaim}
                                 onViewClaim={handleViewClaim}
+                                onPressQrCode={handlePressQrCode}
                             />
                         ))
                     )}
                 </ScrollView>
             )}
+
+            {/* Modale QR code agrandi */}
+            <Modal
+                visible={enlargedQrTag !== null}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setEnlargedQrTag(null)}
+            >
+                <Pressable
+                    style={styles.qrModalOverlay}
+                    onPress={() => setEnlargedQrTag(null)}
+                >
+                    <Pressable
+                        style={[styles.qrModalContent, { backgroundColor: themeColors.cardBackgroundColor }]}
+                        onPress={(e) => e.stopPropagation()}
+                    >
+                        <Text style={[styles.qrModalTitle, { color: textColor }]}>Code QR du bagage</Text>
+                        {enlargedQrTag && (
+                            <View style={styles.qrModalQrWrapper}>
+                                <QRCode
+                                    value={enlargedQrTag}
+                                    size={220}
+                                    color="#000000"
+                                    backgroundColor="#FFFFFF"
+                                />
+                            </View>
+                        )}
+                        <Text style={[styles.qrModalTag, { color: themeColors.secondaryTextColor }]}>
+                            {enlargedQrTag}
+                        </Text>
+                        <Pressable
+                            style={[styles.qrModalCloseButton, { backgroundColor: themeColors.primaryBlue }]}
+                            onPress={() => setEnlargedQrTag(null)}
+                        >
+                            <Text style={styles.qrModalCloseText}>Fermer</Text>
+                        </Pressable>
+                    </Pressable>
+                </Pressable>
+            </Modal>
         </View>
     );
 };
@@ -622,10 +687,22 @@ const styles = StyleSheet.create({
         fontSize: 15,
         fontFamily: 'Ubuntu_Bold',
     },
+    tagRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginTop: 4,
+        gap: 16,
+    },
     tagValue: {
         fontSize: 16,
         fontFamily: 'Ubuntu_Bold',
-        marginTop: 4,
+        flex: 1,
+    },
+    qrCodeWrapper: {
+        padding: 8,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 8,
     },
     historyItem: {
         flexDirection: 'row',
@@ -652,6 +729,48 @@ const styles = StyleSheet.create({
     claimButtonText: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Medium',
+    },
+    qrModalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 24,
+    },
+    qrModalContent: {
+        borderRadius: 16,
+        padding: 24,
+        alignItems: 'center',
+        minWidth: 280,
+    },
+    qrModalTitle: {
+        fontSize: 18,
+        fontFamily: 'Ubuntu_Bold',
+        marginBottom: 20,
+    },
+    qrModalQrWrapper: {
+        padding: 16,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        marginBottom: 12,
+    },
+    qrModalTag: {
+        fontSize: 14,
+        fontFamily: 'Ubuntu_Regular',
+        marginBottom: 20,
+        textAlign: 'center',
+    },
+    qrModalCloseButton: {
+        paddingVertical: 12,
+        paddingHorizontal: 24,
+        borderRadius: 8,
+        minWidth: 120,
+        alignItems: 'center',
+    },
+    qrModalCloseText: {
+        fontSize: 14,
+        fontFamily: 'Ubuntu_Medium',
+        color: '#FFFFFF',
     },
 });
 
