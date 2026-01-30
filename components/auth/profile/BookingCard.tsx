@@ -49,6 +49,14 @@ export const BookingCard: React.FC<BookingCardProps> = ({ booking }) => {
         }
     }, [booking.id, navigation]);
 
+    /** Indique si la date de départ est déjà passée (bouton Itinéraire masqué) */
+    const isDeparturePast = booking.departureDateTime
+        ? new Date(booking.departureDateTime) < new Date()
+        : false;
+
+    /** Afficher le bouton Itinéraire uniquement si non annulé et départ à venir */
+    const showItineraryButton = booking.status !== 'CANCELLED' && !isDeparturePast;
+
     return (
         <View style={[styles.bookingCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
             {/* Route et date */}
@@ -108,7 +116,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({ booking }) => {
                         </>
                     )}
                 </Pressable>
-                {booking.status === 'PAID' && (
+                {showItineraryButton && (
                     <Pressable
                         style={[styles.actionButton, { backgroundColor: 'transparent', borderColor: colors.border }]}
                         onPress={() => {
