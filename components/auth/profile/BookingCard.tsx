@@ -108,15 +108,17 @@ export const BookingCard: React.FC<BookingCardProps> = ({ booking }) => {
                         </>
                     )}
                 </Pressable>
-                <Pressable
-                    style={[styles.actionButton, { backgroundColor: 'transparent', borderColor: colors.border }]}
-                    onPress={() => {
-                        navigation.navigate('trip/route-viewer' as never, { booking: JSON.stringify(booking) } as never);
-                    }}
-                >
-                    <MaterialCommunityIcons name="map-marker-outline" size={20} color={colors.secondaryText} />
-                    <Text style={[styles.actionButtonText, { color: colors.secondaryText }]}>Itinéraire</Text>
-                </Pressable>
+                {booking.status === 'PAID' && (
+                    <Pressable
+                        style={[styles.actionButton, { backgroundColor: 'transparent', borderColor: colors.border }]}
+                        onPress={() => {
+                            navigation.navigate('trip/route-viewer' as never, { booking: JSON.stringify(booking) } as never);
+                        }}
+                    >
+                        <MaterialCommunityIcons name="map-marker-outline" size={20} color={colors.secondaryText} />
+                        <Text style={[styles.actionButtonText, { color: colors.secondaryText }]}>Itinéraire</Text>
+                    </Pressable>
+                )}
             </View>
         </View>
     );
