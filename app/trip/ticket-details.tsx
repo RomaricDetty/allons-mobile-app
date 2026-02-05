@@ -95,7 +95,7 @@ const TicketDetails = () => {
     const ticketParam = route.params?.ticketDetails;
     const ticket = useMemo(() => {
         if (!ticketParam) return undefined;
-        
+
         try {
             // Si c'est une string, parser le JSON
             if (typeof ticketParam === 'string') {
@@ -109,7 +109,7 @@ const TicketDetails = () => {
             return undefined;
         }
     }, [ticketParam]);
-    
+
     const refreshed = route.params?.refreshed;
 
     console.log('ticket details informations:  ', ticket);
@@ -167,8 +167,8 @@ const TicketDetails = () => {
         }
 
         // Vérifier si tous les passagers sont annulés
-        const allPassengersCancelled = ticket.passengers.every(passenger => 
-            passenger.status && 
+        const allPassengersCancelled = ticket.passengers.every(passenger =>
+            passenger.status &&
             (passenger.status.toUpperCase() === 'CANCELLED' || passenger.status.toUpperCase() === 'CANCELED')
         );
 
@@ -328,10 +328,18 @@ const TicketDetails = () => {
      */
     const handleCancelReservation = () => {
         if (!ticket) return;
-        navigation.navigate('trip/cancel-reservation' as never, { 
-            ticketDetails: JSON.stringify(ticket) 
+        navigation.navigate('trip/cancel-reservation' as never, {
+            ticketDetails: JSON.stringify(ticket)
         } as never);
     };
+
+    const handleGiveFeedback = () => {
+        navigation.navigate('trip/feedback-passenger' as never, { bookingId: ticket.id, departureId: ticket.departureId } as never);
+    };
+
+    const canGiveFeedback = useMemo(() => {
+        return ticket.status?.toUpperCase() === 'USED';
+    }, [ticket]);
 
     return (
         <View style={[styles.container, { backgroundColor: themeColors.scrollBackgroundColor }]}>
@@ -488,6 +496,7 @@ const TicketDetails = () => {
                             backgroundColor={themeColors.passengerCardBackground}
                             borderColor={themeColors.borderColor}
                             bookingItemId={passenger.id}
+                            departureId={ticket.departureId}
                         />
                     ))}
                 </View>
@@ -541,7 +550,7 @@ const TicketDetails = () => {
                         <>
                             <Icon name="download" size={20} color={themeColors.primaryBlue} />
                             <Text style={[styles.actionButtonText, { color: themeColors.primaryBlue }]}>
-                                Télécharger le ticket
+                                Télécharger le reçu
                             </Text>
                         </>
                     )}
@@ -554,6 +563,18 @@ const TicketDetails = () => {
                         <Icon name="cancel" size={20} color={'#FFFFFF'} />
                         <Text style={[styles.actionButtonText, { color: '#FFFFFF' }]}>
                             Annuler la réservation
+                        </Text>
+                    </Pressable>
+                )}
+
+                {canGiveFeedback && (
+                    <Pressable
+                        style={[styles.actionButton, { backgroundColor: themeColors.primaryBlue, marginTop: 12 }]}
+                        onPress={handleGiveFeedback}
+                    >
+                        <Icon name="star-outline" size={20} color={'#FFFFFF'} />
+                        <Text style={[styles.actionButtonText, { color: '#FFFFFF' }]}>
+                            Donner mon avis
                         </Text>
                     </Pressable>
                 )}

@@ -53,7 +53,7 @@ export const SignInScreen = ({ onSignIn, onSwitchToSignUp, onForgotPassword }: S
     const backgroundColor = useThemeColor({}, 'background');
     const textColor = useThemeColor({}, 'text');
     const tintColor = useThemeColor({}, 'tint');
-    
+
     // Couleurs spécifiques pour l'écran - style moderne avec fond blanc
     const scrollBackgroundColor = colorScheme === 'dark' ? '#000000' : '#F3F3F7';
     const secondaryTextColor = colorScheme === 'dark' ? '#9BA1A6' : '#666666';
@@ -156,7 +156,7 @@ export const SignInScreen = ({ onSignIn, onSwitchToSignUp, onForgotPassword }: S
         try {
             const response = await authLogin({ emailOrUsername: email.trim().toLowerCase(), password: password.trim() });
             console.log('Réponse de la connexion : ', response);
-            
+
             // Vérifier que la réponse est valide
             if (response && response.status === 200 && response.data) {
                 // Vérifier que tous les champs nécessaires sont présents
@@ -165,34 +165,34 @@ export const SignInScreen = ({ onSignIn, onSwitchToSignUp, onForgotPassword }: S
                 const expiresIn = response.data.expires_in;
                 const tokenType = response.data.token_type;
                 const user = response.data.user;
-                
+
                 if (!accessToken || accessToken.trim() === '') {
                     throw new Error('Token d\'accès manquant dans la réponse');
                 }
-                
+
                 if (!user || !user.id) {
                     throw new Error('Informations utilisateur manquantes dans la réponse');
                 }
-                
+
                 // Stocker les tokens de manière sécurisée
                 try {
                     await AsyncStorage.setItem('token', accessToken);
-                    
+
                     if (refreshToken && refreshToken.trim() !== '') {
                         await AsyncStorage.setItem('refresh_token', refreshToken);
                     }
-                    
+
                     if (expiresIn !== undefined && expiresIn !== null) {
                         await AsyncStorage.setItem('expires_at', String(expiresIn));
                     }
-                    
+
                     if (tokenType && tokenType.trim() !== '') {
                         await AsyncStorage.setItem('token_type', tokenType);
                     }
-                    
+
                     await AsyncStorage.setItem('user_id', user.id);
                     console.log('user_id : ', user.id);
-                    
+
                     onSignIn();
                 } catch (storageError) {
                     console.error('Erreur lors du stockage des données:', storageError);
@@ -205,10 +205,10 @@ export const SignInScreen = ({ onSignIn, onSwitchToSignUp, onForgotPassword }: S
             }
         } catch (error: any) {
             console.error('Erreur lors de la connexion : ', error);
-            
+
             // Afficher un message d'erreur plus spécifique
             let errorMessage = 'Une erreur est survenue lors de la connexion, veuillez vérifier vos informations et réessayer.';
-            
+
             if (error?.response) {
                 // Erreur de l'API
                 if (error.response.status === 401) {
@@ -222,7 +222,7 @@ export const SignInScreen = ({ onSignIn, onSwitchToSignUp, onForgotPassword }: S
                 // Erreur personnalisée
                 errorMessage = error.message;
             }
-            
+
             Alert.alert('Attention !', errorMessage);
         } finally {
             setIsLoading(false);
@@ -235,7 +235,7 @@ export const SignInScreen = ({ onSignIn, onSwitchToSignUp, onForgotPassword }: S
      * Composant logo simple avec deux formes en 'C' stylisées
      */
     const Logo = () => (
-        <Animated.View 
+        <Animated.View
             style={[
                 styles.logoContainer,
                 {
@@ -248,10 +248,10 @@ export const SignInScreen = ({ onSignIn, onSwitchToSignUp, onForgotPassword }: S
         >
             {/* Forme avant (plus foncée) */}
             <View style={styles.logoFront}>
-                <Image 
-                    source={require('@/assets/images/allon-logo-transparent.png')} 
-                    resizeMode="cover" 
-                    style={{ width: 100, height: 100 }} 
+                <Image
+                    source={require('@/assets/images/allon-logo-transparent.png')}
+                    resizeMode="cover"
+                    style={{ width: 100, height: 100 }}
                 />
             </View>
         </Animated.View>
@@ -270,7 +270,7 @@ export const SignInScreen = ({ onSignIn, onSwitchToSignUp, onForgotPassword }: S
                 keyboardShouldPersistTaps="handled"
             >
                 <Logo />
-                <Animated.View 
+                <Animated.View
                     style={[
                         styles.header,
                         {
@@ -285,49 +285,50 @@ export const SignInScreen = ({ onSignIn, onSwitchToSignUp, onForgotPassword }: S
                     <Text style={[styles.subtitle, { color: secondaryTextColor }]}>Veuillez renseigner vos informations de connexion.</Text>
                 </Animated.View>
 
-            <View style={[styles.sectionCard, { backgroundColor: cardBackgroundColor, borderColor: cardBorderColor }]}>
-                <View style={styles.form}>
-                    <AuthFormField
-                        label="Adresse email ou nom d'utilisateur"
-                        value={email}
-                        onChangeText={setEmail}
-                        placeholder=""
-                        keyboardType="email-address"
-                    />
-                    <PasswordField
-                        label="Mot de passe"
-                        value={password}
-                        onChangeText={setPassword}
-                        placeholder=""
-                    />
+                <View style={[styles.sectionCard, { backgroundColor: cardBackgroundColor, borderColor: cardBorderColor }]}>
+                    <View style={styles.form}>
+                        <AuthFormField
+                            label="Adresse email ou nom d'utilisateur"
+                            value={email}
+                            onChangeText={setEmail}
+                            placeholder=""
+                            keyboardType="email-address"
+                        />
+                        <PasswordField
+                            label="Mot de passe"
+                            value={password}
+                            onChangeText={setPassword}
+                            placeholder=""
+                        />
 
-                    <View style={[styles.optionsRow, { alignSelf: 'flex-end' }]}>
-                        <Pressable onPress={onForgotPassword}>
-                            <Text style={[styles.forgotPassword, { color: "#1776BA" }]}>Mot de passe oublié ?</Text>
-                        </Pressable>
+                        <View style={[styles.optionsRow, { alignSelf: 'flex-end' }]}>
+                            <Pressable onPress={onForgotPassword}>
+                                <Text style={[styles.forgotPassword, { color: "#1776BA" }]}>Mot de passe oublié ?</Text>
+                            </Pressable>
+                        </View>
                     </View>
                 </View>
-            </View>
 
-            <Pressable
-                style={styles.primaryButton}
-                onPress={handleSignIn}
-                disabled={isLoading}
-            >
-                {isLoading ? <ActivityIndicator size="small" color="#FFFFFF" /> : (
-                    <Text style={styles.primaryButtonText}>Se connecter</Text>
-                )}
-            </Pressable>
-
-           
-            <View style={styles.footer}>
-                <Text style={[styles.footerText, { color: secondaryTextColor }]}>Vous n'avez pas de compte ? </Text>
-                <Pressable onPress={onSwitchToSignUp}>
-                    <Text style={[styles.footerLink, { color: "#1776BA" }]}>Inscrivez-vous !</Text>
+                <Pressable
+                    style={styles.primaryButton}
+                    onPress={handleSignIn}
+                    disabled={isLoading}
+                >
+                    {isLoading ? <ActivityIndicator size="small" color="#FFFFFF" /> : (
+                        <Text style={styles.primaryButtonText}>Se connecter</Text>
+                    )}
                 </Pressable>
-            </View>
 
-            
+
+                <View style={styles.footer}>
+                    <Text style={[styles.footerText, { color: secondaryTextColor }]}>Vous n'avez pas de compte ? </Text>
+                    <Pressable onPress={onSwitchToSignUp}>
+                        <Text style={[styles.footerLink, { color: "#1776BA" }]}>Inscrivez-vous !</Text>
+                    </Pressable>
+                </View>
+
+                <View style={{paddingBottom: 100}}/>
+
             </ScrollView>
         </KeyboardAvoidingView>
     );

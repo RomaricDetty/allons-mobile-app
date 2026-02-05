@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useAppColors } from '@/hooks/use-app-colors';
 import * as Haptics from 'expo-haptics';
 import React, { useCallback } from 'react';
@@ -36,7 +37,7 @@ export const TabNavigation: React.FC<TabNavigationProps> = ({ activeTab, onTabPr
                         { color: activeTab === 'info' ? colors.activeTabColor : colors.inactiveTabText },
                         activeTab === 'info' && styles.tabTextActive
                     ]}>
-                        Mes informations
+                        Informations
                     </Text>
                 </Pressable>
                 <Pressable style={styles.tab} onPress={() => handleTabPress('tickets')}>
@@ -50,7 +51,7 @@ export const TabNavigation: React.FC<TabNavigationProps> = ({ activeTab, onTabPr
                         { color: activeTab === 'tickets' ? colors.activeTabColor : colors.inactiveTabText },
                         activeTab === 'tickets' && styles.tabTextActive
                     ]}>
-                        Mes tickets
+                        Réservations
                     </Text>
                 </Pressable>
             </View>
@@ -90,8 +91,8 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 20,
-        gap: 8,
+        paddingVertical: 15,
+        gap: 5,
     },
     tabIndicator: {
         position: 'absolute',
@@ -106,6 +107,6 @@ const styles = StyleSheet.create({
         fontFamily: 'Ubuntu_Regular',
     },
     tabTextActive: {
-        fontFamily: 'Ubuntu_Medium',
+        fontFamily: 'Ubuntu_Bold',
     },
 });

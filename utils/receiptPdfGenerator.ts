@@ -1,4 +1,9 @@
+import { getBookingQrCode } from '@/api/booking';
 import { formatFullDate, formatStatus } from '@/constants/functions';
+import { getAuthToken } from '@/utils/storage';
+// Génération QR en SVG (sans canvas) pour affichage fiable dans le PDF
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const QRCode = require('qrcode') as { toString: (text: string, opts: { type: 'svg'; width?: number; margin?: number; color?: { dark: string; light: string } }) => Promise<string> };
 
 /**
  * Formate la méthode de paiement
@@ -82,10 +87,56 @@ const formatPriceWithCurrency = (amount: string | number, currency: string): str
 };
 
 /**
- * Génère le HTML pour le reçu PDF
+ * Récupère le hash du QR code via l'API (même source que l'écran de confirmation).
  */
-export const generateReceiptHTML = (bookingData: BookingData): string => {
-    const qrCodeData = `https://allon-frontoffice-ng.onrender.com/verify-ticket/${bookingData.id}?ref=${bookingData.code}`;
+const fetchQRCodeHash = async (bookingId: string): Promise<string | null> => {
+    const token = await getAuthToken();
+    if (!token?.trim()) return null;
+    try {
+        const response = await getBookingQrCode(bookingId, token);
+        if (response?.status === 200 && response?.data) {
+            const hash = response.data.hash ?? response.data;
+            return typeof hash === 'string' && hash.trim() !== '' ? hash : null;
+        }
+    } catch {
+        // ignore
+    }
+    return null;
+};
+
+/**
+ * Génère le QR en SVG à partir du hash (sans ref ni data URL, fiable pour le PDF).
+ */
+const hashToQRCodeSVG = async (hash: string): Promise<string | null> => {
+    try {
+        const svg = await QRCode.toString(hash, {
+            type: 'svg',
+            width: 100,
+            margin: 2,
+            color: { dark: '#000000', light: '#FFFFFF' },
+        });
+        return typeof svg === 'string' && svg.trim() !== '' ? svg : null;
+    } catch {
+        return null;
+    }
+};
+
+/**
+ * Génère le HTML du reçu en récupérant le hash QR via l'API et en générant le SVG ici.
+ * @param bookingData - Données de la réservation
+ */
+export const generateReceiptHTMLAsync = async (bookingData: BookingData): Promise<string> => {
+    const hash = await fetchQRCodeHash(bookingData.id);
+    const qrSvg = hash ? await hashToQRCodeSVG(hash) : null;
+    return generateReceiptHTML(bookingData, qrSvg ?? undefined);
+};
+
+/**
+ * Génère le HTML pour le reçu PDF.
+ * @param bookingData - Données de la réservation
+ * @param qrCodeSvg - QR code en SVG (généré à partir du hash, affichage fiable dans le PDF)
+ */
+export const generateReceiptHTML = (bookingData: BookingData, qrCodeSvg?: string): string => {
     const currentDate = new Date();
     const formattedDate = currentDate.toLocaleString('fr-FR', {
         day: '2-digit',
@@ -165,12 +216,18 @@ export const generateReceiptHTML = (bookingData: BookingData): string => {
                         align-items: center;
                         justify-content: center;
                     }
-                    .qr-code img {
+                    .qr-code img,
+                    .qr-code svg {
                         width: 100%;
                         height: 100%;
                         display: block;
                         margin: 0 auto;
                         object-fit: contain;
+                    }
+                    .qr-unavailable {
+                        font-size: 11px;
+                        color: #999999;
+                        margin: 0;
                     }
                     .qr-subtitle {
                         font-size: 12px;
@@ -300,10 +357,12 @@ export const generateReceiptHTML = (bookingData: BookingData): string => {
                 </div>
                 <div class="separator"></div>
 
-                <!-- QR Code Section -->
+                <!-- QR Code Section (SVG généré à partir du hash, pas de data URL) -->
                 <div class="qr-section">
                     <div class="qr-code">
-                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(qrCodeData)}" alt="QR Code" style="width: 100%; height: 100%; display: block; margin: 0 auto;" />
+                        ${qrCodeSvg && qrCodeSvg.trim() !== ''
+                            ? `__QR_SVG_PLACEHOLDER__`
+                            : '<p class="qr-unavailable">Code QR non disponible</p>'}
                     </div>
                     <div class="qr-subtitle">Scannez pour vérifier l'authenticité du ticket</div>
                 </div>
@@ -513,6 +572,6 @@ export const generateReceiptHTML = (bookingData: BookingData): string => {
                 </div>
             </body>
         </html>
-    `;
+    `.replace('__QR_SVG_PLACEHOLDER__', (qrCodeSvg && qrCodeSvg.trim() !== '') ? qrCodeSvg : '');
 };
 

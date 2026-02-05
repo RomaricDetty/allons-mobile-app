@@ -182,7 +182,7 @@ const TicketQR = () => {
                 style={[
                     styles.header,
                     {
-                        paddingTop: insets.top,
+                        paddingTop: insets.top + 10,
                         backgroundColor: colors.headerBackground,
                         borderBottomColor: colors.headerBorder,
                     },
@@ -196,7 +196,7 @@ const TicketQR = () => {
                 >
                     <Icon name="arrow-left" size={25} color={iconColor} />
                 </Pressable>
-                <Text style={[styles.headerTitle, { color: textColor }]}>
+                <Text style={[styles.headerTitle, { color: textColor, alignSelf: 'center' }]}>
                     Code QR de vérification
                 </Text>
             </View>
@@ -283,20 +283,20 @@ const styles = StyleSheet.create({
         flexGrow: 1,
     },
     mainCard: {
-        borderRadius: 12,
-        padding: 25,
+        borderRadius: 16,
+        padding: 10,
         width: '100%',
-        maxWidth: 400,
+        maxWidth: 450,
     },
     qrContainer: {
         alignItems: 'center',
         justifyContent: 'center',
-        padding: 30,
-        borderRadius: 12,
+        padding: 20,
+        borderRadius: 16,
         minHeight: 400,
     },
     ticketIdentifier: {
-        fontSize: 16,
+        fontSize: 18,
         fontFamily: 'Ubuntu_Medium',
         textAlign: 'center',
         marginTop: 16,

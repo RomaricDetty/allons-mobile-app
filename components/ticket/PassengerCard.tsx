@@ -31,6 +31,7 @@ interface PassengerCardProps {
     backgroundColor: string;
     borderColor: string;
     bookingItemId?: string; // ID du booking item pour récupérer les bagages
+    departureId?: string; // ID du départ pour récupérer les feedbacks
 }
 
 /**
@@ -44,6 +45,7 @@ export const PassengerCard: React.FC<PassengerCardProps> = ({
     backgroundColor,
     borderColor,
     bookingItemId,
+    departureId,
 }) => {
     /**
      * Navigue vers l'écran de liste des bagages du passager
@@ -96,9 +98,19 @@ export const PassengerCard: React.FC<PassengerCardProps> = ({
         }
     };
 
+    /**
+     * Navigue vers l'écran de feedback du passager
+     */
+    const handleFeedbackPress = () => {
+        router.push({
+            pathname: '/trip/feedback-passenger',
+            params: { bookingItemId: bookingItemId, departureId: departureId },
+        });
+    };
+
     return (
         <>
-            <View style={[styles.passengerCard, { backgroundColor, borderColor, flexDirection: 'column', alignItems: 'flex-start', gap: 15}]}>
+            <View style={[styles.passengerCard, { backgroundColor, borderColor, flexDirection: 'column', alignItems: 'flex-start', gap: 15 }]}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
                     <View style={styles.passengerInfo}>
                         <View style={styles.nameRow}>
@@ -131,15 +143,17 @@ export const PassengerCard: React.FC<PassengerCardProps> = ({
                         </Text>
                     </View>
                 </View>
-                <Pressable
-                    onPress={handleBaggagePress}
-                    style={styles.baggageButton}
-                >
-                    <Text style={[styles.baggageButtonText, { color: primaryBlue }]}>
-                        Bagages
-                    </Text>
-                    <MaterialCommunityIcons name="bag-suitcase" size={20} color={primaryBlue} />
-                </Pressable>
+                <View style={{ flexDirection: 'row', gap: 18 }}>
+                    <Pressable
+                        onPress={handleBaggagePress}
+                        style={styles.baggageButton}
+                    >
+                        <MaterialCommunityIcons name="bag-suitcase" size={20} color={primaryBlue} />
+                        <Text style={[styles.baggageButtonText, { color: primaryBlue }]}>
+                            Voir les bagages
+                        </Text>
+                    </Pressable>
+                </View>
             </View>
 
         </>
@@ -216,6 +230,26 @@ const styles = StyleSheet.create({
     baggageButtonIcon: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
+    },
+    feedbackButton: {
+        paddingHorizontal: 18,
+        paddingVertical: 12,
+        borderRadius: 12,
+        backgroundColor: '#1776BA',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexDirection: 'row',
+        gap: 8,
+    },
+    feedbackButtonText: {
+        fontSize: 16,
+        fontFamily: 'Ubuntu_Regular',
+        color: '#FFFFFF',
+    },
+    feedbackButtonIcon: {
+        fontSize: 14,
+        fontFamily: 'Ubuntu_Regular',
+        color: '#FFFFFF',
     },
 });
 

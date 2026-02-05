@@ -5,9 +5,10 @@ import { Booking, ProfileScreenProps } from '@/interfaces';
 import { clearAuthData } from '@/utils/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
+import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Dimensions, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Dimensions, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import {
     BookingCard,
@@ -236,6 +237,7 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
         const newTab = index === 0 ? 'info' : 'tickets';
 
         if (newTab !== activeTab) {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             setActiveTab(newTab);
         }
 
@@ -261,7 +263,7 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                     onMomentumScrollEnd={handleScrollEnd}
                     scrollEventThrottle={16}
                     style={styles.tabScrollView}
-                    contentContainerStyle={{ width: screenWidth * 2 }}
+                    contentContainerStyle={{ width: screenWidth * 2, paddingBottom: Platform.OS === 'android' ? 100 : 0 }}
                 >
                     <View style={[styles.tabPage, { width: screenWidth }]}>
                         {renderPersonalInfoTab()}
@@ -269,6 +271,9 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                     <View style={[styles.tabPage, { width: screenWidth }]}>
                         {renderTicketsTab()}
                     </View>
+                    {Platform.OS === 'ios' && (
+                        <View style={{ paddingBottom: 100 }} />
+                    )}
                 </ScrollView>
             )}
 

@@ -7,14 +7,14 @@ import { formatStatus, getStatusColor } from '@/constants/functions';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { transformBookingData } from '@/utils/bookingDataTransformer';
-import { generateReceiptHTML } from '@/utils/receiptPdfGenerator';
+import { generateReceiptHTMLAsync } from '@/utils/receiptPdfGenerator';
 import { getAuthToken } from '@/utils/storage';
 import { useRoute } from '@react-navigation/native';
 import * as FileSystemLegacy from 'expo-file-system/legacy';
 import * as Print from 'expo-print';
 import { router } from 'expo-router';
 import * as Sharing from 'expo-sharing';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -40,6 +40,8 @@ const BookingConfirmation = () => {
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
     const [qrCode, setQrCode] = useState<string>('');
     const [isLoadingQrCode, setIsLoadingQrCode] = useState<boolean>(true);
+    /** Ref du QR code affiché à l'écran pour en extraire la data URL (PDF sans API externe) */
+    const qrCodeRef = useRef<any>(null);
 
     // Couleurs dynamiques basées sur le thème
     const colors = useAppColors();
@@ -152,15 +154,14 @@ const BookingConfirmation = () => {
     };
 
     /**
-     * Télécharge le reçu en PDF
+     * Télécharge le reçu en PDF (hash et QR SVG sont générés dans le générateur de reçu).
      */
     const handleDownloadReceipt = useCallback(async () => {
         if (!bookingData) return;
 
         setIsGeneratingPDF(true);
         try {
-            // Générer le HTML
-            const html = generateReceiptHTML(bookingData);
+            const html = await generateReceiptHTMLAsync(bookingData);
 
             // Formater la date pour le nom de fichier
             const dateFormatted = formatDateForFileName();
@@ -341,6 +342,7 @@ const BookingConfirmation = () => {
                             <ActivityIndicator size="large" color={primaryBlue} />
                         ) : (
                             <QRCode
+                                getRef={(c: any) => { qrCodeRef.current = c; }}
                                 value={qrCode}
                                 size={150}
                                 color={primaryBlue}

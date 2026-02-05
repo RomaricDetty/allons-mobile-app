@@ -271,13 +271,18 @@ export default function HomeScreen() {
     const fetchUserInfo = useCallback(async () => {
         try {
             const [token, userId] = await Promise.all([getAuthToken(), getUserId()]);
-
-            if (token && userId) {
+            console.log('token', token);
+            console.log('userId', userId);
+            if (token && userId && token !== null && userId !== null) {
                 const response = await authGetUserInfo(userId, token);
                 if (response.status === 200) {
                     setUser(response.data);
                 }
+
+                return true
             }
+
+            setUser(null);
         } catch (error) {
             console.error('Erreur récupération user info:', error);
         }
@@ -496,7 +501,7 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     scrollContent: {
-        paddingBottom: 40,
+        paddingBottom: 100,
     },
     nameContainer: {
         width: '100%',

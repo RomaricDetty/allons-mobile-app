@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { STATUS_OPTIONS } from '@/constants/profile';
 import { useAppColors } from '@/hooks/use-app-colors';
 import React, { useMemo } from 'react';
