@@ -3,6 +3,7 @@
  */
 
 export { BookingCard } from './BookingCard';
+export { BusRentalRequestCard } from './BusRentalRequestCard';
 export { BookingFilters } from './BookingFilters';
 export { LogoutModal, StatusModal } from './Modals';
 export { PersonalInfoCard } from './PersonalInfoCard';

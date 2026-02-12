@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { getLocationList } from '@/api/auth_register';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { useProfileData } from '@/hooks/useProfileData';
 import { Booking, ProfileScreenProps } from '@/interfaces';
@@ -13,6 +14,7 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import {
     BookingCard,
     BookingFilters,
+    BusRentalRequestCard,
     LogoutModal,
     PersonalInfoCard,
     ProfileHeader,
@@ -31,11 +33,13 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
     const colors = useAppColors();
     const { user, bookingList, isLoading, refreshing, fetchData, handleRefresh } = useProfileData();
 
-    const [activeTab, setActiveTab] = useState<'info' | 'tickets'>('info');
+    const [activeTab, setActiveTab] = useState<'info' | 'tickets' | 'locations'>('info');
     const [searchQuery, setSearchQuery] = useState<string>('');
     const [selectedStatus, setSelectedStatus] = useState<string>('');
     const [showStatusModal, setShowStatusModal] = useState<boolean>(false);
     const [showLogoutModal, setShowLogoutModal] = useState(false);
+    const [locationList, setLocationList] = useState<any[]>([]);
+    const [locationsRefreshing, setLocationsRefreshing] = useState(false);
 
     const scrollViewRef = useRef<ScrollView>(null);
     const screenWidth = Dimensions.get('window').width;
@@ -68,13 +72,27 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
     }, [onLogout]);
 
     /**
-     * Charge les données au montage et au focus de l'écran
+     * Charge les données au montage et au focus de l'écran (profil + réservations + demandes de location)
      */
     useFocusEffect(
         useCallback(() => {
             fetchData();
-        }, [fetchData])
+            fetchLocationList();
+        }, [fetchData, fetchLocationList])
     );
+
+    /**
+     * Charge la liste des demandes de location de bus (onglet Locations bus)
+     */
+    const fetchLocationList = useCallback(async () => {
+        const token = await AsyncStorage.getItem('token');
+        const userId = await AsyncStorage.getItem('user_id');
+        if (!token || !userId) return;
+        const queryParams = `customerId=${userId}&pageSize=50`;
+        const res = await getLocationList(token, queryParams);
+        console.log("getLocationList response ==>, ", res.data.items);
+        if (res?.data?.items) setLocationList(res.data.items);
+    }, []);
 
     /**
      * Initialise la position du scroll
@@ -82,7 +100,7 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
     useEffect(() => {
         if (!isLoading && scrollViewRef.current) {
             setTimeout(() => {
-                const index = activeTab === 'info' ? 0 : 1;
+                const index = activeTab === 'info' ? 0 : activeTab === 'tickets' ? 1 : 2;
                 const scrollPosition = index * screenWidth;
                 scrollViewRef.current?.scrollTo({ x: scrollPosition, animated: false });
                 scrollX.setValue(scrollPosition);
@@ -196,6 +214,63 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
     );
 
     /**
+     * Rafraîchit la liste des demandes de location
+     */
+    const handleRefreshLocations = useCallback(async () => {
+        setLocationsRefreshing(true);
+        await fetchLocationList();
+        setLocationsRefreshing(false);
+    }, [fetchLocationList]);
+
+    /**
+     * Rendu de l'onglet Locations bus (bouton Nouvelle demande en haut, puis liste ou état vide)
+     */
+    const renderLocationsBusTab = () => (
+        <View style={[styles.locationsBusContainer, { backgroundColor: colors.scrollBackground }]}>
+            {/* Bouton en haut : + Nouvelle demande */}
+            <Pressable
+                style={[styles.locationsTopButton, { backgroundColor: colors.activeTabColor }]}
+                onPress={() => router.push('/profile/bus-rental-request')}
+            >
+                <MaterialCommunityIcons name="plus" size={22} color="#FFFFFF" />
+                <Text style={styles.locationsTopButtonText}>Nouvelle demande</Text>
+            </Pressable>
+
+            {locationList.length > 0 ? (
+                <ScrollView
+                    style={styles.scrollView}
+                    contentContainerStyle={styles.scrollContent}
+                    showsVerticalScrollIndicator={false}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={locationsRefreshing}
+                            onRefresh={handleRefreshLocations}
+                            tintColor={colors.activeTabColor}
+                            colors={[colors.activeTabColor]}
+                        />
+                    }
+                >
+                    {locationList.map((item: any) => (
+                        <BusRentalRequestCard
+                            key={item.id}
+                            item={item}
+                            onPayRequest={(req) => router.push({ pathname: '/profile/bus-rental-payment', params: { item: JSON.stringify(req) } })}
+                        />
+                    ))}
+                </ScrollView>
+            ) : (
+                <View style={styles.emptyStateContainer}>
+                    <MaterialCommunityIcons name="bus-clock" size={64} color={colors.inactiveIcon} />
+                    <Text style={[styles.emptyStateText, { color: colors.text }]}>Aucune demande de location</Text>
+                    <Text style={[styles.emptyStateSubtext, { color: colors.secondaryText }]}>
+                        Créez une demande pour louer un bus.
+                    </Text>
+                </View>
+            )}
+        </View>
+    );
+
+    /**
      * Rendu de l'indicateur de chargement
      */
     const renderLoading = useCallback(() => (
@@ -207,9 +282,9 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
     /**
      * Gère le changement d'onglet
      */
-    const handleTabPress = useCallback((tab: 'info' | 'tickets') => {
+    const handleTabPress = useCallback((tab: 'info' | 'tickets' | 'locations') => {
         setActiveTab(tab);
-        const index = tab === 'info' ? 0 : 1;
+        const index = tab === 'info' ? 0 : tab === 'tickets' ? 1 : 2;
         const scrollPosition = index * screenWidth;
 
         isProgrammaticScrollRef.current = true;
@@ -234,7 +309,7 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
     const handleScrollEnd = useCallback((event: any) => {
         const offsetX = event.nativeEvent.contentOffset.x;
         const index = Math.round(offsetX / screenWidth);
-        const newTab = index === 0 ? 'info' : 'tickets';
+        const newTab = index === 0 ? 'info' : index === 1 ? 'tickets' : 'locations';
 
         if (newTab !== activeTab) {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -249,7 +324,7 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
     return (
         <View style={[styles.container, { backgroundColor: colors.scrollBackground }]}>
             <ProfileHeader onLogout={handleLogout} />
-            <TabNavigation activeTab={activeTab} onTabPress={handleTabPress} scrollX={scrollX} />
+            <TabNavigation activeTab={activeTab} onTabPress={handleTabPress} />
 
             {isLoading ? (
                 renderLoading()
@@ -263,13 +338,16 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                     onMomentumScrollEnd={handleScrollEnd}
                     scrollEventThrottle={16}
                     style={styles.tabScrollView}
-                    contentContainerStyle={{ width: screenWidth * 2, paddingBottom: Platform.OS === 'android' ? 100 : 0 }}
+                    contentContainerStyle={{ width: screenWidth * 3, paddingBottom: Platform.OS === 'android' ? 100 : 0 }}
                 >
                     <View style={[styles.tabPage, { width: screenWidth }]}>
                         {renderPersonalInfoTab()}
                     </View>
                     <View style={[styles.tabPage, { width: screenWidth }]}>
                         {renderTicketsTab()}
+                    </View>
+                    <View style={[styles.tabPage, { width: screenWidth }]}>
+                        {renderLocationsBusTab()}
                     </View>
                     {Platform.OS === 'ios' && (
                         <View style={{ paddingBottom: 100 }} />
@@ -332,6 +410,25 @@ const styles = StyleSheet.create({
     },
     ticketsContainer: {
         flex: 1,
+    },
+    locationsBusContainer: {
+        flex: 1,
+    },
+    locationsTopButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        marginHorizontal: 20,
+        marginTop: 12,
+        marginBottom: 8,
+        paddingVertical: 14,
+        borderRadius: 12,
+    },
+    locationsTopButtonText: {
+        fontSize: 16,
+        fontFamily: 'Ubuntu_Bold',
+        color: '#FFFFFF',
     },
     loadingContainer: {
         flex: 1,

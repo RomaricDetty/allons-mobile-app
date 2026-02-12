@@ -1,4 +1,4 @@
-import { verifyRebookingCode as verifyRebookingCodeAPI, RebookingCodeResponse } from '@/api/rebooking';
+import { RebookingCodeResponse, verifyRebookingCode as verifyRebookingCodeAPI } from '@/api/rebooking';
 import { getAuthToken } from '@/utils/storage';
 import { useCallback, useState } from 'react';
 import { Alert } from 'react-native';
@@ -30,10 +30,11 @@ export const useRebookingCode = () => {
 
             // Appel API réel
             const response = await verifyRebookingCodeAPI(rebookingCode, token);
+            console.log("Response vérification code rebooking ==>, ", response)
             
             if (response.status === 200 && response.data.status === 'ACTIVE') {
                 // Utiliser remainingAmount car c'est le montant encore disponible
-                const discountAmount = response.data.remainingAmount || 0;
+                const discountAmount = response.data.creditAmount || 0;
                 
                 if (discountAmount > 0) {
                     setDiscount(discountAmount);

@@ -50,7 +50,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({ booking }) => {
     }, [booking.id, navigation]);
 
     /** Indique si la date de départ est déjà passée (bouton Itinéraire masqué) */
-    console.log('booking.departureDateTime: ', booking.departureDateTime);
+    // console.log('booking.departureDateTime: ', booking.departureDateTime);
     const isDeparturePast = booking.departureDateTime
         ? new Date(booking.departureDateTime) < new Date()
         : false;

@@ -1,8 +1,16 @@
+import { RebookingCodeResponse } from '@/api/rebooking';
+import { formatFullDate, formatPrice } from '@/constants/functions';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import React from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SectionHeader } from './SectionHeader';
+
+/** Styles communs pour les blocs de succès rebooking (fond vert clair, bordure verte) */
+const SUCCESS_BLOCK_BG = 'rgba(76, 175, 80, 0.08)';
+const SUCCESS_BLOCK_BORDER = 'rgba(76, 175, 80, 0.4)';
+const SUCCESS_TEXT = '#2E7D32';
 
 interface RebookingCodeBlockProps {
     rebookingCode: string;
@@ -10,6 +18,8 @@ interface RebookingCodeBlockProps {
     onVerifyCode: () => void;
     isVerifying?: boolean;
     isCodeValid?: boolean | null;
+    /** Données du token après vérification (pour afficher "Token valide" + crédit + expiration) */
+    rebookingTokenData?: RebookingCodeResponse | null;
 }
 
 /**
@@ -20,7 +30,8 @@ export const RebookingCodeBlock = ({
     onRebookingCodeChange,
     onVerifyCode,
     isVerifying = false,
-    isCodeValid = null
+    isCodeValid = null,
+    rebookingTokenData = null
 }: RebookingCodeBlockProps) => {
     const colorScheme = useColorScheme() ?? 'light';
     
@@ -79,7 +90,7 @@ export const RebookingCodeBlock = ({
                             <ActivityIndicator size="small" color="#FFFFFF" />
                         ) : (
                             <Text style={styles.verifyButtonText}>
-                                {isCodeValid === true ? 'Valide ✓' : 'Vérifier'}
+                                {isCodeValid === true ? 'Valide' : 'Vérifier'}
                             </Text>
                         )}
                     </Pressable>
@@ -91,10 +102,25 @@ export const RebookingCodeBlock = ({
                     </Text>
                 )}
 
-                {isCodeValid === true && (
+                {isCodeValid === true && !rebookingTokenData && (
                     <Text style={[styles.successText, { color: successColor }]}>
                         Code appliqué avec succès !
                     </Text>
+                )}
+
+                {isCodeValid === true && rebookingTokenData && (
+                    <View style={styles.tokenValidCard}>
+                        <MaterialCommunityIcons name="check-circle" size={22} color={SUCCESS_TEXT} />
+                        <View style={styles.tokenValidContent}>
+                            <Text style={styles.tokenValidTitle}>Token valide</Text>
+                            <Text style={styles.tokenValidLine}>
+                                Crédit disponible: {formatPrice(rebookingTokenData.creditAmount)}
+                            </Text>
+                            <Text style={styles.tokenValidLine}>
+                                Expire le: {formatFullDate(rebookingTokenData.expiresAt)}
+                            </Text>
+                        </View>
+                    </View>
                 )}
             </View>
         </View>
@@ -155,5 +181,69 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontFamily: 'Ubuntu_Medium',
         marginTop: 8,
+    },
+    tokenValidCard: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 12,
+        marginTop: 16,
+        padding: 14,
+        borderRadius: 12,
+        backgroundColor: SUCCESS_BLOCK_BG,
+        borderWidth: 1,
+        borderColor: SUCCESS_BLOCK_BORDER,
+    },
+    tokenValidContent: { flex: 1 },
+    tokenValidTitle: {
+        fontSize: 15,
+        fontFamily: 'Ubuntu_Bold',
+        color: SUCCESS_TEXT,
+        marginBottom: 6,
+    },
+    tokenValidLine: {
+        fontSize: 13,
+        fontFamily: 'Ubuntu_Regular',
+        color: SUCCESS_TEXT,
+        marginBottom: 2,
+    },
+});
+
+/** Bloc affiché quand le crédit rebooking couvre entièrement le montant (aucun paiement requis) */
+export const NoPaymentRequiredBlock = () => (
+    <View style={noPaymentStyles.card}>
+        <MaterialCommunityIcons name="check-circle" size={24} color={SUCCESS_TEXT} />
+        <View style={noPaymentStyles.content}>
+            <Text style={noPaymentStyles.title}>Aucun paiement requis</Text>
+            <Text style={noPaymentStyles.message}>
+                Votre crédit de rebooking couvre entièrement le montant de la réservation. Vous pouvez continuer sans paiement.
+            </Text>
+        </View>
+    </View>
+);
+
+const noPaymentStyles = StyleSheet.create({
+    card: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 12,
+        marginBottom: 24,
+        padding: 16,
+        borderRadius: 12,
+        backgroundColor: SUCCESS_BLOCK_BG,
+        borderWidth: 1,
+        borderColor: SUCCESS_BLOCK_BORDER,
+    },
+    content: { flex: 1 },
+    title: {
+        fontSize: 16,
+        fontFamily: 'Ubuntu_Bold',
+        color: SUCCESS_TEXT,
+        marginBottom: 6,
+    },
+    message: {
+        fontSize: 14,
+        fontFamily: 'Ubuntu_Regular',
+        color: SUCCESS_TEXT,
+        lineHeight: 20,
     },
 });

@@ -189,3 +189,65 @@ export const getCountryList = async (): Promise<AxiosResponse<any>> => {
         },
     });
 }
+
+/**
+ * Recuperation de la liste des compagnies
+ * @param token - The user's token
+ * @returns AxiosResponse<any>
+ */
+export const getCompanyList = async (token: string): Promise<AxiosResponse<any>> => {
+    return await axios.get(`${baseUrl}/customers/companies`, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+}
+
+/**
+ * Recuperation de la liste des locations
+ * @param userId - The user's ID
+ * @param token - The user's token
+ * @returns AxiosResponse<any>
+ */
+export const getLocationList = async (token: string, queryParams: string): Promise<AxiosResponse<any>> => {
+    return await axios.get(`${baseUrl}/bus-rental-requests?${queryParams}`, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+}
+
+export const createBusRentalRequest = async (data: any, token: string): Promise<AxiosResponse<any>> => {
+    return await axios.post(`${baseUrl}/bus-rental-requests`, data, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+}
+
+/**
+ * PayDto pour l’API de paiement (demande de location ou autre).
+ * referenceId = id de la demande de location pour le paiement location bus.
+ */
+export interface PayDto {
+    referenceId: string;
+    method: string;
+    amount: number;
+    channel: string;
+    currency?: string;
+    provider?: string;
+    reference?: string;
+    rawPayload?: Record<string, unknown>;
+}
+
+/**
+ * Envoie un paiement pour une demande de location de bus (ou autre référence).
+ */
+export const payBusRentalRequest = async (data: PayDto, token: string): Promise<AxiosResponse<any>> => {
+    return await axios.post(`${baseUrl}/customers/bus-rental-requests/pay`, data, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+        },
+    });
+}

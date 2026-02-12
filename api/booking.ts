@@ -40,6 +40,52 @@ export const createBooking = async (bookingData: any, token?: string): Promise<A
 }
 
 /**
+ * Payload passager pour la réservation avec code rebooking (phone en objet)
+ */
+export interface RebookingPassengerPayload {
+    seatNumber: number;
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: { digits: string; countryCode: string; type: string; isPrimary: boolean };
+    age?: number;
+    passengerType: string;
+    isMainPassenger: boolean;
+    userId: string | null;
+    price: number;
+    leg: 'OUTBOUND' | 'RETURN';
+}
+
+/**
+ * Crée une réservation avec un code de rebooking (POST body: tokenCode, departureId, returnDepartureId?, passengers).
+ * @param payload - tokenCode, departureId, returnDepartureId (optionnel), passengers
+ * @param token - Token d'authentification
+ */
+export const createRebookingBooking = async (
+    payload: {
+        tokenCode: string;
+        departureId: string;
+        returnDepartureId?: string | null;
+        passengers: RebookingPassengerPayload[];
+    },
+    token?: string
+): Promise<AxiosResponse<any>> => {
+    const headers: any = { 'Content-Type': 'application/json' };
+    if (token && token.trim() !== '') {
+        headers.Authorization = `Bearer ${token}`;
+    }
+    const body: any = {
+        tokenCode: payload.tokenCode,
+        departureId: payload.departureId,
+        passengers: payload.passengers
+    };
+    if (payload.returnDepartureId) {
+        body.returnDepartureId = payload.returnDepartureId;
+    }
+    return await axios.post(`${baseUrl}/customers/bookings/rebook`, body, { headers });
+};
+
+/**
  * Crée un paiement pour une réservation
  * @param bookingData - Les données de paiement
  * @param token - Le token d'authentification (optionnel)

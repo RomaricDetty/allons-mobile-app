@@ -9,7 +9,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 interface SelectionBottomSheetProps {
     visible: boolean;
     title: string;
-    options: Array<{value: string, label: string}>;
+    options: Array<{value: string, label: string }>;
     currentValue: string;
     onSelect: (value: string) => void;
     onClose: () => void;

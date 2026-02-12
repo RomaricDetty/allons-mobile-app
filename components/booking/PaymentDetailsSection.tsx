@@ -1,7 +1,7 @@
+import { formatFullDateWithTime } from '@/constants/functions';
 import React, { memo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { formatFullDateWithTime } from '@/constants/functions';
 
 /**
  * Interface pour les données de paiement
@@ -33,6 +33,9 @@ interface PaymentDetailsSectionProps {
     primaryBlue: string;
     formatPriceWithCurrency: (amount: string | number) => string;
     formatPaymentMethod: (method: string) => string;
+    rebookingCode: string;
+    creditRemaining: number;
+    remainingTokenCode: string;
 }
 
 /**
@@ -48,6 +51,9 @@ export const PaymentDetailsSection = memo<PaymentDetailsSectionProps>(({
     primaryBlue,
     formatPriceWithCurrency,
     formatPaymentMethod,
+    rebookingCode,
+    creditRemaining,
+    remainingTokenCode,
 }) => {
     return (
         <View style={[styles.sectionCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
@@ -107,6 +113,30 @@ export const PaymentDetailsSection = memo<PaymentDetailsSectionProps>(({
                     {formatFullDateWithTime(payment.createdAt)}
                 </Text>
             </View>
+            {rebookingCode && (
+                <View style={styles.detailRow}>
+                    <Text style={[styles.detailLabel, { color: secondaryTextColor }]}>Code de rebooking</Text>
+                    <Text style={[styles.detailValue, { color: textColor, textAlign: 'right', width: '45%' }]}>
+                        {rebookingCode}
+                    </Text>
+                </View>
+            )}
+            {creditRemaining > 0 && (
+                <View style={styles.detailRow}>
+                    <Text style={[styles.detailLabel, { color: secondaryTextColor }]}>Crédit restant</Text>
+                    <Text style={[styles.detailValue, { color: textColor, textAlign: 'right', width: '45%' }]}>
+                        {creditRemaining}
+                    </Text>
+                </View>
+            )}
+            {remainingTokenCode && (
+                <View style={styles.detailRow}>
+                    <Text style={[styles.detailLabel, { color: secondaryTextColor }]}>Code de token restant</Text>
+                    <Text style={[styles.detailValue, { color: textColor, textAlign: 'right', width: '45%' }]}>
+                        {remainingTokenCode}
+                    </Text>
+                </View>
+            )}
         </View>
     );
 });

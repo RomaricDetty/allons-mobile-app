@@ -161,6 +161,8 @@ function RootContent() {
                     <Stack.Screen name="trip/cancel-reservation" options={{ headerShown: false }} />
                     <Stack.Screen name="trip/feedback-passenger" options={{ headerShown: false }} />
                     <Stack.Screen name="auth/forgot-password" options={{ headerShown: false }} />
+                    <Stack.Screen name="profile/bus-rental-request" options={{ headerShown: false }} />
+                    <Stack.Screen name="profile/bus-rental-payment" options={{ headerShown: false }} />
                 </Stack>
                 <StatusBar 
                     style={colorScheme === 'dark' ? 'light' : 'dark'} 

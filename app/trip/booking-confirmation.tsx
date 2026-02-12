@@ -67,6 +67,8 @@ const BookingConfirmation = () => {
         searchParams?: any;
     }) || {};
 
+    const rebookingCode = route.params?.rebookingCode || '';
+
     /**
      * Formate les données de réservation pour l'affichage
      */
@@ -219,6 +221,7 @@ const BookingConfirmation = () => {
      * Génère le QR Code en récupérant le hash depuis l'API
      */
     const generateQRCodeBase64 = useCallback(async () => {
+        console.log("generateQRCodeBase64 ==>, ", bookingData)
         if (!bookingData?.id) return;
         
         setIsLoadingQrCode(true);
@@ -482,6 +485,9 @@ const BookingConfirmation = () => {
                     primaryBlue={primaryBlue}
                     formatPriceWithCurrency={formatPriceWithCurrency}
                     formatPaymentMethod={formatPaymentMethod}
+                    rebookingCode={rebookingCode}
+                    creditRemaining={bookingData.creditRemaining}
+                    remainingTokenCode={bookingData.remainingTokenCode}
                 />
 
                 {/* Bouton de téléchargement */}

@@ -4,7 +4,7 @@ import { EmergencyContactBlock } from '@/components/passengers/EmergencyContactB
 import { ErrorModal } from '@/components/passengers/ErrorModal';
 import { PassengersInfoBlock } from '@/components/passengers/PassengersInfoBlock';
 import { PaymentMethodBlock } from '@/components/passengers/PaymentMethodBlock';
-import { RebookingCodeBlock } from '@/components/passengers/RebookingCodeBlock';
+import { NoPaymentRequiredBlock, RebookingCodeBlock } from '@/components/passengers/RebookingCodeBlock';
 import { SelectionBottomSheet } from '@/components/passengers/SelectionBottomSheet';
 import { SummaryBlock } from '@/components/passengers/SummaryBlock';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -149,7 +149,7 @@ const PassengersInfo = () => {
      * Gère la confirmation et le paiement
      */
     const handleConfirmAndPay = useCallback(async () => {
-        const errors = validateForm(selectedPaymentMethod, cardName, cardNumber, expirationDate, cardCvv, paymentNumber);
+        const errors = validateForm(selectedPaymentMethod, cardName, cardNumber, expirationDate, cardCvv, paymentNumber, pricing.totalAmount);
 
         if (errors) {
             setValidationErrors(errors);
@@ -305,25 +305,30 @@ const PassengersInfo = () => {
                         onVerifyCode={verifyRebookingCode}
                         isVerifying={isVerifying}
                         isCodeValid={isCodeValid}
+                        rebookingTokenData={rebookingTokenData}
                     />
 
-                    <PaymentMethodBlock
-                        selectedPaymentMethod={selectedPaymentMethod}
-                        onSelectPaymentMethod={setSelectedPaymentMethod}
-                        cardName={cardName}
-                        onCardNameChange={setCardName}
-                        cardNumber={cardNumber}
-                        onCardNumberChange={setCardNumber}
-                        expirationDate={expirationDate}
-                        onExpirationDateChange={setExpirationDate}
-                        cardCvv={cardCvv}
-                        onCardCvvChange={setCardCvv}
-                        paymentNumber={paymentNumber}
-                        onPaymentNumberChange={setPaymentNumber}
-                        countryCode={paymentCountryCode}
-                        onCountryCodeChange={setPaymentCountryCode}
-                        onOpenBottomSheet={openSelectionBottomSheet}
-                    />
+                    {isCodeValid && pricing.totalAmount === 0 && <NoPaymentRequiredBlock />}
+
+                    {(!isCodeValid || pricing.totalAmount > 0) && (
+                        <PaymentMethodBlock
+                            selectedPaymentMethod={selectedPaymentMethod}
+                            onSelectPaymentMethod={setSelectedPaymentMethod}
+                            cardName={cardName}
+                            onCardNameChange={setCardName}
+                            cardNumber={cardNumber}
+                            onCardNumberChange={setCardNumber}
+                            expirationDate={expirationDate}
+                            onExpirationDateChange={setExpirationDate}
+                            cardCvv={cardCvv}
+                            onCardCvvChange={setCardCvv}
+                            paymentNumber={paymentNumber}
+                            onPaymentNumberChange={setPaymentNumber}
+                            countryCode={paymentCountryCode}
+                            onCountryCodeChange={setPaymentCountryCode}
+                            onOpenBottomSheet={openSelectionBottomSheet}
+                        />
+                    )}
                 </View>
 
                 <SummaryBlock

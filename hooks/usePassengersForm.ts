@@ -78,10 +78,20 @@ export const usePassengersForm = (numberOfPersons: number, isRoundTrip: boolean,
     }, []);
 
     /**
-     * Valide le formulaire complet
+     * Valide le formulaire complet.
+     * Si totalAmount === 0 (crédit rebooking couvre tout), la validation paiement est ignorée.
      */
-    const validateForm = useCallback((selectedPaymentMethod: string | null, cardName: string, cardNumber: string, expirationDate: string, cardCvv: string, paymentNumber: string) => {
+    const validateForm = useCallback((
+        selectedPaymentMethod: string | null,
+        cardName: string,
+        cardNumber: string,
+        expirationDate: string,
+        cardCvv: string,
+        paymentNumber: string,
+        totalAmount?: number
+    ) => {
         const errors: string[] = [];
+        const noPaymentRequired = totalAmount !== undefined && totalAmount === 0;
 
         passengers.forEach((passenger, index) => {
             const passengerNumber = passengers.length > 1 ? ` ${index + 1}` : '';
@@ -108,11 +118,13 @@ export const usePassengersForm = (numberOfPersons: number, isRoundTrip: boolean,
             }
         });
 
-        if (!selectedPaymentMethod) {
-            errors.push('Méthode de paiement requise');
+        if (!noPaymentRequired) {
+            if (!selectedPaymentMethod) {
+                errors.push('Méthode de paiement requise');
+            }
         }
 
-        if (selectedPaymentMethod === 'credit-card') {
+        if (!noPaymentRequired && selectedPaymentMethod === 'credit-card') {
             if (!cardName?.trim()) errors.push('Nom sur la carte requis');
 
             const cleanedCardNumber = cardNumber.replace(/\s/g, '');
@@ -127,7 +139,7 @@ export const usePassengersForm = (numberOfPersons: number, isRoundTrip: boolean,
             if (cardCvv.length !== 3 || !/^\d+$/.test(cardCvv)) {
                 errors.push('CVV invalide (3 chiffres)');
             }
-        } else if (selectedPaymentMethod && selectedPaymentMethod !== 'credit-card') {
+        } else if (!noPaymentRequired && selectedPaymentMethod && selectedPaymentMethod !== 'credit-card') {
             if (!paymentNumber?.trim() || !isValidPhone(paymentNumber)) {
                 errors.push('Numéro de paiement invalide');
             }

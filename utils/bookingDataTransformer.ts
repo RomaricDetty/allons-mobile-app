@@ -106,10 +106,15 @@ export const transformBookingData = (rawData: RawBookingData) => {
         return null;
     }
 
-    const booking = bookingResponse.data;
+    console.log("bookingResponse.data.newBooking ==>, ", bookingResponse.data.newBooking)
+
+    const booking = bookingResponse.data ;
+    console.log("booking vaut maintenant ==>, ", booking)
     const payment = paymentResponse.data;
-    const bookingId = booking.bookingId || booking.id;
-    const bookingCode = booking.code || booking.bookingCode || `BK-${bookingId?.slice(-8)}`;
+    const bookingId = bookingResponse.data?.newBooking ? bookingResponse.data?.newBooking?.id : booking.bookingId || booking.id;
+    const bookingCode = bookingResponse.data?.newBooking ? bookingResponse.data?.newBooking?.code : booking.code || booking.bookingCode ;
+    const creditRemaining = bookingResponse.data?.creditRemaining || 0;
+    const remainingTokenCode = bookingResponse.data?.remainingTokenCode || '';
     
     // Extraire les informations du trajet
     const departureInfo = booking.departure || trip;
@@ -200,7 +205,9 @@ export const transformBookingData = (rawData: RawBookingData) => {
             numberOfPassengers: numberOfPassengers
         },
         passengers: processedPassengers,
-        contact: booking.contact || {}
+        contact: booking.contact || {},
+        creditRemaining: creditRemaining,
+        remainingTokenCode: remainingTokenCode
     };
 };
 

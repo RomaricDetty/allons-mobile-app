@@ -1,5 +1,5 @@
 import React, { memo } from 'react';
-import { View, Text, Pressable, ActivityIndicator, StyleSheet } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 interface FixedButtonProps {
     onPress: () => void;
@@ -19,10 +19,12 @@ export const FixedButton = memo<FixedButtonProps>(({
     borderColor,
     paddingBottom
 }) => (
-    <View style={[
-        styles.container,
-        { paddingBottom: paddingBottom + 8, backgroundColor, borderTopColor: borderColor }
-    ]}>
+    <View style={
+        [
+            styles.container,
+            { paddingBottom: paddingBottom + 8, backgroundColor, borderTopColor: borderColor }
+        ]
+    }>
         <Pressable
             style={[styles.button, styles.buttonWidth]}
             onPress={onPress}
