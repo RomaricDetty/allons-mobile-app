@@ -57,7 +57,9 @@ export interface BusRentalRequestItem {
 
 interface BusRentalRequestCardProps {
     item: BusRentalRequestItem;
-    /** Appelé quand l’utilisateur tape sur une demande au statut ACCEPTED (pour aller au paiement) */
+    /** Appelé au tap sur la carte pour afficher les détails (tous statuts) */
+    onViewDetails?: (item: BusRentalRequestItem) => void;
+    /** Appelé quand l’utilisateur tape sur « Payer » (statut ACCEPTED uniquement) */
     onPayRequest?: (item: BusRentalRequestItem) => void;
 }
 
@@ -65,7 +67,7 @@ interface BusRentalRequestCardProps {
  * Carte d'affichage d'une demande de location de bus.
  * Design type carte trajet : DÉPART | timeline | ARRIVÉE, badge places, type bus, statut.
  */
-export const BusRentalRequestCard: React.FC<BusRentalRequestCardProps> = ({ item, onPayRequest }) => {
+export const BusRentalRequestCard: React.FC<BusRentalRequestCardProps> = ({ item, onViewDetails, onPayRequest }) => {
     const colors = useAppColors();
     const departureDateFormatted = item.departureDate ? formatBookingDate(item.departureDate) : '';
     const returnDateFormatted = item.returnDate ? formatBookingDate(item.returnDate) : '';
@@ -130,19 +132,19 @@ export const BusRentalRequestCard: React.FC<BusRentalRequestCardProps> = ({ item
             </View>
 
             {isPayable ? (
-                <View style={styles.payRow}>
+                <Pressable style={styles.payRow} onPress={() => onPayRequest?.(item)}>
                     <Text style={[styles.payLabel, { color: colors.activeTabColor }]}>Payer</Text>
                     <MaterialCommunityIcons name="chevron-right" size={20} color={colors.activeTabColor} />
-                </View>
+                </Pressable>
             ) : null}
         </>
     );
 
     const cardStyle = [styles.card, { backgroundColor: colors.cardBackground, borderWidth: 1, borderColor: colors.border }];
 
-    if (isPayable) {
+    if (onViewDetails) {
         return (
-            <Pressable style={cardStyle} onPress={() => onPayRequest?.(item)}>
+            <Pressable style={cardStyle} onPress={() => onViewDetails(item)}>
                 {cardContent}
             </Pressable>
         );

@@ -15,6 +15,7 @@ import {
     BookingCard,
     BookingFilters,
     BusRentalRequestCard,
+    BusRentalRequestDetailModal,
     LogoutModal,
     PersonalInfoCard,
     ProfileHeader,
@@ -40,6 +41,7 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
     const [showLogoutModal, setShowLogoutModal] = useState(false);
     const [locationList, setLocationList] = useState<any[]>([]);
     const [locationsRefreshing, setLocationsRefreshing] = useState(false);
+    const [selectedBusRequest, setSelectedBusRequest] = useState<any | null>(null);
 
     const scrollViewRef = useRef<ScrollView>(null);
     const screenWidth = Dimensions.get('window').width;
@@ -254,7 +256,11 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                         <BusRentalRequestCard
                             key={item.id}
                             item={item}
-                            onPayRequest={(req) => router.push({ pathname: '/profile/bus-rental-payment', params: { item: JSON.stringify(req) } })}
+                            onViewDetails={setSelectedBusRequest}
+                            onPayRequest={(req) => {
+                                setSelectedBusRequest(null);
+                                router.push({ pathname: '/profile/bus-rental-payment', params: { item: JSON.stringify(req) } });
+                            }}
                         />
                     ))}
                 </ScrollView>
@@ -359,6 +365,16 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                 visible={showLogoutModal}
                 onClose={() => setShowLogoutModal(false)}
                 onConfirm={confirmLogout}
+            />
+
+            <BusRentalRequestDetailModal
+                visible={!!selectedBusRequest}
+                item={selectedBusRequest}
+                onClose={() => setSelectedBusRequest(null)}
+                onPayRequest={(req) => {
+                    setSelectedBusRequest(null);
+                    router.push({ pathname: '/profile/bus-rental-payment', params: { item: JSON.stringify(req) } });
+                }}
             />
         </View>
     );
