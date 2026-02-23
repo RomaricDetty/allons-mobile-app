@@ -69,7 +69,7 @@ export const formatFullDateWithTime = (dateString: string): string => {
      */
 export const formatBookingDate = (dateString: string): string => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+    return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 };
 
 /**

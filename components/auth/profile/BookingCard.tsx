@@ -1,12 +1,10 @@
 // @ts-nocheck
-import { getBookingDetails } from '@/api/booking';
 import { formatBookingDate, formatStatus, getStatusColor } from '@/constants/functions';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { Booking } from '@/interfaces';
-import { getAuthToken } from '@/utils/storage';
 import { useNavigation } from '@react-navigation/native';
-import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 interface BookingCardProps {
@@ -19,34 +17,10 @@ interface BookingCardProps {
 export const BookingCard: React.FC<BookingCardProps> = ({ booking }) => {
     const colors = useAppColors();
     const navigation = useNavigation();
-    const [isLoading, setIsLoading] = useState(false);
 
-    /**
-     * Affiche les détails d'une réservation
-     */
-    const handleViewBooking = useCallback(async () => {
-        try {
-            setIsLoading(true);
-            const token = await getAuthToken();
-
-            if (!token || token.trim() === '') {
-                Alert.alert('Erreur', 'Token d\'authentification manquant. Veuillez vous reconnecter.');
-                return;
-            }
-
-            const response = await getBookingDetails(booking.id, token);
-            console.log('response getBookingDetails:  ', response);
-            if (response.status === 200) {
-                navigation.navigate('trip/ticket-details' as never, { ticketDetails: response.data } as never);
-            } else {
-                Alert.alert('Erreur', 'Une erreur est survenue lors de la récupération des détails de la réservation');
-            }
-        } catch (error) {
-            console.error('Erreur lors de la récupération des détails:', error);
-            Alert.alert('Erreur', 'Une erreur est survenue lors de la récupération des détails de la réservation');
-        } finally {
-            setIsLoading(false);
-        }
+    /** Ouvre l’écran détails du ticket (l’API est appelée sur l’écran ticket-details) */
+    const handleViewBooking = useCallback(() => {
+        navigation.navigate('trip/ticket-details' as never, { bookingId: booking.id } as never);
     }, [booking.id, navigation]);
 
     /** Indique si la date de départ est déjà passée (bouton Itinéraire masqué) */
@@ -97,25 +71,11 @@ export const BookingCard: React.FC<BookingCardProps> = ({ booking }) => {
             {/* Boutons d'action */}
             <View style={styles.actionButtons}>
                 <Pressable
-                    style={[
-                        styles.actionButton,
-                        {
-                            backgroundColor: colors.activeTabColor,
-                            borderColor: colors.activeTabColor,
-                            opacity: isLoading ? 0.7 : 1
-                        }
-                    ]}
+                    style={[styles.actionButton, { backgroundColor: colors.activeTabColor, borderColor: colors.activeTabColor }]}
                     onPress={handleViewBooking}
-                    disabled={isLoading}
                 >
-                    {isLoading ? (
-                        <ActivityIndicator size="small" color="#ffffff" />
-                    ) : (
-                        <>
-                            <MaterialCommunityIcons name="eye-outline" size={20} color="#ffffff" />
-                            <Text style={styles.actionButtonText}>Ticket</Text>
-                        </>
-                    )}
+                    <MaterialCommunityIcons name="eye-outline" size={20} color="#ffffff" />
+                    <Text style={styles.actionButtonText}>Ticket</Text>
                 </Pressable>
                 {showItineraryButton && (
                     <Pressable

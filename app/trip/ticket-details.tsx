@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { getBookingDetails } from '@/api/booking';
 import { DetailRow } from '@/components/ticket/DetailRow';
 import { PassengerCard } from '@/components/ticket/PassengerCard';
 import { QrCodeSection } from '@/components/ticket/QrCodeSection';
@@ -8,13 +9,14 @@ import { formatPaymentMethod } from '@/constants/paymentMethods';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { useTicketQrCode } from '@/hooks/useTicketQrCode';
+import { getAuthToken } from '@/utils/storage';
 import { formatDateForFileName, generateTicketHTML } from '@/utils/ticketPdfGenerator';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as FileSystemLegacy from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -90,30 +92,57 @@ const TicketDetails = () => {
     const insets = useSafeAreaInsets();
     const colorScheme = useColorScheme() ?? 'light';
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+    const [ticketFetched, setTicketFetched] = useState<TicketDetails | null | undefined>(undefined);
+    const [loadingTicket, setLoadingTicket] = useState(false);
+    const [fetchError, setFetchError] = useState<string | null>(null);
 
-    // Récupération des données du ticket
+    const bookingId = route.params?.bookingId as string | undefined;
     const ticketParam = route.params?.ticketDetails;
-    const ticket = useMemo(() => {
-        if (!ticketParam) return undefined;
 
+    /** Ticket issu des params (legacy) */
+    const ticketFromParams = useMemo(() => {
+        if (!ticketParam) return undefined;
         try {
-            // Si c'est une string, parser le JSON
-            if (typeof ticketParam === 'string') {
-                return JSON.parse(ticketParam) as TicketDetails;
-            }
-            // Si c'est déjà un objet, le retourner directement
+            if (typeof ticketParam === 'string') return JSON.parse(ticketParam) as TicketDetails;
             return ticketParam as TicketDetails;
         } catch (error) {
-            console.error('Erreur lors du parsing du ticket:', error);
-            console.error('Valeur reçue:', ticketParam);
+            console.error('Erreur parsing ticketDetails:', error);
             return undefined;
         }
     }, [ticketParam]);
 
-    const refreshed = route.params?.refreshed;
+    /** Chargement des détails par API quand on reçoit un bookingId */
+    const fetchTicket = useCallback(async () => {
+        if (!bookingId) return;
+        setLoadingTicket(true);
+        setFetchError(null);
+        try {
+            const token = await getAuthToken();
+            if (!token?.trim()) {
+                setFetchError('Session expirée. Reconnectez-vous.');
+                return;
+            }
+            const response = await getBookingDetails(bookingId, token);
+            if (response.status === 200) {
+                setTicketFetched(response.data as TicketDetails);
+            } else {
+                setFetchError('Impossible de charger les détails du ticket.');
+            }
+        } catch (error) {
+            console.error('Erreur chargement ticket:', error);
+            setFetchError('Une erreur est survenue.');
+        } finally {
+            setLoadingTicket(false);
+        }
+    }, [bookingId]);
 
-    console.log('ticket details informations:  ', ticket);
-    console.log('refreshed:', refreshed);
+    useEffect(() => {
+        if (bookingId) fetchTicket();
+    }, [bookingId, fetchTicket]);
+
+    /** Ticket affiché : priorité aux données fetchées, sinon params */
+    const ticket = ticketFetched !== undefined ? ticketFetched : ticketFromParams;
+    const refreshed = route.params?.refreshed;
 
     // Hook personnalisé pour le QR code
     const { qrCode, isLoadingQrCode, error: qrCodeError, retry: retryQrCode } = useTicketQrCode(ticket?.id);
@@ -145,7 +174,7 @@ const TicketDetails = () => {
         return {
             statusColor: getStatusColor(ticket.status),
             formattedStatus: formatStatus(ticket.status),
-            routeText: `${ticket.trip.stationFrom.city} → ${ticket.trip.stationTo.city}`,
+            routeText: `${(ticket.trip.stationFrom as any)?.city ?? (ticket.trip.stationFrom as any)?.cityName ?? '—'} → ${(ticket.trip.stationTo as any)?.city ?? (ticket.trip.stationTo as any)?.cityName ?? '—'}`,
             passengerCountText: ticket.passengers.length > 1 ? 'Passagers' : 'Passager',
             formattedPaymentMethod: formatPaymentMethod(ticket.paymentProvider),
         };
@@ -192,6 +221,8 @@ const TicketDetails = () => {
         return hoursUntilDeparture >= 24;
     }, [ticket]);
 
+    const canGiveFeedback = useMemo(() => ticket?.status?.toUpperCase() === 'USED', [ticket]);
+
     /**
      * Formate le prix avec la devise
      */
@@ -208,6 +239,26 @@ const TicketDetails = () => {
         if (!ticket) return;
         navigation.navigate('trip/ticket-qr' as never, { ticketCode: ticket.code, ticketId: ticket.id } as never);
     };
+
+    if (loadingTicket) {
+        return (
+            <View style={[styles.container, { backgroundColor: themeColors.scrollBackgroundColor, justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color={themeColors.primaryBlue} />
+                <Text style={[styles.loadingTicketText, { color: textColor }]}>Chargement des détails...</Text>
+            </View>
+        );
+    }
+
+    if (fetchError) {
+        return (
+            <View style={[styles.container, { backgroundColor: themeColors.scrollBackgroundColor, justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
+                <Text style={{ color: textColor, fontSize: 16, fontFamily: 'Ubuntu_Bold', textAlign: 'center' }}>{fetchError}</Text>
+                <Pressable style={[styles.retryButton, { marginTop: 16 }]} onPress={fetchTicket}>
+                    <Text style={styles.retryButtonText}>Réessayer</Text>
+                </Pressable>
+            </View>
+        );
+    }
 
     if (!ticket || !ticketDerivedValues) {
         return (
@@ -334,12 +385,9 @@ const TicketDetails = () => {
     };
 
     const handleGiveFeedback = () => {
+        if (!ticket) return;
         navigation.navigate('trip/feedback-passenger' as never, { bookingId: ticket.id, departureId: ticket.departureId } as never);
     };
-
-    const canGiveFeedback = useMemo(() => {
-        return ticket.status?.toUpperCase() === 'USED';
-    }, [ticket]);
 
     return (
         <View style={[styles.container, { backgroundColor: themeColors.scrollBackgroundColor }]}>
@@ -606,6 +654,22 @@ const TicketDetails = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+    },
+    loadingTicketText: {
+        fontSize: 14,
+        fontFamily: 'Ubuntu_Regular',
+        marginTop: 12,
+    },
+    retryButton: {
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        borderRadius: 8,
+        backgroundColor: '#1776BA',
+    },
+    retryButtonText: {
+        fontSize: 14,
+        fontFamily: 'Ubuntu_Bold',
+        color: '#FFFFFF',
     },
     header: {
         flexDirection: 'row',

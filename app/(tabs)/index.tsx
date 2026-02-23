@@ -1,11 +1,13 @@
 // @ts-nocheck
 import { authGetUserInfo } from '@/api/auth_register';
-import { getPopularTrips } from '@/api/trip';
+import { getNextTrip, getPopularTrips } from '@/api/trip';
+import { BottomSheet } from '@/components/bottom-sheet';
 import { DepartureCard } from '@/components/departure-card';
 import { ItineraryCard } from '@/components/itinerary-card';
+import { formatBookingDate } from '@/constants/functions';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
-import { User } from '@/interfaces';
+import { Booking, User } from '@/interfaces';
 import { PopularTrip } from '@/types';
 import { getAuthToken, getUserId } from '@/utils/storage';
 import { useNavigation } from '@react-navigation/native';
@@ -20,7 +22,7 @@ import {
     StyleSheet,
     Text,
     useWindowDimensions,
-    View,
+    View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -178,39 +180,40 @@ const SectionHeader = memo(
 SectionHeader.displayName = 'SectionHeader';
 
 /**
- * Carte de prochain voyage mémorisée
+ * Extrait le nom de ville (API peut retourner city ou cityName)
  */
-const NextTripCard = memo(() => (
-    <View style={[styles.nextTripCard, { backgroundColor: PRIMARY_COLOR }]}>
-        {/* Section gauche - Départ */}
-        <View style={styles.tripSection}>
-            <View style={styles.tripHeader}>
-                <MaterialCommunityIcons name="bus" size={16} color="#FFFFFF" />
-                <Text style={styles.tripTime}>18:20</Text>
-            </View>
-            <Text style={styles.tripAirportCode}>BOU</Text>
-            <Text style={styles.tripCity}>Bouaké</Text>
-        </View>
+function getCityName(station: { city?: string; cityName?: string } | undefined): string {
+    return (station as any)?.city ?? (station as any)?.cityName ?? '—';
+}
 
-        {/* Section centrale - Durée */}
-        <View style={styles.tripCenter}>
-            <View style={styles.tripArcContainer}>
-                <View style={styles.tripArc} />
+/**
+ * Carte de prochain voyage, même design que DepartureCard
+ */
+const NextTripCard = memo(({ booking, cardWidth, onPress, loading = false }: { booking: Booking; cardWidth: number; onPress?: () => void; loading?: boolean }) => {
+    const fromCity = getCityName(booking?.trip?.stationFrom);
+    const toCity = getCityName(booking?.trip?.stationTo);
+    const route = `${fromCity} → ${toCity}`;
+    const price = `${parseFloat(booking.totalAmount).toLocaleString('fr-FR')} ${booking.currency}`;
+    return (
+        loading ? (
+            <View style={[styles.nextTripCardContainer, { width: cardWidth, backgroundColor: 'transparent' }]}>
+                <ActivityIndicator size="small" color={'#fff'} />
             </View>
-            <Text style={styles.tripDuration}>7h20min</Text>
-        </View>
-
-        {/* Section droite - Arrivée */}
-        <View style={[styles.tripSection, styles.tripSectionRight]}>
-            <View style={styles.tripHeader}>
-                <MaterialCommunityIcons name="bus-stop" size={16} color="#FFFFFF" />
-                <Text style={styles.tripTime}>01:00</Text>
-            </View>
-            <Text style={styles.tripAirportCode}>ABJ</Text>
-            <Text style={styles.tripCity}>Abidjan</Text>
-        </View>
-    </View>
-));
+        ) : (
+            <Pressable style={[styles.nextTripCardContainer, { width: cardWidth }]} onPress={onPress}>
+                <View style={styles.nextTripImageContainer}>
+                    <MaterialCommunityIcons name="bus" size={60} color="#1776BA" />
+                </View>
+                <View style={styles.nextTripContentContainer}>
+                    <Text style={styles.nextTripPriceText}>{price}</Text>
+                    <Text style={styles.nextTripRouteText} numberOfLines={2}>
+                        {route}
+                    </Text>
+                </View>
+            </Pressable>
+        )
+    );
+});
 
 NextTripCard.displayName = 'NextTripCard';
 
@@ -237,12 +240,13 @@ export default function HomeScreen() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [popularTrips, setPopularTrips] = useState<PopularTrip[]>([]);
+    const [nextTrip, setNextTrip] = useState<Booking | null>(null);
+    const [nextTripsSheetVisible, setNextTripsSheetVisible] = useState(false);
     const [user, setUser] = useState<User | null>(null);
     const colorScheme = useColorScheme() ?? 'light';
     const insets = useSafeAreaInsets();
     const navigation = useNavigation();
 
-    // ⚠️ IMPORTANT: Appeler tous les hooks AVANT tout useMemo/useCallback
     // pour respecter les Rules of Hooks
     const backgroundColor = useThemeColor({}, 'background');
     const textColor = useThemeColor({}, 'text');
@@ -289,12 +293,35 @@ export default function HomeScreen() {
     }, []);
 
     /**
+     * Récupère le prochain voyage
+     */
+    const fetchNextTripInfo = useCallback(async () => {
+        try {
+            const token = await getAuthToken();
+            if (!token || token.trim() === '') {
+                return false;
+            }
+            const response = await getNextTrip(token);
+            const raw = response.data;
+            const list = Array.isArray(raw) ? raw : (raw?.data ?? []);
+            const first = list ?? null;
+            console.log('first ==> ', first);
+            setNextTrip(first);
+            return true;
+        } catch (error) {
+            console.error('Erreur récupération prochain voyage:', error);
+            return false;
+        }
+    }, []);
+    /**
      * Récupère les trajets populaires
      */
     const fetchPopularTrips = useCallback(async () => {
         try {
             const response = await getPopularTrips();
-            setPopularTrips(response.data || []);
+            const raw = response.data;
+            const list = Array.isArray(raw) ? raw : (raw?.data ?? []);
+            setPopularTrips(list);
         } catch (error) {
             console.error('Erreur récupération trajets populaires:', error);
             setPopularTrips([]);
@@ -307,13 +334,13 @@ export default function HomeScreen() {
     const loadInitialData = useCallback(async () => {
         setLoading(true);
         try {
-            await Promise.all([fetchUserInfo(), fetchPopularTrips()]);
+            await Promise.all([fetchUserInfo(), fetchPopularTrips(), fetchNextTripInfo()]);
         } catch (error) {
             console.error('Erreur chargement données:', error);
         } finally {
             setLoading(false);
         }
-    }, [fetchUserInfo, fetchPopularTrips]);
+    }, [fetchUserInfo, fetchPopularTrips, fetchNextTripInfo]);
 
     /**
      * Rafraîchit les données
@@ -321,7 +348,7 @@ export default function HomeScreen() {
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
         try {
-            await Promise.all([fetchUserInfo(), fetchPopularTrips()]);
+            await Promise.all([fetchUserInfo(), fetchPopularTrips(), fetchNextTripInfo()]);
         } catch (error) {
             console.error('Erreur rafraîchissement:', error);
         } finally {
@@ -362,12 +389,25 @@ export default function HomeScreen() {
     /**
      * Clic sur une promotion
      */
+    /** Clic sur une carte "top itinéraire" : navigation vers la recherche avec le trajet pré-rempli */
     const handlePromoCardPress = useCallback(
-        (id: number) => {
+        (item: PopularTrip) => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            console.log('Promo card pressed:', id);
+            navigation.navigate('trip/search', { popularTrip: item });
         },
-        []
+        [navigation]
+    );
+
+    /**
+     * Clic sur la carte prochain voyage : ouvre les détails du ticket
+     */
+    /** Clic sur la carte prochain voyage : navigation vers ticket-details (l’API est appelée sur l’écran) */
+    const handleNextTripPress = useCallback(
+        (booking: Booking) => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            navigation.navigate('trip/ticket-details' as never, { bookingId: booking.id } as never);
+        },
+        [navigation]
     );
 
     /**
@@ -376,6 +416,12 @@ export default function HomeScreen() {
     const handleSeeMorePress = useCallback(() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         console.log('See more pressed');
+    }, []);
+
+    /** Ouvre le bottom sheet "Voyage de la semaine" avec la liste des nextTrips */
+    const handleSeeMoreNextTripsPress = useCallback(() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        setNextTripsSheetVisible(true);
     }, []);
 
     /**
@@ -395,6 +441,22 @@ export default function HomeScreen() {
     );
 
     /**
+     * Render item pour le prochain voyage
+     */
+    const nextTripCardWidth = (width - 100) / 2.2;
+
+    const renderNextTrip = useCallback(
+        ({ item }: { item: Booking }) => (
+            <NextTripCard
+                booking={item}
+                cardWidth={nextTripCardWidth}
+                onPress={() => handleNextTripPress(item)}
+            />
+        ),
+        [width, handleNextTripPress]
+    );
+
+    /**
      * Key extractor pour FlatList
      */
     const keyExtractor = useCallback((item: PopularTrip) => String(item.id), []);
@@ -403,6 +465,35 @@ export default function HomeScreen() {
      * Séparateur entre items
      */
     const ItemSeparator = useCallback(() => <View style={styles.itemSeparator} />, []);
+
+    /** Liste des prochains voyages pour le bottom sheet (tableau) */
+    const nextTripsList = useMemo(
+        () => (Array.isArray(nextTrip) ? nextTrip : nextTrip ? [nextTrip] : []),
+        [nextTrip]
+    );
+
+    /** Ligne cliquable dans le bottom sheet "Voyage de la semaine" */
+    const renderNextTripSheetItem = useCallback(
+        (booking: Booking, onSelect: () => void) => (
+            <Pressable
+                style={[styles.nextTripSheetRow, { borderBottomColor: themeColors.searchBg }]}
+                onPress={() => {
+                    handleNextTripPress(booking);
+                    onSelect();
+                }}>
+                <View style={styles.nextTripSheetRowContent}>
+                    <Text style={[styles.nextTripSheetRoute, { color: themeColors.text }]} numberOfLines={1}>
+                        {`${getCityName(booking?.trip?.stationFrom)} → ${getCityName(booking?.trip?.stationTo)}`}
+                    </Text>
+                    <Text style={[styles.nextTripSheetMeta, { color: themeColors.searchText }]}>
+                        {formatBookingDate(booking.departureDateTime)} · {booking.companyName}
+                    </Text>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={24} color={themeColors.searchText} />
+            </Pressable>
+        ),
+        [themeColors, handleNextTripPress]
+    );
 
     /**
      * =================================================================
@@ -415,6 +506,7 @@ export default function HomeScreen() {
     }
 
     return (
+        <>
         <ScrollView
             style={[styles.scrollView, { backgroundColor: themeColors.background, paddingTop: insets.top }]}
             contentContainerStyle={styles.scrollContent}
@@ -438,7 +530,7 @@ export default function HomeScreen() {
             />
 
             {/* Trajets populaires */}
-            {popularTrips.length > 0 && (
+            {/* {popularTrips.length > 0 && (
                 <View style={styles.itinerarySection}>
                     <View style={styles.carouselWrapper}>
                         <SectionHeader title="Nos top itinéraires" onSeeMore={handleSeeMorePress} showSeeMore={true} />
@@ -454,28 +546,61 @@ export default function HomeScreen() {
                         />
                     </View>
                 </View>
-            )}
+            )} */}
 
-            {/* Promotions */}
-            {PROMOTIONS.length > 0 && (
+            {/* Top itinéraires */}
+            {popularTrips.length > 0 && (
                 <View style={styles.itinerarySection}>
-                    <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Nos itinéraires en promotion</Text>
+                    <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Nos top itinéraires</Text>
                     <View style={styles.cardsContainer}>
-                        {PROMOTIONS.map((item) => (
+                        {popularTrips.map((item) => (
                             <ItineraryCard key={item.id} item={item} width={width} height={height} onPress={handlePromoCardPress} />
                         ))}
                     </View>
                 </View>
             )}
 
-            {/* Prochain voyage */}
+            {/* Voyage de la semaine */}
             {user && (
                 <View style={styles.nextTripContainer}>
-                    <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Prochain voyage</Text>
-                    <NextTripCard />
+                    {/* <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Voyage de la semaine</Text> */}
+                    {/* <NextTripCard /> */}
+                    {nextTrip && nextTrip.length > 0 && (
+                        <View style={styles.itinerarySection}>
+                            <View style={styles.carouselWrapper}>
+                                <SectionHeader
+                                    title="Voyage de la semaine"
+                                    onSeeMore={handleSeeMoreNextTripsPress}
+                                    showSeeMore={true}
+                                />
+                                {/* nextTrip && nextTrip.length > 3 ? true : false */}
+                                <FlatList
+                                    horizontal
+                                    showsHorizontalScrollIndicator={false}
+                                    data={nextTrip}
+                                    keyExtractor={keyExtractor}
+                                    renderItem={renderNextTrip}
+                                    ItemSeparatorComponent={ItemSeparator}
+                                    contentContainerStyle={styles.carouselContent}
+                                    {...FLATLIST_CONFIG}
+                                />
+                            </View>
+                        </View>
+                    )}
                 </View>
             )}
         </ScrollView>
+
+            <BottomSheet<Booking>
+                visible={nextTripsSheetVisible}
+                onClose={() => setNextTripsSheetVisible(false)}
+                title="Voyage de la semaine"
+                data={nextTripsList}
+                keyExtractor={(item) => item.id}
+                renderItem={renderNextTripSheetItem}
+                emptyText="Aucun voyage à venir"
+            />
+        </>
     );
 }
 
@@ -611,79 +736,55 @@ const styles = StyleSheet.create({
     },
     nextTripContainer: {
         width: '100%',
-        paddingHorizontal: 20,
         paddingBottom: 30,
     },
-    nextTripCard: {
-        borderRadius: 20,
-        padding: 24,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
+    nextTripCardContainer: {
+        borderRadius: 15,
+        backgroundColor: '#FFFFFF',
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#bfcfe8',
+    },
+    nextTripImageContainer: {
+        width: '100%',
+        height: 80,
+        justifyContent: 'center',
         alignItems: 'center',
+        backgroundColor: '#dfe7f4',
     },
-    tripSection: {
-        flex: 1,
-        alignItems: 'flex-start',
+    nextTripContentContainer: {
+        padding: 10,
+        backgroundColor: '#FFFFFF',
     },
-    tripSectionRight: {
-        alignItems: 'flex-end',
-    },
-    tripHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        marginBottom: 8,
-    },
-    tripTime: {
+    nextTripPriceText: {
         fontSize: 14,
-        fontFamily: 'Ubuntu_Regular',
-        color: '#FFFFFF',
-    },
-    tripAirportCode: {
-        fontSize: 32,
         fontFamily: 'Ubuntu_Bold',
-        color: '#FFFFFF',
+        color: '#11181C',
+        marginBottom: 6,
+    },
+    nextTripRouteText: {
+        fontSize: 12,
+        fontFamily: 'Ubuntu_Regular',
+        color: '#11181C',
+        lineHeight: 18,
+    },
+    nextTripSheetRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 14,
+        paddingHorizontal: 4,
+        borderBottomWidth: 1,
+    },
+    nextTripSheetRowContent: {
+        flex: 1,
+    },
+    nextTripSheetRoute: {
+        fontSize: 16,
+        fontFamily: 'Ubuntu_Bold',
         marginBottom: 4,
     },
-    tripCity: {
-        fontSize: 14,
-        fontFamily: 'Ubuntu_Regular',
-        color: '#FFFFFF',
-        opacity: 0.8,
-    },
-    tripCenter: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginHorizontal: 16,
-        position: 'relative',
-        minWidth: 90,
-        height: 55,
-    },
-    tripArcContainer: {
-        width: 120,
-        height: 90,
-        position: 'absolute',
-        top: 0,
-        alignItems: 'center',
-        justifyContent: 'flex-start',
-    },
-    tripArc: {
-        width: 120,
-        height: 90,
-        borderRadius: 90,
-        borderWidth: 2.5,
-        borderColor: 'rgba(255, 255, 255, 0.2)',
-        borderBottomColor: 'transparent',
-        borderLeftColor: 'transparent',
-        borderRightColor: 'transparent',
-        position: 'absolute',
-        left: 0,
-    },
-    tripDuration: {
+    nextTripSheetMeta: {
         fontSize: 13,
-        fontFamily: 'Ubuntu_Medium',
-        color: '#FFFFFF',
-        marginTop: 25,
-        zIndex: 1,
+        fontFamily: 'Ubuntu_Regular',
     },
 });

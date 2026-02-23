@@ -51,6 +51,7 @@ export interface Booking {
     departureDateTime: string;
     departureTime: string;
     arrivalTime: string;
+    duration?: string;
     status: string;
     totalAmount: string;
     currency: string;

@@ -4,46 +4,100 @@ import { ImageBackground, Pressable, StyleSheet, Text, View, useWindowDimensions
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 /**
- * Type pour les données d'un itinéraire
+ * Type pour les données d'un itinéraire (affichage)
  */
 export type ItineraryData = {
-    id: number;
-    route: string;
-    image: any;
-    compagnie: string;
-    tarif: string;
-    duree: string | null;
-    placesDisponibles: number | null;
+    id: number | string;
+    route?: string;
+    image?: any;
+    compagnie?: string;
+    tarif?: string;
+    duree?: string | null;
+    placesDisponibles?: number | null;
+    /** Format API popularTrips : on construit route / tarif / duree si absents */
+    stationFrom?: { cityName?: string };
+    stationTo?: { cityName?: string };
+    basePrice?: number;
+    durationMinutes?: number;
 };
 
 type ItineraryCardProps = {
     item: ItineraryData;
-    onPress?: (id: number) => void;
+    width?: number;
+    height?: number;
+    onPress?: (item: ItineraryData) => void;
+};
+
+/** Image par défaut si l’item n’en fournit pas (ex. popularTrips API) */
+const DEFAULT_IMAGE = require('@/assets/images/default.jpg');
+
+/** Correspondance (origine|destination) normalisée → image. Clé = "origine|destination" en minuscules sans accents. */
+const ROUTE_IMAGES: Record<string, ReturnType<typeof require>> = {
+    'abidjan|yamoussoukro': require('@/assets/images/basilique.jpg'),
+    'abidjan|bouaké': require('@/assets/images/bouake.jpg'),
+    'abidjan|bouake': require('@/assets/images/bouake.jpg'),
+    'divo|bouaké': require('@/assets/images/divo.jpg'),
+    'divo|bouake': require('@/assets/images/divo.jpg'),
+    'yamoussoukro|boundiali': require('@/assets/images/yakro.jpg'),
 };
 
 /**
- * Composant de carte d'itinéraire
- * Affiche une carte avec image, localisation, tarif et informations pratiques
+ * Normalise un nom de ville pour la clé de correspondance (minuscules, sans accents).
+ */
+function normalizeCityKey(name: string): string {
+    return String(name)
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/\p{Diacritic}/gu, '');
+}
+
+/**
+ * Retourne l'image associée au trajet origine → destination, ou l'image par défaut.
+ */
+function getImageForRoute(origin: string, destination: string): ReturnType<typeof require> {
+    if (!origin || !destination) return DEFAULT_IMAGE;
+    const key = `${normalizeCityKey(origin)}|${normalizeCityKey(destination)}`;
+    return ROUTE_IMAGES[key] ?? DEFAULT_IMAGE;
+}
+
+/**
+ * Composant de carte d'itinéraire.
+ * Accepte le format affichage (route, image, tarif) ou le format API (stationFrom, stationTo, basePrice).
  */
 export function ItineraryCard({ item, onPress }: ItineraryCardProps) {
     const { width } = useWindowDimensions();
     const cardWidth = (width - 40 - 15) / 2;
-    
-    const destination = item.route.split('→')[1]?.trim() || item.route;
-    const origin = item.route.split('→')[0]?.trim() || '';
+
+    const routeStr =
+        item.route ??
+        (item.stationFrom?.cityName && item.stationTo?.cityName
+            ? `${item.stationFrom.cityName} → ${item.stationTo.cityName}`
+            : '');
+    const destination = routeStr ? (routeStr.split('→')[1]?.trim() || routeStr) : '—';
+    const origin = routeStr ? (routeStr.split('→')[0]?.trim() || '') : '—';
+
+    const imageSource = item.image ?? getImageForRoute(origin, destination);
+
+    const tarif = item.tarif ?? (item.basePrice != null ? `${Number(item.basePrice).toLocaleString('fr-FR')} XOF` : '—');
+    const duree =
+        item.duree ??
+        (item.durationMinutes != null
+            ? `${Math.floor(item.durationMinutes / 60)}h${item.durationMinutes % 60 ? String(item.durationMinutes % 60).padStart(2, '0') : '00'}`
+            : null);
 
     return (
         <Pressable
             style={[styles.card, { width: cardWidth }]}
-            onPress={() => onPress?.(item.id)}>
+            onPress={() => onPress?.(item)}>
             <ImageBackground
-                source={item.image}
+                source={imageSource}
                 style={styles.image}
                 resizeMode="cover">
                 <View style={styles.overlay} />
                 
                 <View style={styles.priceBadge}>
-                    <Text style={styles.priceText}>{item.tarif}</Text>
+                    <Text style={styles.priceText}>{tarif}</Text>
                 </View>
                 
                 <View style={styles.bottomContent}>
@@ -55,18 +109,18 @@ export function ItineraryCard({ item, onPress }: ItineraryCardProps) {
                     </View>
                     
                     <View style={styles.infoRow}>
-                        {item.duree && (
+                        {duree && (
                             <View style={styles.infoBadge}>
                                 <MaterialCommunityIcons 
                                     name="clock-outline" 
                                     size={12} 
                                     color="#FFFFFF" 
                                 />
-                                <Text style={styles.infoText}>{item.duree}</Text>
+                                <Text style={styles.infoText}>{duree}</Text>
                             </View>
                         )}
                         
-                        {item.placesDisponibles !== null && (
+                        {item.placesDisponibles != null && item.placesDisponibles !== undefined && (
                             <View style={[
                                 styles.infoBadge,
                                 item.placesDisponibles < 5 && styles.infoBadgeUrgent
