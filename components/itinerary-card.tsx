@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import React from 'react';
 import { ImageBackground, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -86,9 +87,12 @@ export function ItineraryCard({ item, onPress }: ItineraryCardProps) {
             ? `${Math.floor(item.durationMinutes / 60)}h${item.durationMinutes % 60 ? String(item.durationMinutes % 60).padStart(2, '0') : '00'}`
             : null);
 
+    const colorScheme = useColorScheme() ?? 'dark';
+    const borderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
+
     return (
         <Pressable
-            style={[styles.card, { width: cardWidth }]}
+            style={[styles.card, { width: cardWidth, borderWidth: 2, borderColor }]}
             onPress={() => onPress?.(item)}>
             <ImageBackground
                 source={imageSource}
@@ -145,11 +149,11 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         overflow: 'hidden',
         marginBottom: 8,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.15,
-        shadowRadius: 8,
-        elevation: 5,
+        // shadowColor: '#000',
+        // shadowOffset: { width: 0, height: 2 },
+        // shadowOpacity: 0.15,
+        // shadowRadius: 8,
+        // elevation: 5,
         aspectRatio: 0.85,
     },
     image: {

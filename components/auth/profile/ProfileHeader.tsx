@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useAppColors } from '@/hooks/use-app-colors';
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';

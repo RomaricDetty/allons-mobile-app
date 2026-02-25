@@ -354,7 +354,7 @@ export default function HomeScreen() {
         } finally {
             setRefreshing(false);
         }
-    }, [fetchUserInfo, fetchPopularTrips]);
+    }, [fetchUserInfo, fetchPopularTrips, fetchNextTripInfo]);
 
     // Chargement initial
     useEffect(() => {
@@ -495,6 +495,17 @@ export default function HomeScreen() {
         [themeColors, handleNextTripPress]
     );
 
+    /** Clic sur le bouton Location de bus : navigation vers la page de location de bus */
+    const handleLocationBusPress = useCallback(() => {
+        if (!user) {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            navigation.navigate('profile' as never);
+            return;
+        }
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        navigation.navigate('profile/bus-rental-request' as never);
+    }, [navigation, user]);
+
     /**
      * =================================================================
      * RENDER
@@ -507,89 +518,102 @@ export default function HomeScreen() {
 
     return (
         <>
-        <ScrollView
-            style={[styles.scrollView, { backgroundColor: themeColors.background, paddingTop: insets.top }]}
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-            refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY_COLOR} colors={[PRIMARY_COLOR]} />
-            }
-        >
-            {/* Salutation */}
-            {user && <GreetingSection user={user} textColor={themeColors.text} />}
+            <ScrollView
+                style={[styles.scrollView, { backgroundColor: themeColors.background, paddingTop: insets.top }]}
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY_COLOR} colors={[PRIMARY_COLOR]} />
+                }
+            >
 
-            {/* Titre */}
-            <TitleSection textColor={themeColors.text} />
+                {!refreshing && (
+                    <>
+                        {/* Salutation */}
+                        {user && <GreetingSection user={user} textColor={themeColors.text} />}
 
-            {/* Barre de recherche */}
-            <SearchBar
-                onPress={handleSearchPress}
-                backgroundColor={themeColors.searchBg}
-                textColor={themeColors.searchText}
-                iconColor={themeColors.searchIcon}
-            />
+                        {/* Titre */}
+                        <TitleSection textColor={themeColors.text} />
 
-            {/* Trajets populaires */}
-            {/* {popularTrips.length > 0 && (
-                <View style={styles.itinerarySection}>
-                    <View style={styles.carouselWrapper}>
-                        <SectionHeader title="Nos top itinéraires" onSeeMore={handleSeeMorePress} showSeeMore={true} />
-                        <FlatList
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            data={popularTrips}
-                            keyExtractor={keyExtractor}
-                            renderItem={renderPopularTrip}
-                            ItemSeparatorComponent={ItemSeparator}
-                            contentContainerStyle={styles.carouselContent}
-                            {...FLATLIST_CONFIG}
+                        {/* Barre de recherche */}
+                        <SearchBar
+                            onPress={handleSearchPress}
+                            backgroundColor={themeColors.searchBg}
+                            textColor={themeColors.searchText}
+                            iconColor={themeColors.searchIcon}
                         />
-                    </View>
-                </View>
-            )} */}
 
-            {/* Top itinéraires */}
-            {popularTrips.length > 0 && (
-                <View style={styles.itinerarySection}>
-                    <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Nos top itinéraires</Text>
-                    <View style={styles.cardsContainer}>
-                        {popularTrips.map((item) => (
-                            <ItineraryCard key={item.id} item={item} width={width} height={height} onPress={handlePromoCardPress} />
-                        ))}
-                    </View>
-                </View>
-            )}
-
-            {/* Voyage de la semaine */}
-            {user && (
-                <View style={styles.nextTripContainer}>
-                    {/* <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Voyage de la semaine</Text> */}
-                    {/* <NextTripCard /> */}
-                    {nextTrip && nextTrip.length > 0 && (
-                        <View style={styles.itinerarySection}>
-                            <View style={styles.carouselWrapper}>
-                                <SectionHeader
-                                    title="Voyage de la semaine"
-                                    onSeeMore={handleSeeMoreNextTripsPress}
-                                    showSeeMore={true}
-                                />
-                                {/* nextTrip && nextTrip.length > 3 ? true : false */}
-                                <FlatList
-                                    horizontal
-                                    showsHorizontalScrollIndicator={false}
-                                    data={nextTrip}
-                                    keyExtractor={keyExtractor}
-                                    renderItem={renderNextTrip}
-                                    ItemSeparatorComponent={ItemSeparator}
-                                    contentContainerStyle={styles.carouselContent}
-                                    {...FLATLIST_CONFIG}
-                                />
+                        {/* Top itinéraires */}
+                        {popularTrips.length > 0 && (
+                            <View style={styles.itinerarySection}>
+                                <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Nos top itinéraires</Text>
+                                <View style={styles.cardsContainer}>
+                                    {popularTrips.map((item) => (
+                                        <ItineraryCard key={item.id} item={item} width={width} height={height} onPress={handlePromoCardPress} />
+                                    ))}
+                                </View>
                             </View>
-                        </View>
-                    )}
-                </View>
-            )}
-        </ScrollView>
+                        )}
+
+                        {/* Voyage de la semaine */}
+                        {user && (
+                            <View style={styles.nextTripContainer}>
+                                {/* <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Voyage de la semaine</Text> */}
+                                {/* <NextTripCard /> */}
+                                {nextTrip && nextTrip.length > 0 && (
+                                    <View style={styles.itinerarySection}>
+                                        <View style={styles.carouselWrapper}>
+                                            <SectionHeader
+                                                title={nextTrip.length > 1 ? 'Voyages de la semaine' : 'Voyage de la semaine'}
+                                                onSeeMore={handleSeeMoreNextTripsPress}
+                                                showSeeMore={nextTrip && nextTrip.length > 3 ? true : false}
+                                            />
+                                            {/* nextTrip && nextTrip.length > 3 ? true : false */}
+                                            <FlatList
+                                                horizontal
+                                                showsHorizontalScrollIndicator={false}
+                                                data={nextTrip.slice(0, 3)}
+                                                keyExtractor={keyExtractor}
+                                                renderItem={renderNextTrip}
+                                                ItemSeparatorComponent={ItemSeparator}
+                                                contentContainerStyle={styles.carouselContent}
+                                                {...FLATLIST_CONFIG}
+                                            />
+                                        </View>
+                                    </View>
+                                )}
+                            </View>
+                        )}
+
+                        {/* Carte Location de bus */}
+                        <Pressable
+                            style={({ pressed }) => [
+                                styles.locationBusCard,
+                                { opacity: pressed ? 0.9 : 1 },
+                            ]}
+                            onPress={handleLocationBusPress}>
+                            {/* <View style={styles.locationBusAccent} /> */}
+                            <View style={[styles.locationBusContent, { backgroundColor: themeColors.background }]}>
+                                <View style={styles.locationBusIconWrap}>
+                                    <MaterialCommunityIcons name="bus-multiple" size={28} color={PRIMARY_COLOR} />
+                                </View>
+                                <View style={styles.locationBusTextWrap}>
+                                    <Text style={[styles.locationBusTitle, { color: themeColors.text }]}>
+                                        Location de bus
+                                    </Text>
+                                    <Text style={[styles.locationBusSubtitle, { color: themeColors.searchText }]}>
+                                        Réservez un bus pour votre groupe ou un événement
+                                    </Text>
+                                </View>
+                                <View style={styles.locationBusChevronWrap}>
+                                    <MaterialCommunityIcons name="chevron-right" size={26} color={PRIMARY_COLOR} />
+                                </View>
+                            </View>
+                        </Pressable>
+                    </>
+                )}
+
+            </ScrollView>
 
             <BottomSheet<Booking>
                 visible={nextTripsSheetVisible}
@@ -663,7 +687,7 @@ const styles = StyleSheet.create({
         marginTop: 10,
     },
     searchContainer: {
-        borderRadius: 15,
+        borderRadius: 20,
         height: 55,
         width: '100%',
         overflow: 'hidden',
@@ -694,7 +718,7 @@ const styles = StyleSheet.create({
     itinerarySection: {
         width: '100%',
         paddingHorizontal: 20,
-        paddingBottom: 30,
+        paddingBottom: 10,
     },
     sectionTitle: {
         fontSize: 16,
@@ -736,7 +760,7 @@ const styles = StyleSheet.create({
     },
     nextTripContainer: {
         width: '100%',
-        paddingBottom: 30,
+        paddingBottom: 10,
     },
     nextTripCardContainer: {
         borderRadius: 15,
@@ -786,5 +810,60 @@ const styles = StyleSheet.create({
     nextTripSheetMeta: {
         fontSize: 13,
         fontFamily: 'Ubuntu_Regular',
+    },
+    locationBusCard: {
+        marginHorizontal: 20,
+        // marginTop: 24,
+        marginBottom: 32,
+        borderRadius: 20,
+        overflow: 'hidden',
+        position: 'relative',
+    },
+    locationBusAccent: {
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        bottom: 0,
+        width: 4,
+        // backgroundColor: PRIMARY_COLOR,
+        borderTopLeftRadius: 4,
+        borderBottomLeftRadius: 4,
+    },
+    locationBusContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 18,
+        paddingLeft: 20,
+        paddingRight: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(23, 118, 186, 1)',
+        borderRadius: 25,
+    },
+    locationBusIconWrap: {
+        width: 52,
+        height: 52,
+        borderRadius: 15,
+        backgroundColor: 'rgba(23, 118, 186, 0.1)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 14,
+    },
+    locationBusTextWrap: {
+        flex: 1,
+        minWidth: 0,
+    },
+    locationBusTitle: {
+        fontSize: 17,
+        fontFamily: 'Ubuntu_Bold',
+        marginBottom: 4,
+    },
+    locationBusSubtitle: {
+        fontSize: 13,
+        fontFamily: 'Ubuntu_Regular',
+        lineHeight: 18,
+        opacity: 0.9,
+    },
+    locationBusChevronWrap: {
+        padding: 4,
     },
 });
