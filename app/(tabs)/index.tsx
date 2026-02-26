@@ -243,6 +243,7 @@ export default function HomeScreen() {
     const [nextTrip, setNextTrip] = useState<Booking | null>(null);
     const [nextTripsSheetVisible, setNextTripsSheetVisible] = useState(false);
     const [user, setUser] = useState<User | null>(null);
+    const [refreshTintColor, setRefreshTintColor] = useState(PRIMARY_COLOR);
     const colorScheme = useColorScheme() ?? 'light';
     const insets = useSafeAreaInsets();
     const navigation = useNavigation();
@@ -259,6 +260,8 @@ export default function HomeScreen() {
             searchBg: colorScheme === 'dark' ? '#2C2C2E' : '#F3F3F7',
             searchText: colorScheme === 'dark' ? '#9BA1A6' : '#A6A6AA',
             searchIcon: colorScheme === 'dark' ? '#9BA1A6' : '#A6A6AA',
+            /** Couleur du spinner pull-to-refresh (iOS: tintColor, Android: colors) */
+            refreshTint: colorScheme === 'dark' ? '#FFFFFF' : PRIMARY_COLOR,
         }),
         [backgroundColor, textColor, colorScheme]
     );
@@ -360,6 +363,13 @@ export default function HomeScreen() {
     useEffect(() => {
         loadInitialData();
     }, [loadInitialData]);
+
+    /** iOS applique mal tintColor au premier rendu : on le fixe après un court délai */
+    useEffect(() => {
+        const tint = colorScheme === 'dark' ? '#FFFFFF' : PRIMARY_COLOR;
+        const t = setTimeout(() => setRefreshTintColor(tint), 100);
+        return () => clearTimeout(t);
+    }, [colorScheme]);
 
     /**
      * =================================================================
@@ -523,7 +533,12 @@ export default function HomeScreen() {
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
                 refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY_COLOR} colors={[PRIMARY_COLOR]} />
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        tintColor={refreshTintColor}
+                        colors={[refreshTintColor]}
+                    />
                 }
             >
 
@@ -814,7 +829,7 @@ const styles = StyleSheet.create({
     locationBusCard: {
         marginHorizontal: 20,
         // marginTop: 24,
-        marginBottom: 32,
+        marginBottom: 100,
         borderRadius: 20,
         overflow: 'hidden',
         position: 'relative',
