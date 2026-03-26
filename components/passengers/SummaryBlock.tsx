@@ -7,6 +7,7 @@ import { StyleSheet, Text, View } from 'react-native';
 interface SummaryBlockProps {
     totalPrice: number;
     taxes: number;
+    fees?: number;
     totalAmount: number;
     rebookingDiscount?: number;
 }
@@ -17,6 +18,7 @@ interface SummaryBlockProps {
 export const SummaryBlock = ({
     totalPrice,
     taxes,
+    fees = 0,
     totalAmount,
     rebookingDiscount = 0
 }: SummaryBlockProps) => {
@@ -52,6 +54,10 @@ export const SummaryBlock = ({
                 <View style={styles.summaryRow}>
                     <Text style={[styles.summaryLabel, { color: textColor }]}>Taxes</Text>
                     <Text style={[styles.summaryValue, { color: textColor }]}>{formatPrice(taxes)}</Text>
+                </View>
+                <View style={styles.summaryRow}>
+                    <Text style={[styles.summaryLabel, { color: textColor }]}>Frais</Text>
+                    <Text style={[styles.summaryValue, { color: textColor }]}>{formatPrice(fees)}</Text>
                 </View>
                 {rebookingDiscount > 0 && (
                     <View style={styles.summaryRow}>

@@ -1,11 +1,12 @@
 // import TripRouteViewerMapbox from '@/components/TripRouteViewerMapbox';
+// @ts-nocheck
 import TripRouteViewerMapbox from '@/components/TripRouteViewerMapbox';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { Booking } from '@/interfaces';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import {
     ActivityIndicator,
     StyleSheet,

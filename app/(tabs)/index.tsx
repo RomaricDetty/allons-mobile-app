@@ -4,7 +4,7 @@ import { getNextTrip, getPopularTrips } from '@/api/trip';
 import { BottomSheet } from '@/components/bottom-sheet';
 import { DepartureCard } from '@/components/departure-card';
 import { ItineraryCard } from '@/components/itinerary-card';
-import { formatBookingDate } from '@/constants/functions';
+import { formatBookingDate, formatFullDate } from '@/constants/functions';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { Booking, User } from '@/interfaces';
@@ -194,6 +194,8 @@ const NextTripCard = memo(({ booking, cardWidth, onPress, loading = false }: { b
     const toCity = getCityName(booking?.trip?.stationTo);
     const route = `${fromCity} → ${toCity}`;
     const price = `${parseFloat(booking.totalAmount).toLocaleString('fr-FR')} ${booking.currency}`;
+    const dateTrip = formatFullDate(booking.departureDateTime);
+    const timeTrip = booking.departureTime;
     return (
         loading ? (
             <View style={[styles.nextTripCardContainer, { width: cardWidth, backgroundColor: 'transparent' }]}>
@@ -205,7 +207,7 @@ const NextTripCard = memo(({ booking, cardWidth, onPress, loading = false }: { b
                     <MaterialCommunityIcons name="bus" size={60} color="#1776BA" />
                 </View>
                 <View style={styles.nextTripContentContainer}>
-                    <Text style={styles.nextTripPriceText}>{price}</Text>
+                    <Text style={styles.nextTripPriceText}>{dateTrip} . {timeTrip}</Text>
                     <Text style={styles.nextTripRouteText} numberOfLines={2}>
                         {route}
                     </Text>
@@ -796,7 +798,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF',
     },
     nextTripPriceText: {
-        fontSize: 14,
+        fontSize: 12,
         fontFamily: 'Ubuntu_Bold',
         color: '#11181C',
         marginBottom: 6,

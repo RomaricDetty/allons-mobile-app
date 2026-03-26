@@ -1,10 +1,12 @@
 // @ts-nocheck
+import { getFeesAndTaxesQuote } from '@/api/booking';
 import { capitalizeBusType, formatFullDate, formatPrice } from '@/constants/functions';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { SearchParams, Trip } from '@/types';
+import { getAuthToken } from '@/utils/storage';
 import { CommonActions, useNavigation, useRoute } from '@react-navigation/native';
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     Pressable,
     ScrollView,
@@ -160,6 +162,23 @@ const TripSummary = () => {
     }) || {};
     const numberOfPersons = searchParams?.numberOfPersons || 1;
     const isRoundTrip = !!returnTrip;
+    const [feesTotal, setFeesTotal] = useState(0);
+    const [taxesTotal, setTaxesTotal] = useState(0);
+    const [apiTotalAmount, setApiTotalAmount] = useState(0);
+
+    /**
+     * Construit le tableau passagers requis par l'API frais/taxes.
+     */
+    const buildFeesPassengersPayload = useCallback(() => {
+        const payload: Array<{ price: number; leg: 'OUTBOUND' | 'RETURN' }> = [];
+        for (let i = 0; i < numberOfPersons; i += 1) {
+            payload.push({ price: trip.price, leg: 'OUTBOUND' });
+            if (isRoundTrip && returnTrip) {
+                payload.push({ price: returnTrip.price, leg: 'RETURN' });
+            }
+        }
+        return payload;
+    }, [numberOfPersons, trip?.price, isRoundTrip, returnTrip?.price]);
 
     // Mémorisation des calculs de prix
     const priceCalculations = useMemo(() => {
@@ -168,12 +187,40 @@ const TripSummary = () => {
         const outboundPrice = trip.price * numberOfPersons;
         const returnPrice = returnTrip ? returnTrip.price * numberOfPersons : 0;
         const totalPrice = outboundPrice + returnPrice;
-        // const fees = 500;
-        const taxes = 0;
-        const amountDue = totalPrice + taxes;
+        const taxes = taxesTotal;
+        const amountDue = apiTotalAmount || totalPrice + taxesTotal + feesTotal;
         
         return { totalPrice, taxes, amountDue };
-    }, [trip, returnTrip, numberOfPersons]);
+    }, [trip, returnTrip, numberOfPersons, taxesTotal, feesTotal, apiTotalAmount]);
+
+    /**
+     * Récupère le devis des frais/taxes depuis l'API.
+     */
+    const fetchFeesAndTaxes = useCallback(async () => {
+        if (!trip?.id || !trip?.companyId) return;
+        try {
+            const token = await getAuthToken();
+            const response = await getFeesAndTaxesQuote(
+                {
+                    companyId: trip.companyId,
+                    channel: 'MOBILE_APP',
+                    passengers: buildFeesPassengersPayload(),
+                    outboundDepartureId: trip.id,
+                    ...(isRoundTrip && returnTrip?.id ? { returnDepartureId: returnTrip.id } : {}),
+                },
+                token || undefined
+            );
+            setFeesTotal(Number(response.data?.feesTotal || 0));
+            setTaxesTotal(Number(response.data?.taxesTotal || 0));
+            setApiTotalAmount(Number(response.data?.totalAmount || 0));
+        } catch (error) {
+            console.error('Erreur fees-and-taxes (trip-summary):', error);
+        }
+    }, [trip?.id, trip?.companyId, returnTrip?.id, isRoundTrip, buildFeesPassengersPayload]);
+
+    useEffect(() => {
+        fetchFeesAndTaxes();
+    }, [fetchFeesAndTaxes]);
 
     // Mémorisation des cartes de passagers
     const passengerCards = useMemo(() => {
@@ -205,9 +252,14 @@ const TripSummary = () => {
         navigation.navigate('trip/passengers-info', { 
             trip, 
             returnTrip: returnTrip || undefined,
-            searchParams 
+            searchParams,
+            feesAndTaxes: {
+                feesTotal,
+                taxesTotal,
+                totalAmount: priceCalculations.amountDue,
+            },
         });
-    }, [navigation, trip, returnTrip, searchParams]);
+    }, [navigation, trip, returnTrip, searchParams, feesTotal, taxesTotal, priceCalculations.amountDue]);
 
     const handleGoBack = useCallback(() => {
         navigation.goBack();
@@ -361,6 +413,14 @@ const TripSummary = () => {
                                 </Text>
                             </View>
                         )}
+
+                        <View style={styles.priceRow}>
+                            <Text style={[styles.priceLabel, { color: textColor }]}>Frais</Text>
+                            <Text style={[styles.priceValue, { color: textColor }]}>
+                                {formatPrice(feesTotal)}
+                            </Text>
+                        </View>
+                        
                         <View style={styles.priceRow}>
                             <Text style={[styles.priceLabel, { color: textColor }]}>Taxes</Text>
                             <Text style={[styles.priceValue, { color: textColor }]}>

@@ -20,7 +20,7 @@
     "@react-navigation/bottom-tabs": "^7.4.0",
     "@react-navigation/elements": "^2.6.3",
     "@react-navigation/native": "^7.1.8",
-    "@rnmapbox/maps": "^11.0.0",
+    "@rnmapbox/maps": "^10.3.0",
     "axios": "^1.13.1",
     "expo": "~54.0.20",
     "expo-constants": "~18.0.10",
@@ -48,17 +48,19 @@
     "react-native-reanimated": "~4.1.1",
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0",
+    "react-native-svg": "^15.15.4",
     "react-native-vector-icons": "^10.3.0",
     "react-native-view-shot": "4.0.3",
     "react-native-web": "~0.21.0",
-    "react-native-worklets": "0.5.1"
+    "react-native-worklets": "0.5.1",
+    "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
     "@types/react": "~19.1.0",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~10.0.0",
-    "typescript": "~5.9.2",
-    "patch-package": "^8.0.0"
+    "patch-package": "^8.0.0",
+    "typescript": "~5.9.2"
   },
   "private": true,
   "packageManager": "pnpm@10.28.1+sha512.7d7dbbca9e99447b7c3bf7a73286afaaf6be99251eb9498baefa7d406892f67b879adb3a1d7e687fc4ccc1a388c7175fbaae567a26ab44d1067b54fcb0d6a316"

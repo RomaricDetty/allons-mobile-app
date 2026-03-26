@@ -1,3 +1,4 @@
+import { baseUrl } from '@/api/config';
 import { busTrackingService } from '@/services/busTrackingService';
 import { routingService } from '@/services/routingService';
 import { getAuthToken } from '@/utils/storage';
@@ -115,7 +116,7 @@ const getDefaultTestData = (tripId: string): { trip: Trip; busPosition: BusPosit
     };
 };
 
-export function useBusTracking(tripId: string, bookingId: string): UseBusTrackingResult {
+export function useBusTracking(tripId: string, bookingId: string, preferredBusId?: string): UseBusTrackingResult {
     const [busPosition, setBusPosition] = useState<BusPosition | null>(null);
     const [busStops, setBusStops] = useState<BusStop[]>([]);
     const [trip, setTrip] = useState<Trip | null>(null);
@@ -123,12 +124,31 @@ export function useBusTracking(tripId: string, bookingId: string): UseBusTrackin
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const routeProgressRef = useRef(0); // Référence pour maintenir la progression de l'itinéraire
+    const hasRealtimeUpdateRef = useRef(false);
+    const isConnectedRef = useRef(false);
+
+    /**
+     * Synchronise la référence de connexion pour les callbacks d'intervalle.
+     */
+    useEffect(() => {
+        isConnectedRef.current = isConnected;
+    }, [isConnected]);
 
     // Charger les détails du voyage
     const fetchTripDetails = useCallback(async () => {
         try {
             setIsLoading(true);
             setError(null);
+
+            if (!tripId || tripId.trim() === '') {
+                console.log('tripId manquant, utilisation des données de test');
+                const testData = getDefaultTestData('trip-test');
+                setTrip(testData.trip);
+                setBusStops(testData.busStops);
+                setBusPosition(testData.busPosition);
+                setIsLoading(false);
+                return;
+            }
 
             // Récupérer le token d'authentification
             const token = await getAuthToken();
@@ -145,9 +165,8 @@ export function useBusTracking(tripId: string, bookingId: string): UseBusTrackin
                 return;
             }
 
-            // Note: Cette URL est un placeholder - à remplacer par l'URL réelle de l'API
             const response = await fetch(
-                `https://votre-backend.com/api/trips/${tripId}`,
+                `${baseUrl}/trips/${tripId}`,
                 {
                     headers: {
                         Authorization: `Bearer ${token}`,
@@ -186,10 +205,13 @@ export function useBusTracking(tripId: string, bookingId: string): UseBusTrackin
 
         // Handlers pour les messages WebSocket
         const handleConnection = (message: any) => {
+            console.log('[useBusTracking] connection', message?.data);
             setIsConnected(message.data.connected);
         };
 
         const handleBusPositionUpdate = (message: any) => {
+            hasRealtimeUpdateRef.current = true;
+            console.log('[useBusTracking] bus_position_update', message?.data?.position);
             setBusPosition(message.data.position);
         };
 
@@ -224,6 +246,10 @@ export function useBusTracking(tripId: string, bookingId: string): UseBusTrackin
         
         const testInterval = setInterval(() => {
             setBusPosition((prev) => {
+                if (isConnectedRef.current || hasRealtimeUpdateRef.current) {
+                    return prev;
+                }
+
                 if (!prev) {
                     return testData.busPosition;
                 }
@@ -305,6 +331,7 @@ export function useBusTracking(tripId: string, bookingId: string): UseBusTrackin
         // Nettoyage
         return () => {
             clearInterval(testInterval);
+            hasRealtimeUpdateRef.current = false;
             busTrackingService.off('connection', handleConnection);
             busTrackingService.off('bus_position_update', handleBusPositionUpdate);
             busTrackingService.off('bus_stop_update', handleBusStopUpdate);
@@ -312,6 +339,24 @@ export function useBusTracking(tripId: string, bookingId: string): UseBusTrackin
             busTrackingService.disconnect();
         };
     }, [tripId, bookingId, fetchTripDetails]);
+
+    /**
+     * Rejoint explicitement la room du bus dès que son identifiant est connu.
+     */
+    useEffect(() => {
+        const candidateBusIds = [
+            preferredBusId,
+            trip?.busId,
+            tripId,
+        ].filter((value): value is string => !!value && value.trim() !== '');
+
+        if (candidateBusIds.length === 0) return;
+
+        candidateBusIds.forEach((busId) => {
+            console.log('[useBusTracking] tentative bus:join', { busId });
+            busTrackingService.joinBusRoom(busId);
+        });
+    }, [preferredBusId, trip?.busId, tripId]);
 
     return {
         busPosition,

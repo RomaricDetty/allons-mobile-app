@@ -176,7 +176,7 @@ export const usePaymentManagement = (defaultCountryCode: string = '+225') => {
                     channel: 'MOBILE_APP',
                     contact,
                     passengers: passengersData,
-                    totalAmount: pricing.totalAmountWithoutFees
+                    totalAmount: pricing.totalAmount
                 };
                 bookingResponse = await createBooking(bookingData, token || '');
             }

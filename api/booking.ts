@@ -40,6 +40,52 @@ export const createBooking = async (bookingData: any, token?: string): Promise<A
 }
 
 /**
+ * Payload passager pour le calcul des frais et taxes.
+ */
+export interface FeesAndTaxesPassengerPayload {
+    price: number;
+    leg: 'OUTBOUND' | 'RETURN';
+}
+
+/**
+ * Payload de calcul des frais et taxes.
+ */
+export interface FeesAndTaxesRequestPayload {
+    companyId: string;
+    channel: 'MOBILE_APP';
+    passengers: FeesAndTaxesPassengerPayload[];
+    outboundDepartureId: string;
+    returnDepartureId?: string;
+}
+
+/**
+ * Réponse simplifiée du calcul des frais et taxes.
+ */
+export interface FeesAndTaxesResponse {
+    feesTotal: number;
+    taxesTotal: number;
+    totalAmount: number;
+    [key: string]: any;
+}
+
+/**
+ * Récupère le devis frais/taxes pour la réservation.
+ * @param payload - Données de calcul (company, départs, passagers)
+ * @param token - Token d'authentification (optionnel)
+ */
+export const getFeesAndTaxesQuote = async (
+    payload: FeesAndTaxesRequestPayload,
+    token?: string
+): Promise<AxiosResponse<FeesAndTaxesResponse>> => {
+    const headers: any = { 'Content-Type': 'application/json' };
+    if (token && token.trim() !== '') {
+        headers.Authorization = `Bearer ${token}`;
+    }
+
+    return await axios.post(`${baseUrl}/customers/fees-and-taxes`, payload, { headers });
+};
+
+/**
  * Payload passager pour la réservation avec code rebooking (phone en objet)
  */
 export interface RebookingPassengerPayload {

@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { getFeesAndTaxesQuote } from '@/api/booking';
 import { FixedButton, Header, ProgressBar, SeatSelectionButton, SelectedSeatsDisplay } from '@/components/passengers-info';
 import { EmergencyContactBlock } from '@/components/passengers/EmergencyContactBlock';
 import { ErrorModal } from '@/components/passengers/ErrorModal';
@@ -16,8 +17,9 @@ import { usePaymentManagement } from '@/hooks/usePaymentManagement';
 import { useRebookingCode } from '@/hooks/useRebookingCode';
 import { useSeatsManagement } from '@/hooks/useSeatsManagement';
 import { SearchParams, Trip } from '@/types';
+import { getAuthToken } from '@/utils/storage';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -58,6 +60,9 @@ const PassengersInfo = () => {
 
     const [showErrorModal, setShowErrorModal] = useState(false);
     const [validationErrors, setValidationErrors] = useState<string[]>([]);
+    const [feesTotal, setFeesTotal] = useState<number>(Number((route.params as any)?.feesAndTaxes?.feesTotal || 0));
+    const [taxesTotal, setTaxesTotal] = useState<number>(Number((route.params as any)?.feesAndTaxes?.taxesTotal || 0));
+    const [apiTotalAmount, setApiTotalAmount] = useState<number>(Number((route.params as any)?.feesAndTaxes?.totalAmount || 0));
 
     // Hooks personnalisés
     const isKeyboardVisible = useKeyboardVisibility();
@@ -128,18 +133,64 @@ const PassengersInfo = () => {
         return outboundPrice + returnPrice;
     }, [trip?.price, returnTrip?.price, numberOfPersons]);
 
+    /**
+     * Construit le tableau passagers requis par l'API frais/taxes.
+     */
+    const buildFeesPassengersPayload = useCallback(() => {
+        const payload: Array<{ price: number; leg: 'OUTBOUND' | 'RETURN' }> = [];
+        for (let i = 0; i < numberOfPersons; i += 1) {
+            payload.push({ price: trip.price, leg: 'OUTBOUND' });
+            if (isRoundTrip && returnTrip) {
+                payload.push({ price: returnTrip.price, leg: 'RETURN' });
+            }
+        }
+        return payload;
+    }, [numberOfPersons, trip?.price, isRoundTrip, returnTrip?.price]);
+
+    /**
+     * Charge les frais/taxes pour calculer le total final de réservation.
+     */
+    const fetchFeesAndTaxes = useCallback(async () => {
+        if (!trip?.id || !trip?.companyId) return;
+        try {
+            const token = await getAuthToken();
+            const response = await getFeesAndTaxesQuote(
+                {
+                    companyId: trip.companyId,
+                    channel: 'MOBILE_APP',
+                    passengers: buildFeesPassengersPayload(),
+                    outboundDepartureId: trip.id,
+                    ...(isRoundTrip && returnTrip?.id ? { returnDepartureId: returnTrip.id } : {}),
+                },
+                token || undefined
+            );
+            setFeesTotal(Number(response.data?.feesTotal || 0));
+            setTaxesTotal(Number(response.data?.taxesTotal || 0));
+            setApiTotalAmount(Number(response.data?.totalAmount || 0));
+        } catch (error) {
+            console.error('Erreur fees-and-taxes (passengers-info):', error);
+        }
+    }, [trip?.id, trip?.companyId, returnTrip?.id, isRoundTrip, buildFeesPassengersPayload]);
+
+    useEffect(() => {
+        fetchFeesAndTaxes();
+    }, [fetchFeesAndTaxes]);
+
     const pricing = useMemo(() => {
-        const taxes = 0;
+        const taxes = taxesTotal;
+        const fees = feesTotal;
         const rebookingDiscount = isCodeValid ? discount : 0;
-        const totalAmount = Math.max(0, totalPrice + taxes - rebookingDiscount);
-        const totalAmountWithoutFees = Math.max(0, totalPrice + taxes - rebookingDiscount);
+        const computedTotal = totalPrice + taxes + fees - rebookingDiscount;
+        const totalAmount = Math.max(0, apiTotalAmount > 0 ? apiTotalAmount - rebookingDiscount : computedTotal);
+        const totalAmountWithoutFees = totalAmount;
         return { 
             taxes, 
+            fees,
             totalAmount, 
             totalAmountWithoutFees,
             rebookingDiscount
         };
-    }, [totalPrice, discount, isCodeValid]);
+    }, [totalPrice, discount, isCodeValid, taxesTotal, feesTotal, apiTotalAmount]);
 
     const handleGoBack = useCallback(() => {
         navigation.goBack();
@@ -334,6 +385,7 @@ const PassengersInfo = () => {
                 <SummaryBlock
                     totalPrice={totalPrice}
                     taxes={pricing.taxes}
+                    fees={pricing.fees}
                     totalAmount={pricing.totalAmount}
                     rebookingDiscount={pricing.rebookingDiscount}
                 />
