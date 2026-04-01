@@ -2,11 +2,10 @@
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { COUNTRY_CODES } from '@/interfaces';
-import React from 'react';
 import { Image, ImageSourcePropType, Pressable, StyleSheet, View } from 'react-native';
-import { SectionHeader } from './SectionHeader';
 import { FormField } from './FormField';
 import { PhoneField } from './PhoneField';
+import { SectionHeader } from './SectionHeader';
 
 interface PaymentMethodCardProps {
     name: string;
@@ -181,12 +180,12 @@ export const PaymentMethodBlock = ({
             <SectionHeader number={4} title="Méthode de paiement" />
 
             <View style={styles.paymentMethodsContainer}>
-                <PaymentMethodCard
+                {/* <PaymentMethodCard
                     name="Carte de crédit"
                     imageSource={require('@/assets/images/payment/logo-payment-card.png')}
                     isSelected={selectedPaymentMethod === 'credit-card'}
                     onPress={() => onSelectPaymentMethod('credit-card')}
-                />
+                /> */}
                 <PaymentMethodCard
                     name="Wave"
                     imageSource={require('@/assets/images/payment/logo-payment-wave.png')}

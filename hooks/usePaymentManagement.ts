@@ -174,6 +174,8 @@ export const usePaymentManagement = (defaultCountryCode: string = '+225') => {
                     ...(isRoundTrip && returnTrip ? { returnDepartureId: returnTrip.id } : {}),
                     type: tripType,
                     channel: 'MOBILE_APP',
+                    paymentMethod: 'MOBILE_MONEY',
+                    paymentChannel: 'MOBILE_APP',
                     contact,
                     passengers: passengersData,
                     totalAmount: pricing.totalAmount

@@ -204,6 +204,8 @@ const TripSummary = () => {
                 {
                     companyId: trip.companyId,
                     channel: 'MOBILE_APP',
+                    paymentMethod: 'MOBILE_MONEY',
+                    paymentChannel: 'MOBILE_APP',
                     passengers: buildFeesPassengersPayload(),
                     outboundDepartureId: trip.id,
                     ...(isRoundTrip && returnTrip?.id ? { returnDepartureId: returnTrip.id } : {}),

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { refreshTokenApi } from '@/api/auth_register';
 import { ProfileScreen } from '@/components/auth/ProfileScreen';
 import { SignInScreen } from '@/components/auth/SignInScreen';

@@ -41,6 +41,17 @@ export interface ProfileScreenProps {
     onLogout: () => void;
 }
 
+export interface Departure {
+    status: 'SCHEDULED' | 'BOARDING' | 'DEPARTED' | 'ARRIVED' | 'DELAYED' | 'CANCELLED';
+    id: string;
+    code: string;
+    departureDateTime: string;
+    trip: {
+        id: string;
+        label: string;
+    };
+}
+
 /**
  * Écran de profil pour l'utilisateur connecté
  */
@@ -54,6 +65,7 @@ export interface Booking {
     duration?: string;
     status: string;
     totalAmount: string;
+    departure: Departure;
     currency: string;
     passengers: Array<{
         firstName: string;

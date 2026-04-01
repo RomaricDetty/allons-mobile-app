@@ -67,6 +67,7 @@ export const useProfileData = () => {
             }
 
             const response = await bookingListInfo(userId, token);
+            console.log('response bookingListInfo ==> ', response.data.items[0].departure);
             if (response.status === 200 && response.data?.items) {
                 setBookingList(response.data.items);
             } else {

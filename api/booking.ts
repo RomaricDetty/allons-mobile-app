@@ -53,6 +53,9 @@ export interface FeesAndTaxesPassengerPayload {
 export interface FeesAndTaxesRequestPayload {
     companyId: string;
     channel: 'MOBILE_APP';
+    paymentMethod?: 'MOBILE_MONEY' | 'CREDIT_CARD';
+    provider?: 'WAVE' | 'ORANGE_MONEY' | 'MTN_MONEY' | null;
+    paymentChannel?: 'MOBILE_APP';
     passengers: FeesAndTaxesPassengerPayload[];
     outboundDepartureId: string;
     returnDepartureId?: string;

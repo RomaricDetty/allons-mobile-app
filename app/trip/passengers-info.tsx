@@ -19,7 +19,7 @@ import { useSeatsManagement } from '@/hooks/useSeatsManagement';
 import { SearchParams, Trip } from '@/types';
 import { getAuthToken } from '@/utils/storage';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -134,6 +134,24 @@ const PassengersInfo = () => {
     }, [trip?.price, returnTrip?.price, numberOfPersons]);
 
     /**
+     * Mappe la méthode de paiement UI vers les champs attendus par l'API de frais/taxes.
+     */
+    const getFeesPaymentConfig = useCallback((method: string | null) => {
+        switch (method) {
+            // case 'credit-card':
+            //     return { paymentMethod: 'CREDIT_CARD', provider: null };
+            case 'wave':
+                return { paymentMethod: 'MOBILE_MONEY', provider: 'WAVE' };
+            case 'orange-money':
+                return { paymentMethod: 'MOBILE_MONEY', provider: 'ORANGE_MONEY' };
+            case 'mtn-money':
+                return { paymentMethod: 'MOBILE_MONEY', provider: 'MTN_MONEY' };
+            default:
+                return { paymentMethod: 'MOBILE_MONEY', provider: null };
+        }
+    }, []);
+
+    /**
      * Construit le tableau passagers requis par l'API frais/taxes.
      */
     const buildFeesPassengersPayload = useCallback(() => {
@@ -153,11 +171,15 @@ const PassengersInfo = () => {
     const fetchFeesAndTaxes = useCallback(async () => {
         if (!trip?.id || !trip?.companyId) return;
         try {
+            const { paymentMethod, provider } = getFeesPaymentConfig(selectedPaymentMethod);
             const token = await getAuthToken();
             const response = await getFeesAndTaxesQuote(
                 {
                     companyId: trip.companyId,
                     channel: 'MOBILE_APP',
+                    paymentMethod,
+                    paymentChannel: 'MOBILE_APP',
+                    // ...(provider ? { provider } : {}),
                     passengers: buildFeesPassengersPayload(),
                     outboundDepartureId: trip.id,
                     ...(isRoundTrip && returnTrip?.id ? { returnDepartureId: returnTrip.id } : {}),
@@ -168,9 +190,19 @@ const PassengersInfo = () => {
             setTaxesTotal(Number(response.data?.taxesTotal || 0));
             setApiTotalAmount(Number(response.data?.totalAmount || 0));
         } catch (error) {
+            console.log('error response data', (error as any).response.data);
+            console.log('error response status', (error as any).response.status);
+            console.log('error response headers', (error as any).response.headers);
+            console.log('error response config', (error as any).response.config);
+            console.log('error response request', (error as any).response.request);
+            console.log('error response data', (error as any).response.data);
+            console.log('error response status', (error as any).response.status);
+            console.log('error response headers', (error as any).response.headers);
+            console.log('error response config', (error as any).response.config);
+            console.log('error response request', (error as any).response.request);
             console.error('Erreur fees-and-taxes (passengers-info):', error);
         }
-    }, [trip?.id, trip?.companyId, returnTrip?.id, isRoundTrip, buildFeesPassengersPayload]);
+    }, [trip?.id, trip?.companyId, returnTrip?.id, isRoundTrip, buildFeesPassengersPayload, selectedPaymentMethod, getFeesPaymentConfig]);
 
     useEffect(() => {
         fetchFeesAndTaxes();

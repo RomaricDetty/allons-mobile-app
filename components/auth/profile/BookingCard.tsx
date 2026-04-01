@@ -30,7 +30,8 @@ export const BookingCard: React.FC<BookingCardProps> = ({ booking }) => {
         : false;
 
     /** Afficher le bouton Itinéraire uniquement si non annulé et départ à venir */
-    const showItineraryButton = booking.status !== 'CANCELLED' && !isDeparturePast;
+    const showItineraryButton = booking.status !== 'CANCELLED' && !isDeparturePast && booking.departure.status == 'DEPARTED';
+    console.log('booking.departure.status: ', booking.departure.status);
 
     return (
         <View style={[styles.bookingCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
