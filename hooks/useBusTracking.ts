@@ -10,6 +10,7 @@ interface UseBusTrackingResult {
     busStops: BusStop[];
     trip: Trip | null;
     isConnected: boolean;
+    hasRealtimeData: boolean;
     isLoading: boolean;
     error: string | null;
     refetch: () => Promise<void>;
@@ -117,10 +118,14 @@ const getDefaultTestData = (tripId: string): { trip: Trip; busPosition: BusPosit
 };
 
 export function useBusTracking(tripId: string, bookingId: string, preferredBusId?: string): UseBusTrackingResult {
+    const logDev = (...args: any[]) => {
+        if (__DEV__) console.log(...args);
+    };
     const [busPosition, setBusPosition] = useState<BusPosition | null>(null);
     const [busStops, setBusStops] = useState<BusStop[]>([]);
     const [trip, setTrip] = useState<Trip | null>(null);
     const [isConnected, setIsConnected] = useState(false);
+    const [hasRealtimeData, setHasRealtimeData] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const routeProgressRef = useRef(0); // Référence pour maintenir la progression de l'itinéraire
@@ -141,7 +146,7 @@ export function useBusTracking(tripId: string, bookingId: string, preferredBusId
             setError(null);
 
             if (!tripId || tripId.trim() === '') {
-                console.log('tripId manquant, utilisation des données de test');
+                logDev('tripId manquant, utilisation des données de test');
                 const testData = getDefaultTestData('trip-test');
                 setTrip(testData.trip);
                 setBusStops(testData.busStops);
@@ -155,7 +160,7 @@ export function useBusTracking(tripId: string, bookingId: string, preferredBusId
             
             // Si pas de token, utiliser les données de test
             if (!token || token.trim() === '') {
-                console.log('Token d\'authentification manquant, utilisation des données de test');
+                logDev('Token d\'authentification manquant, utilisation des données de test');
                 const testData = getDefaultTestData(tripId);
                 setTrip(testData.trip);
                 setBusStops(testData.busStops);
@@ -188,7 +193,7 @@ export function useBusTracking(tripId: string, bookingId: string, preferredBusId
         } catch (err) {
             console.error('Erreur fetchTripDetails:', err);
             // Utiliser les données de test par défaut en cas d'erreur
-            console.log('Utilisation des données de test par défaut');
+            logDev('Utilisation des données de test par défaut');
             const testData = getDefaultTestData(tripId);
             setTrip(testData.trip);
             setBusStops(testData.busStops);
@@ -205,13 +210,14 @@ export function useBusTracking(tripId: string, bookingId: string, preferredBusId
 
         // Handlers pour les messages WebSocket
         const handleConnection = (message: any) => {
-            console.log('[useBusTracking] connection', message?.data);
+            logDev('[useBusTracking] connection', message?.data);
             setIsConnected(message.data.connected);
         };
 
         const handleBusPositionUpdate = (message: any) => {
             hasRealtimeUpdateRef.current = true;
-            console.log('[useBusTracking] bus_position_update', message?.data?.position);
+            setHasRealtimeData(true);
+            logDev('[useBusTracking] bus_position_update', message?.data?.position);
             setBusPosition(message.data.position);
         };
 
@@ -332,6 +338,7 @@ export function useBusTracking(tripId: string, bookingId: string, preferredBusId
         return () => {
             clearInterval(testInterval);
             hasRealtimeUpdateRef.current = false;
+            setHasRealtimeData(false);
             busTrackingService.off('connection', handleConnection);
             busTrackingService.off('bus_position_update', handleBusPositionUpdate);
             busTrackingService.off('bus_stop_update', handleBusStopUpdate);
@@ -353,7 +360,7 @@ export function useBusTracking(tripId: string, bookingId: string, preferredBusId
         if (candidateBusIds.length === 0) return;
 
         candidateBusIds.forEach((busId) => {
-            console.log('[useBusTracking] tentative bus:join', { busId });
+            logDev('[useBusTracking] tentative bus:join', { busId });
             busTrackingService.joinBusRoom(busId);
         });
     }, [preferredBusId, trip?.busId, tripId]);
@@ -363,6 +370,7 @@ export function useBusTracking(tripId: string, bookingId: string, preferredBusId
         busStops,
         trip,
         isConnected,
+        hasRealtimeData,
         isLoading,
         error,
         refetch: fetchTripDetails,

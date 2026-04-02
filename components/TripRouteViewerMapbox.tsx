@@ -1,19 +1,17 @@
 // @ts-nocheck
-import { useTheme } from "@/contexts/ThemeContext";
-import { useBusTracking } from "@/hooks/useBusTracking";
+import { ControlButtons } from "@/components/trip-route-viewer-mapbox/ControlButtons";
+import { InfoPanel } from "@/components/trip-route-viewer-mapbox/InfoPanel";
+import { MapScene } from "@/components/trip-route-viewer-mapbox/MapScene";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useThemeColor } from "@/hooks/use-theme-color";
+import { useBusTracking } from "@/hooks/useBusTracking";
 import { Booking } from "@/interfaces";
 import { geocodingService } from "@/services/geocodingService";
 import { routingService } from "@/services/routingService";
 import { PassengerLocation } from "@/types/tracking";
 import { Ionicons } from "@expo/vector-icons";
 import Mapbox, {
-    Camera,
-    LineLayer,
     MapView,
-    MarkerView,
-    ShapeSource,
 } from "@rnmapbox/maps";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
@@ -28,15 +26,14 @@ import {
     ActivityIndicator,
     Alert,
     Animated,
-    Image,
+    PanResponder,
     Platform,
-    ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 // Initialisation de Mapbox avec le token
 // Import des images
@@ -63,6 +60,20 @@ const COLORS = {
     LIGHT_BADGE: "#F0F4F8",
 } as const;
 
+// Optimisation suivi temps réel (mode équilibré)
+const LIVE_UPDATE_INTERVAL_MS = 2500;
+const CAMERA_UPDATE_INTERVAL_MS = 900;
+const MIN_BUS_MOVE_KM = 0.02; // 20m
+const MIN_HEADING_DELTA_DEG = 3;
+const SIM_UPDATE_INTERVAL_MS = 120;
+const SIM_MIN_DURATION_SECONDS = 180; // 3 min
+const SIM_MAX_DURATION_SECONDS = 600; // 10 min
+const POSITION_SMOOTHING_ALPHA = 0.28;
+const ROTATION_SMOOTHING_ALPHA = 0.22;
+const PANEL_EXPANDED_VALUE = 1;
+const PANEL_COLLAPSED_VALUE = 0.2;
+const PANEL_SWIPE_THRESHOLD = 24;
+
 interface TripRouteViewerMapboxProps {
     booking: Booking;
 }
@@ -80,7 +91,6 @@ export default function TripRouteViewerMapbox({
 }: TripRouteViewerMapboxProps) {
     const router = useRouter();
     const colorScheme = useColorScheme() ?? "light";
-    const { isDarkMode } = useTheme();
     const insets = useSafeAreaInsets();
 
     const [passengerLocation, setPassengerLocation] =
@@ -120,7 +130,6 @@ export default function TripRouteViewerMapbox({
     const panelHeightAnim = useRef(new Animated.Value(1)).current;
 
     const mapRef = useRef<MapView>(null);
-    const cameraRef = useRef<Camera>(null);
     const locationSubscription = useRef<Location.LocationSubscription | null>(
         null,
     );
@@ -129,12 +138,33 @@ export default function TripRouteViewerMapbox({
         null,
     );
     const routeDistancesRef = useRef<number[]>([]);
-    const lastCameraUpdateRef = useRef<number>(0);
     const addressUpdateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
         null,
     );
     const bookingIdRef = useRef<string | number | null>(null);
     const isFollowingBusRef = useRef<boolean>(false);
+    const pendingLivePositionRef = useRef<{
+        latitude: number;
+        longitude: number;
+        heading?: number;
+    } | null>(null);
+    const liveFlushIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const lastAppliedLiveRef = useRef<{
+        latitude: number;
+        longitude: number;
+        heading?: number;
+    } | null>(null);
+    const hasLiveSocketUpdateRef = useRef<boolean>(false);
+    const smoothedRotationRef = useRef<number>(0);
+    const cameraStateRef = useRef<{
+        center: [number, number] | null;
+        zoom: number;
+        lastUpdateAt: number;
+    }>({
+        center: null,
+        zoom: 13,
+        lastUpdateAt: 0,
+    });
 
     const trackingTripId = useMemo(
         () =>
@@ -164,19 +194,73 @@ export default function TripRouteViewerMapbox({
         [booking],
     );
 
-    const { busPosition: liveBusPosition } = useBusTracking(
+    const { busPosition: liveBusPosition, hasRealtimeData } = useBusTracking(
         trackingTripId,
         trackingBookingId,
         trackingBusId,
     );
 
     useEffect(() => {
-        console.log("[TripRouteViewerMapbox] ids tracking", {
-            trackingTripId,
-            trackingBookingId,
-            trackingBusId,
-        });
+        if (__DEV__) {
+            console.log("[TripRouteViewerMapbox] ids tracking", {
+                trackingTripId,
+                trackingBookingId,
+                trackingBusId,
+            });
+        }
     }, [trackingTripId, trackingBookingId, trackingBusId]);
+
+    /**
+     * Compare deux headings en tenant compte de la boucle 360°.
+     */
+    const getHeadingDelta = useCallback((prev?: number, next?: number) => {
+        if (typeof prev !== "number" || typeof next !== "number") return 999;
+        const raw = Math.abs(prev - next) % 360;
+        return raw > 180 ? 360 - raw : raw;
+    }, []);
+
+    /**
+     * Lisse la rotation (angle) en prenant la plus petite différence angulaire.
+     */
+    const smoothAngle = useCallback((from: number, to: number, alpha: number) => {
+        const delta = ((((to - from) % 360) + 540) % 360) - 180;
+        const next = from + delta * alpha;
+        return (next + 360) % 360;
+    }, []);
+
+    /**
+     * Met à jour la caméra avec throttling pour éviter les re-renders excessifs.
+     */
+    const updateCamera = useCallback(
+        (center: [number, number], zoom: number, force = false) => {
+            const now = Date.now();
+            const previous = cameraStateRef.current;
+
+            if (!force && now - previous.lastUpdateAt < CAMERA_UPDATE_INTERVAL_MS) {
+                return;
+            }
+
+            if (previous.center && !force) {
+                const movedKm = routingService.calculateDistance(
+                    { latitude: previous.center[1], longitude: previous.center[0] },
+                    { latitude: center[1], longitude: center[0] },
+                );
+                const zoomDelta = Math.abs(previous.zoom - zoom);
+                if (movedKm < MIN_BUS_MOVE_KM && zoomDelta < 0.05) {
+                    return;
+                }
+            }
+
+            cameraStateRef.current = {
+                center,
+                zoom,
+                lastUpdateAt: now,
+            };
+            setCameraCenter(center);
+            setCameraZoom(zoom);
+        },
+        [],
+    );
 
     // Couleurs du thème mémorisées
     const backgroundColor = useThemeColor({}, "background");
@@ -487,9 +571,8 @@ export default function TripRouteViewerMapbox({
                 ? Math.max(8, Math.min(15, 15 - Math.log2(maxDelta * 100)))
                 : 13;
 
-        setCameraCenter([centerLng, centerLat]);
-        setCameraZoom(zoom);
-    }, [startPoint, endPoint, passengerLocation]);
+            updateCamera([centerLng, centerLat], zoom, true);
+    }, [startPoint, endPoint, passengerLocation, updateCamera]);
 
     /**
      * Initialise la localisation du passager et calcule l'itinéraire
@@ -523,8 +606,7 @@ export default function TripRouteViewerMapbox({
      */
     useEffect(() => {
         if (startPoint) {
-            setCameraCenter([startPoint.longitude, startPoint.latitude]);
-            setCameraZoom(13);
+            updateCamera([startPoint.longitude, startPoint.latitude], 13, true);
 
             if (routePath.length > 0) {
                 setTimeout(() => {
@@ -534,7 +616,7 @@ export default function TripRouteViewerMapbox({
         } else if (routePath.length > 0) {
             centerMapOnRoute();
         }
-    }, [routePath, startPoint, centerMapOnRoute]);
+    }, [routePath, startPoint, centerMapOnRoute, updateCamera]);
 
     /**
      * Met à jour la ref du mode manuel
@@ -706,32 +788,85 @@ export default function TripRouteViewerMapbox({
      * Synchronise la position du bus depuis Socket.IO (temps réel).
      */
     useEffect(() => {
-        if (!liveBusPosition) return;
-
-        console.log("[TripRouteViewerMapbox] liveBusPosition reçue", liveBusPosition);
-        setIsBusAnimationActive(false);
-        setBusPosition({
+        if (!liveBusPosition || !hasRealtimeData) return;
+        if (__DEV__) {
+            console.log("[TripRouteViewerMapbox] liveBusPosition reçue", liveBusPosition);
+        }
+        hasLiveSocketUpdateRef.current = true;
+        pendingLivePositionRef.current = {
             latitude: liveBusPosition.latitude,
             longitude: liveBusPosition.longitude,
-        });
-        setBusRotation(liveBusPosition.heading || 0);
+            heading: liveBusPosition.heading || 0,
+        };
+        setIsBusAnimationActive(false);
+    }, [liveBusPosition, hasRealtimeData]);
 
-        if (isFollowingBusRef.current) {
-            setCameraCenter([liveBusPosition.longitude, liveBusPosition.latitude]);
-            setCameraZoom(15);
-        }
-    }, [liveBusPosition]);
+    /**
+     * Flush des updates live toutes les 2.5s (mode équilibré).
+     */
+    useEffect(() => {
+        liveFlushIntervalRef.current = setInterval(() => {
+            const pending = pendingLivePositionRef.current;
+            if (!pending) return;
+
+            const previous = lastAppliedLiveRef.current;
+            const movedKm = previous
+                ? routingService.calculateDistance(
+                      { latitude: previous.latitude, longitude: previous.longitude },
+                      { latitude: pending.latitude, longitude: pending.longitude },
+                  )
+                : 999;
+            const headingDelta = getHeadingDelta(previous?.heading, pending.heading);
+            const shouldApply = movedKm >= MIN_BUS_MOVE_KM || headingDelta >= MIN_HEADING_DELTA_DEG;
+
+            if (!shouldApply) return;
+
+            pendingLivePositionRef.current = null;
+            lastAppliedLiveRef.current = pending;
+            setBusPosition({
+                latitude: pending.latitude,
+                longitude: pending.longitude,
+            });
+            const currentRotation = smoothedRotationRef.current || 0;
+            const nextRotation = smoothAngle(
+                currentRotation,
+                pending.heading || 0,
+                ROTATION_SMOOTHING_ALPHA,
+            );
+            smoothedRotationRef.current = nextRotation;
+            setBusRotation(nextRotation);
+
+            if (isFollowingBusRef.current) {
+                updateCamera([pending.longitude, pending.latitude], 15);
+            }
+        }, LIVE_UPDATE_INTERVAL_MS);
+
+        return () => {
+            if (liveFlushIntervalRef.current) {
+                clearInterval(liveFlushIntervalRef.current);
+                liveFlushIntervalRef.current = null;
+            }
+        };
+    }, [getHeadingDelta, updateCamera, smoothAngle]);
 
     /**
      * Gère l'animation du bus le long de l'itinéraire
      */
     useEffect(() => {
-        if (!isBusAnimationActive || !routeDuration || routePath.length === 0) {
+        if (
+            !isBusAnimationActive ||
+            hasLiveSocketUpdateRef.current ||
+            !routeDuration ||
+            routePath.length === 0
+        ) {
             return;
         }
 
-        const totalDurationSeconds = routeDuration * 60;
-        const updateInterval = 50;
+        const totalDurationSeconds = Math.max(
+            SIM_MIN_DURATION_SECONDS,
+            Math.min(SIM_MAX_DURATION_SECONDS, routeDuration * 60),
+        );
+        const updateInterval = SIM_UPDATE_INTERVAL_MS;
         const progressIncrement = updateInterval / (totalDurationSeconds * 1000);
 
         let currentProgress = animationProgress;
@@ -741,20 +876,35 @@ export default function TripRouteViewerMapbox({
 
             const position = calculateBusPosition(currentProgress);
             if (position) {
-                setBusPosition({
-                    latitude: position.latitude,
-                    longitude: position.longitude,
+                setBusPosition((prev) => {
+                    if (!prev) {
+                        return {
+                            latitude: position.latitude,
+                            longitude: position.longitude,
+                        };
+                    }
+                    return {
+                        latitude:
+                            prev.latitude +
+                            (position.latitude - prev.latitude) * POSITION_SMOOTHING_ALPHA,
+                        longitude:
+                            prev.longitude +
+                            (position.longitude - prev.longitude) * POSITION_SMOOTHING_ALPHA,
+                    };
                 });
-                setBusRotation(position.rotation);
+
+                const currentRotation = smoothedRotationRef.current || position.rotation;
+                const nextRotation = smoothAngle(
+                    currentRotation,
+                    position.rotation,
+                    ROTATION_SMOOTHING_ALPHA,
+                );
+                smoothedRotationRef.current = nextRotation;
+                setBusRotation(nextRotation);
                 setAnimationProgress(currentProgress);
 
                 if (isFollowingBusRef.current) {
-                    const now = Date.now();
-                    if (now - lastCameraUpdateRef.current >= 200) {
-                        setCameraCenter([position.longitude, position.latitude]);
-                        setCameraZoom(15);
-                        lastCameraUpdateRef.current = now;
-                    }
+                    updateCamera([position.longitude, position.latitude], 15);
                 }
             }
 
@@ -775,6 +925,8 @@ export default function TripRouteViewerMapbox({
         routePath.length,
         calculateBusPosition,
         animationProgress,
+        updateCamera,
+        smoothAngle,
     ]);
 
     /**
@@ -792,8 +944,10 @@ export default function TripRouteViewerMapbox({
 
             if (routePath.length > 1) {
                 const initialRotation = calculateBearing(routePath[0], routePath[1]);
+                smoothedRotationRef.current = initialRotation;
                 setBusRotation(initialRotation);
             } else {
+                smoothedRotationRef.current = 0;
                 setBusRotation(0);
             }
         }
@@ -813,6 +967,10 @@ export default function TripRouteViewerMapbox({
             if (busAnimationIntervalRef.current) {
                 clearInterval(busAnimationIntervalRef.current);
                 busAnimationIntervalRef.current = null;
+            }
+            if (liveFlushIntervalRef.current) {
+                clearInterval(liveFlushIntervalRef.current);
+                liveFlushIntervalRef.current = null;
             }
         };
     }, []);
@@ -877,30 +1035,27 @@ export default function TripRouteViewerMapbox({
         }
 
         if (positionToUse) {
-            setCameraCenter([positionToUse.longitude, positionToUse.latitude]);
-            setCameraZoom(15);
+            updateCamera([positionToUse.longitude, positionToUse.latitude], 15, true);
         }
-    }, [passengerLocation, isManualMode, refreshCurrentLocation]);
+    }, [passengerLocation, isManualMode, refreshCurrentLocation, updateCamera]);
 
     /**
      * Centre la carte sur le point de départ
      */
     const centerOnStartPoint = useCallback(() => {
         if (startPoint) {
-            setCameraCenter([startPoint.longitude, startPoint.latitude]);
-            setCameraZoom(15);
+            updateCamera([startPoint.longitude, startPoint.latitude], 15, true);
         }
-    }, [startPoint]);
+    }, [startPoint, updateCamera]);
 
     /**
      * Centre la carte sur le point d'arrivée
      */
     const centerOnEndPoint = useCallback(() => {
         if (endPoint) {
-            setCameraCenter([endPoint.longitude, endPoint.latitude]);
-            setCameraZoom(15);
+            updateCamera([endPoint.longitude, endPoint.latitude], 15, true);
         }
-    }, [endPoint]);
+    }, [endPoint, updateCamera]);
 
     /**
      * Gère la sélection manuelle d'une position sur la carte
@@ -943,46 +1098,13 @@ export default function TripRouteViewerMapbox({
     }, [isManualMode, stopLocationTracking, refreshCurrentLocation]);
 
     /**
-     * Démarre ou arrête l'animation du bus
-     */
-    const toggleBusAnimation = useCallback(() => {
-        if (isBusAnimationActive) {
-            setIsBusAnimationActive(false);
-            setIsFollowingBus(false);
-        } else {
-            if (startPoint && routePath.length > 0 && routeDuration) {
-                setAnimationProgress(0);
-                setBusPosition(startPoint);
-
-                if (routePath.length > 1) {
-                    const initialRotation = calculateBearing(routePath[0], routePath[1]);
-                    setBusRotation(initialRotation);
-                } else {
-                    setBusRotation(0);
-                }
-
-                lastCameraUpdateRef.current = 0;
-
-                setIsBusAnimationActive(true);
-            }
-        }
-    }, [
-        isBusAnimationActive,
-        startPoint,
-        routePath,
-        routeDuration,
-        calculateBearing,
-    ]);
-
-    /**
      * Centre la carte sur la position du bus
      */
     const centerOnBus = useCallback(() => {
         if (busPosition) {
-            setCameraCenter([busPosition.longitude, busPosition.latitude]);
-            setCameraZoom(15);
+            updateCamera([busPosition.longitude, busPosition.latitude], 15, true);
         }
-    }, [busPosition]);
+    }, [busPosition, updateCamera]);
 
     /**
      * Active ou désactive le suivi automatique du bus
@@ -993,25 +1115,66 @@ export default function TripRouteViewerMapbox({
         isFollowingBusRef.current = newFollowState;
 
         if (newFollowState && busPosition) {
-            setCameraCenter([busPosition.longitude, busPosition.latitude]);
-            setCameraZoom(15);
-            lastCameraUpdateRef.current = Date.now();
+            updateCamera([busPosition.longitude, busPosition.latitude], 15, true);
         }
-    }, [isFollowingBus, busPosition]);
+    }, [isFollowingBus, busPosition, updateCamera]);
 
     /**
      * Réduit ou étend le panneau d'informations
      */
-    const togglePanelCollapse = useCallback(() => {
-        const newCollapsedState = !isPanelCollapsed;
-        setIsPanelCollapsed(newCollapsedState);
+    const animateInfoPanel = useCallback(
+        (collapsed: boolean) => {
+            setIsPanelCollapsed(collapsed);
+            Animated.timing(panelHeightAnim, {
+                toValue: collapsed ? PANEL_COLLAPSED_VALUE : PANEL_EXPANDED_VALUE,
+                duration: 300,
+                useNativeDriver: false,
+            }).start();
+        },
+        [panelHeightAnim],
+    );
 
-        Animated.timing(panelHeightAnim, {
-            toValue: newCollapsedState ? 0.2 : 1,
-            duration: 300,
-            useNativeDriver: false,
-        }).start();
-    }, [isPanelCollapsed, panelHeightAnim]);
+    /**
+     * Bascule l'état du panneau via un appui sur la poignée.
+     */
+    const togglePanelCollapse = useCallback(() => {
+        animateInfoPanel(!isPanelCollapsed);
+    }, [animateInfoPanel, isPanelCollapsed]);
+
+    /**
+     * Applique l'action afficher/masquer selon le swipe vertical.
+     */
+    const handlePanelSwipeRelease = useCallback(
+        (deltaY: number) => {
+            if (deltaY > PANEL_SWIPE_THRESHOLD && !isPanelCollapsed) {
+                animateInfoPanel(true);
+                return;
+            }
+            if (deltaY < -PANEL_SWIPE_THRESHOLD && isPanelCollapsed) {
+                animateInfoPanel(false);
+            }
+        },
+        [animateInfoPanel, isPanelCollapsed],
+    );
+
+    /**
+     * Configure le pan gesture de la poignée du panneau.
+     */
+    const panelPanResponder = useMemo(
+        () =>
+            PanResponder.create({
+                onMoveShouldSetPanResponder: (_, gestureState) =>
+                    Math.abs(gestureState.dy) > 6 &&
+                    Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
+                onPanResponderRelease: (_, gestureState) => {
+                    handlePanelSwipeRelease(gestureState.dy);
+                },
+                onPanResponderTerminate: (_, gestureState) => {
+                    handlePanelSwipeRelease(gestureState.dy);
+                },
+            }),
+        [handlePanelSwipeRelease],
+    );
 
     /**
      * Calcule la durée estimée du trajet
@@ -1212,128 +1375,31 @@ export default function TripRouteViewerMapbox({
     }
 
     return (
-        <View style={[styles.container, { backgroundColor }]}>
-            {/* Carte Mapbox */}
-            <MapView
-                ref={mapRef}
-                style={styles.map}
-                // styleURL={
-                //   isDarkMode
-                //     ? "mapbox://styles/mapbox/dark-v11"
-                //     : "mapbox://styles/mapbox/standard-v11"
-                // }
-                onPress={(feature: any) => {
-                    if (!isManualMode) return;
-
-                    // Gérer différentes structures d'événement Mapbox
-                    let coords: [number, number] | null = null;
-
-                    if (feature.geometry && "coordinates" in feature.geometry) {
-                        // Format GeoJSON: [longitude, latitude]
-                        coords = feature.geometry.coordinates as [number, number];
-                    } else if (feature.coordinates) {
-                        // Format alternatif avec objet coordinates
-                        if (
-                            typeof feature.coordinates.longitude === "number" &&
-                            typeof feature.coordinates.latitude === "number"
-                        ) {
-                            coords = [
-                                feature.coordinates.longitude,
-                                feature.coordinates.latitude,
-                            ];
-                        }
-                    }
-
-                    if (coords) {
-                        handleMapPress(coords);
-                    }
+        <SafeAreaView style={[styles.container, { backgroundColor }]} edges={['bottom']}>
+            <MapScene
+                mapRef={mapRef}
+                styles={styles}
+                isManualMode={isManualMode}
+                handleMapPress={handleMapPress}
+                cameraCenter={cameraCenter}
+                cameraZoom={cameraZoom}
+                routeGeoJSON={routeGeoJSON}
+                isValidCoordinate={isValidCoordinate}
+                startPoint={startPoint}
+                endPoint={endPoint}
+                passengerLocation={passengerLocation}
+                busPosition={busPosition}
+                busRotation={busRotation}
+                busMarkerImageStyle={busMarkerImageStyle}
+                toMapboxCoordinates={toMapboxCoordinates}
+                colors={{
+                    ...COLORS,
+                    busImage,
+                    flagStartImage,
+                    flagEndImage,
+                    userLocationPinImage,
                 }}
-            >
-                {/* Caméra pour contrôler la vue */}
-                {cameraCenter && (
-                    <Camera
-                        ref={cameraRef}
-                        centerCoordinate={cameraCenter}
-                        zoomLevel={cameraZoom}
-                        animationMode="flyTo"
-                        animationDuration={500}
-                    />
-                )}
-
-                {/* Itinéraire du trajet */}
-                {routeGeoJSON && (
-                    <ShapeSource id="routeSource" shape={routeGeoJSON}>
-                        <LineLayer
-                            id="routeLayer"
-                            style={{
-                                lineColor: COLORS.ACCENT,
-                                lineWidth: 5,
-                                lineCap: "round",
-                                lineJoin: "round",
-                            }}
-                        />
-                    </ShapeSource>
-                )}
-
-                {/* Point de départ */}
-                {isValidCoordinate(startPoint) && (
-                    <MarkerView
-                        id="start-point"
-                        coordinate={toMapboxCoordinates(startPoint)}
-                    >
-                        <Image
-                            source={flagStartImage}
-                            style={styles.flagMarker}
-                            resizeMode="contain"
-                        />
-                    </MarkerView>
-                )}
-
-                {/* Point d'arrivée */}
-                {isValidCoordinate(endPoint) && (
-                    <MarkerView id="end-point" coordinate={toMapboxCoordinates(endPoint)}>
-                        <Image
-                            source={flagEndImage}
-                            style={styles.flagMarker}
-                            resizeMode="contain"
-                        />
-                    </MarkerView>
-                )}
-
-                {/* Position du passager */}
-                {isValidCoordinate(passengerLocation) && (
-                    <MarkerView
-                        id="passenger-location"
-                        coordinate={toMapboxCoordinates(passengerLocation)}
-                    >
-                        <View style={styles.userLocationPinContainer}>
-                            <Image
-                                source={userLocationPinImage}
-                                style={styles.userLocationPinMarker}
-                                resizeMode="contain"
-                            />
-                        </View>
-                    </MarkerView>
-                )}
-
-                {/* Position du bus */}
-                {isValidCoordinate(busPosition) && (
-                    <MarkerView
-                        id="bus-marker"
-                        coordinate={toMapboxCoordinates(busPosition)}
-                    >
-                        <View style={styles.busMarkerContainer}>
-                            <View style={[{ transform: [{ rotate: `${busRotation}deg` }] }]}>
-                                <Image
-                                    source={busImage}
-                                    style={busMarkerImageStyle}
-                                    resizeMode="contain"
-                                />
-                            </View>
-                        </View>
-                    </MarkerView>
-                )}
-            </MapView>
+            />
 
             {/* En-tête de navigation */}
             <View style={headerStyle}>
@@ -1342,495 +1408,43 @@ export default function TripRouteViewerMapbox({
                 </TouchableOpacity>
             </View>
 
-            {/* Boutons de contrôle */}
-            <View style={styles.controlButtonsContainer}>
-                <TouchableOpacity
-                    style={[
-                        styles.controlButton,
-                        {
-                            backgroundColor: isManualMode
-                                ? COLORS.ACCENT
-                                : themeColors.iconCircleBackground,
-                        },
-                    ]}
-                    onPress={toggleLocationMode}
-                >
-                    <Ionicons
-                        name={isManualMode ? "location" : "location-outline"}
-                        size={20}
-                        color={isManualMode ? COLORS.WHITE : textColor}
-                    />
-                </TouchableOpacity>
-                {busPosition && routeDuration && (
-                    <TouchableOpacity
-                        style={[
-                            styles.controlButton,
-                            {
-                                backgroundColor: isBusAnimationActive
-                                    ? COLORS.ACCENT
-                                    : themeColors.iconCircleBackground,
-                            },
-                        ]}
-                        onPress={toggleBusAnimation}
-                    >
-                        <Ionicons
-                            name={isBusAnimationActive ? "pause" : "bus"}
-                            size={20}
-                            color={isBusAnimationActive ? COLORS.WHITE : textColor}
-                        />
-                    </TouchableOpacity>
-                )}
-                {busPosition && (
-                    <TouchableOpacity
-                        style={[
-                            styles.controlButton,
-                            {
-                                backgroundColor: isFollowingBus
-                                    ? COLORS.ACCENT
-                                    : themeColors.iconCircleBackground,
-                            },
-                        ]}
-                        onPress={toggleFollowBus}
-                    >
-                        <Ionicons
-                            name={isFollowingBus ? "eye" : "eye-outline"}
-                            size={20}
-                            color={isFollowingBus ? COLORS.WHITE : textColor}
-                        />
-                    </TouchableOpacity>
-                )}
-                {busPosition && (
-                    <TouchableOpacity
-                        style={[
-                            styles.controlButton,
-                            { backgroundColor: themeColors.iconCircleBackground },
-                        ]}
-                        onPress={centerOnBus}
-                    >
-                        <Ionicons name="locate" size={20} color={textColor} />
-                    </TouchableOpacity>
-                )}
-                <TouchableOpacity
-                    style={[
-                        styles.controlButton,
-                        { backgroundColor: themeColors.iconCircleBackground },
-                    ]}
-                    onPress={centerOnMe}
-                >
-                    <Ionicons name="person" size={20} color={textColor} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[
-                        styles.controlButton,
-                        { backgroundColor: themeColors.iconCircleBackground },
-                    ]}
-                    onPress={centerMapOnRoute}
-                >
-                    <Ionicons name="expand-outline" size={20} color={textColor} />
-                </TouchableOpacity>
-            </View>
+            <ControlButtons
+                styles={styles}
+                themeColors={themeColors}
+                isManualMode={isManualMode}
+                toggleLocationMode={toggleLocationMode}
+                textColor={textColor}
+                busPosition={busPosition}
+                isFollowingBus={isFollowingBus}
+                toggleFollowBus={toggleFollowBus}
+                centerOnBus={centerOnBus}
+                centerOnMe={centerOnMe}
+                centerMapOnRoute={centerMapOnRoute}
+                colors={COLORS}
+            />
 
-            {/* Panneau d'informations */}
-            <Animated.View style={infoPanelStyle}>
-                <TouchableOpacity
-                    style={styles.panelHandleContainer}
-                    onPress={togglePanelCollapse}
-                    activeOpacity={0.7}
-                >
-                    <View
-                        style={[
-                            styles.panelHandle,
-                            {
-                                backgroundColor: themeColors.border,
-                                borderColor: themeColors.border,
-                            },
-                        ]}
-                    />
-                </TouchableOpacity>
-                <ScrollView
-                    style={styles.scrollView}
-                    contentContainerStyle={scrollViewContentStyle}
-                    showsVerticalScrollIndicator={!isPanelCollapsed}
-                >
-                    {/* En-tête avec destination et durée */}
-                    <View
-                        style={[
-                            styles.panelHeader,
-                            { backgroundColor: themeColors.cardBackground },
-                        ]}
-                    >
-                        <View
-                            style={[
-                                styles.headerContent,
-                                styles.headerContentBorder,
-                                {
-                                    borderColor: themeColors.border,
-                                    backgroundColor: themeColors.cardBackground,
-                                },
-                            ]}
-                        >
-                            {/* Section de départ */}
-                            <View style={styles.headerColumn}>
-                                <View
-                                    style={[
-                                        styles.cityCodeBadge,
-                                        { backgroundColor: themeColors.badgeBackground },
-                                    ]}
-                                >
-                                    <Text style={[styles.headerCityCode, { color: textColor }]}>
-                                        {startCityCode}
-                                    </Text>
-                                </View>
-                                <Text
-                                    style={[styles.headerCityName, { color: textColor }]}
-                                    numberOfLines={1}
-                                >
-                                    {booking.trip?.stationFrom?.city || ""}
-                                </Text>
-                                <View style={styles.timezoneContainer}>
-                                    <Text
-                                        style={[
-                                            styles.headerTimezone,
-                                            { color: secondaryTextColor },
-                                        ]}
-                                    >
-                                        {booking.trip?.stationFrom?.name || ""}
-                                    </Text>
-                                </View>
-                            </View>
-
-                            {/* Icône de bus au centre */}
-                            <View style={styles.headerCenterSection}>
-                                <View
-                                    style={[
-                                        styles.headerIconContainer,
-                                        { backgroundColor: COLORS.ACCENT },
-                                    ]}
-                                >
-                                    <Ionicons name="bus-outline" size={20} color={COLORS.WHITE} />
-                                </View>
-                                <View
-                                    style={[
-                                        styles.headerConnectorLine,
-                                        { backgroundColor: themeColors.border },
-                                    ]}
-                                />
-                            </View>
-
-                            {/* Section d'arrivée */}
-                            <View style={styles.headerColumn}>
-                                <View
-                                    style={[
-                                        styles.cityCodeBadge,
-                                        { backgroundColor: themeColors.badgeBackground },
-                                    ]}
-                                >
-                                    <Text style={[styles.headerCityCode, { color: textColor }]}>
-                                        {endCityCode}
-                                    </Text>
-                                </View>
-                                <Text
-                                    style={[styles.headerCityName, { color: textColor }]}
-                                    numberOfLines={1}
-                                >
-                                    {booking.trip?.stationTo?.city || ""}
-                                </Text>
-                                <View style={styles.timezoneContainer}>
-                                    <Text
-                                        style={[
-                                            styles.headerTimezone,
-                                            { color: secondaryTextColor },
-                                        ]}
-                                    >
-                                        {booking.trip?.stationTo?.name || ""}
-                                    </Text>
-                                </View>
-                            </View>
-                        </View>
-                        {/* Durée du trajet */}
-                        {formattedDuration && booking.arrivalTime && (
-                            <View
-                                style={[
-                                    styles.durationBadge,
-                                    {
-                                        backgroundColor: COLORS.ACCENT,
-                                        borderColor: COLORS.ACCENT,
-                                    },
-                                ]}
-                            >
-                                <Ionicons name="time" size={18} color={COLORS.WHITE} />
-                                <Text style={[styles.headerDuration, { color: COLORS.WHITE }]}>
-                                    Durée estimée du trajet : {formattedDuration}
-                                </Text>
-                            </View>
-                        )}
-                    </View>
-
-                    {/* Indicateur de mode sélection manuelle */}
-                    {isManualMode && !isPanelCollapsed && (
-                        <View
-                            style={[
-                                styles.modeIndicator,
-                                {
-                                    backgroundColor: COLORS.ACCENT_LIGHT,
-                                    borderColor: COLORS.ACCENT,
-                                },
-                            ]}
-                        >
-                            <View
-                                style={[
-                                    styles.modeIndicatorIconContainer,
-                                    { backgroundColor: COLORS.ACCENT },
-                                ]}
-                            >
-                                <Ionicons
-                                    name="hand-left-outline"
-                                    size={16}
-                                    color={COLORS.WHITE}
-                                />
-                            </View>
-                            <View style={styles.modeIndicatorTextContainer}>
-                                <Text
-                                    style={[styles.modeIndicatorTitle, { color: COLORS.ACCENT }]}
-                                >
-                                    Mode sélection manuelle
-                                </Text>
-                                <Text
-                                    style={[styles.modeIndicatorText, { color: COLORS.ACCENT }]}
-                                >
-                                    Appuyez sur la carte pour choisir votre position
-                                </Text>
-                            </View>
-                        </View>
-                    )}
-
-                    {/* Liste des étapes */}
-                    {!isPanelCollapsed && (
-                        <View style={styles.stepsContainer}>
-                            {/* Position actuelle */}
-                            <View style={styles.stepItem}>
-                                <View style={styles.stepLeft}>
-                                    <TouchableOpacity onPress={centerOnMe} activeOpacity={0.7}>
-                                        <View
-                                            style={[
-                                                styles.stepIconContainer,
-                                                { backgroundColor: COLORS.ACCENT },
-                                            ]}
-                                        >
-                                            <Ionicons name="locate" size={16} color={COLORS.WHITE} />
-                                        </View>
-                                    </TouchableOpacity>
-                                    <View
-                                        style={[
-                                            styles.stepLine,
-                                            { backgroundColor: themeColors.border },
-                                        ]}
-                                    />
-                                </View>
-                                <TouchableOpacity
-                                    style={[
-                                        styles.stepCard,
-                                        styles.stepCardRow,
-                                        { backgroundColor: themeColors.listItemBackground },
-                                    ]}
-                                    activeOpacity={0.7}
-                                    onPress={centerOnMe}
-                                >
-                                    <View style={{ width: "90%" }}>
-                                        <View style={styles.stepCardHeader}>
-                                            <Text
-                                                style={[styles.stepMainText, { color: textColor }]}
-                                                numberOfLines={2}
-                                            >
-                                                Position actuelle
-                                            </Text>
-                                        </View>
-                                        <Text
-                                            style={[
-                                                styles.stepSubText,
-                                                { color: secondaryTextColor },
-                                            ]}
-                                            numberOfLines={2}
-                                        >
-                                            {currentAddress}
-                                        </Text>
-                                    </View>
-                                    <Ionicons
-                                        name="chevron-forward"
-                                        size={16}
-                                        color={secondaryTextColor}
-                                    />
-                                </TouchableOpacity>
-                            </View>
-
-                            {/* Ville de départ */}
-                            <View style={styles.stepItem}>
-                                <View style={styles.stepLeft}>
-                                    <TouchableOpacity
-                                        onPress={centerOnStartPoint}
-                                        activeOpacity={0.7}
-                                    >
-                                        <View
-                                            style={[
-                                                styles.stepIconContainer,
-                                                { backgroundColor: COLORS.START_MARKER },
-                                            ]}
-                                        >
-                                            <Ionicons
-                                                name="bus-outline"
-                                                size={16}
-                                                color={COLORS.WHITE}
-                                            />
-                                        </View>
-                                    </TouchableOpacity>
-                                    <View
-                                        style={[
-                                            styles.stepLine,
-                                            { backgroundColor: themeColors.border },
-                                        ]}
-                                    />
-                                </View>
-                                <TouchableOpacity
-                                    style={[
-                                        styles.stepCard,
-                                        styles.stepCardRow,
-                                        { backgroundColor: themeColors.listItemBackground },
-                                    ]}
-                                    activeOpacity={0.7}
-                                    onPress={centerOnStartPoint}
-                                >
-                                    <View style={{ width: "90%" }}>
-                                        <View style={styles.stepCardHeader}>
-                                            <Text
-                                                style={[styles.stepMainText, { color: textColor }]}
-                                                numberOfLines={1}
-                                            >
-                                                Ville de départ
-                                            </Text>
-                                        </View>
-                                        <View style={styles.stepCardDetails}>
-                                            <Ionicons
-                                                name="location"
-                                                size={12}
-                                                color={secondaryTextColor}
-                                            />
-                                            <Text
-                                                style={[
-                                                    styles.stepSubText,
-                                                    { color: secondaryTextColor },
-                                                ]}
-                                                numberOfLines={1}
-                                            >
-                                                {booking.trip.stationFrom.city}
-                                            </Text>
-                                        </View>
-                                        <View style={styles.stepCardDetails}>
-                                            <Ionicons
-                                                name="time-outline"
-                                                size={12}
-                                                color={secondaryTextColor}
-                                            />
-                                            <Text
-                                                style={[
-                                                    styles.stepSubText,
-                                                    { color: secondaryTextColor },
-                                                ]}
-                                            >
-                                                Départ prévu à {booking.departureTime}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                    <Ionicons
-                                        name="chevron-forward"
-                                        size={16}
-                                        color={secondaryTextColor}
-                                    />
-                                </TouchableOpacity>
-                            </View>
-
-                            {/* Ville d'arrivée */}
-                            <View style={styles.stepItem}>
-                                <View style={styles.stepLeft}>
-                                    <TouchableOpacity
-                                        onPress={centerOnEndPoint}
-                                        activeOpacity={0.7}
-                                    >
-                                        <View
-                                            style={[
-                                                styles.stepIconContainer,
-                                                { backgroundColor: COLORS.END_MARKER },
-                                            ]}
-                                        >
-                                            <Ionicons
-                                                name="stop-outline"
-                                                size={16}
-                                                color={COLORS.WHITE}
-                                            />
-                                        </View>
-                                    </TouchableOpacity>
-                                </View>
-                                <TouchableOpacity
-                                    style={[
-                                        styles.stepCard,
-                                        styles.stepCardRow,
-                                        { backgroundColor: themeColors.listItemBackground },
-                                    ]}
-                                    activeOpacity={0.7}
-                                    onPress={centerOnEndPoint}
-                                >
-                                    <View style={{ width: "90%" }}>
-                                        <View style={styles.stepCardHeader}>
-                                            <Text
-                                                style={[styles.stepMainText, { color: textColor }]}
-                                                numberOfLines={1}
-                                            >
-                                                {"Ville d'arrivée"}
-                                            </Text>
-                                        </View>
-                                        <View style={styles.stepCardDetails}>
-                                            <Ionicons
-                                                name="location"
-                                                size={12}
-                                                color={secondaryTextColor}
-                                            />
-                                            <Text
-                                                style={[
-                                                    styles.stepSubText,
-                                                    { color: secondaryTextColor },
-                                                ]}
-                                                numberOfLines={1}
-                                            >
-                                                {booking.trip.stationTo.city}
-                                            </Text>
-                                        </View>
-                                        <View style={styles.stepCardDetails}>
-                                            <Ionicons
-                                                name="time-outline"
-                                                size={12}
-                                                color={secondaryTextColor}
-                                            />
-                                            <Text
-                                                style={[
-                                                    styles.stepSubText,
-                                                    { color: secondaryTextColor },
-                                                ]}
-                                            >
-                                                Arrivée prévue à {booking.arrivalTime}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                    <Ionicons
-                                        name="chevron-forward"
-                                        size={16}
-                                        color={secondaryTextColor}
-                                    />
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-                    )}
-                </ScrollView>
-            </Animated.View>
-        </View>
+            <InfoPanel
+                infoPanelStyle={infoPanelStyle}
+                styles={styles}
+                togglePanelCollapse={togglePanelCollapse}
+                panelHandlePanHandlers={panelPanResponder.panHandlers}
+                themeColors={themeColors}
+                scrollViewContentStyle={scrollViewContentStyle}
+                textColor={textColor}
+                secondaryTextColor={secondaryTextColor}
+                startCityCode={startCityCode}
+                endCityCode={endCityCode}
+                booking={booking}
+                formattedDuration={formattedDuration}
+                isManualMode={isManualMode}
+                isPanelCollapsed={isPanelCollapsed}
+                centerOnMe={centerOnMe}
+                centerOnStartPoint={centerOnStartPoint}
+                centerOnEndPoint={centerOnEndPoint}
+                currentAddress={currentAddress}
+                colors={COLORS}
+            />
+        </SafeAreaView>
     );
 }
 
