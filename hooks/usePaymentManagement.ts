@@ -123,7 +123,9 @@ export const usePaymentManagement = (defaultCountryCode: string = '+225') => {
                     tokenCode: rebookingCode.trim(),
                     departureId: trip.id,
                     returnDepartureId: isRoundTrip && returnTrip ? returnTrip.id : null,
-                    passengers: rebookingPassengers
+                    passengers: rebookingPassengers,
+                    departureTripId: trip.departureTripId ?? null,
+                    returnDepartureTripId: isRoundTrip && returnTrip ? returnTrip.departureTripId : null,
                 };
                 bookingResponse = await createRebookingBooking(rebookingPayload, token || '');
                 console.log("bookingResponse ==>, ", bookingResponse.data)
@@ -171,6 +173,8 @@ export const usePaymentManagement = (defaultCountryCode: string = '+225') => {
                     companyId: trip.companyId,
                     customerId: userId,
                     departureId: trip.id,
+                    departureTripId: trip.departureTripId ?? null,
+                    returnDepartureTripId: isRoundTrip && returnTrip ? returnTrip.departureTripId : null,
                     ...(isRoundTrip && returnTrip ? { returnDepartureId: returnTrip.id } : {}),
                     type: tripType,
                     channel: 'MOBILE_APP',

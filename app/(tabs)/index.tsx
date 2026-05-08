@@ -495,7 +495,7 @@ export default function HomeScreen() {
                 }}>
                 <View style={styles.nextTripSheetRowContent}>
                     <Text style={[styles.nextTripSheetRoute, { color: themeColors.text }]} numberOfLines={1}>
-                        {`${getCityName(booking?.trip?.stationFrom)} → ${getCityName(booking?.trip?.stationTo)}`}
+                        {`${getCityName(booking?.trip?.label)} → ${getCityName(booking?.trip?.stationTo)}`}
                     </Text>
                     <Text style={[styles.nextTripSheetMeta, { color: themeColors.searchText }]}>
                         {formatBookingDate(booking.departureDateTime)} · {booking.companyName}
@@ -527,6 +527,8 @@ export default function HomeScreen() {
     if (loading) {
         return <LoadingView />;
     }
+
+    console.log('nextTrip trip ==> ', nextTrip[0]?.trip);
 
     return (
         <>

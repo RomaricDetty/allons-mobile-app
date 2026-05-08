@@ -1,8 +1,13 @@
 // @ts-nocheck
 import { formatBookingDate } from '@/constants/functions';
 import { useAppColors } from '@/hooks/use-app-colors';
+import { formatDateForFileName } from '@/utils/ticketPdfGenerator';
+import { generateBusRentalReceiptHTML, getBusRentalReceiptReference } from '@/utils/busRentalReceiptPdfGenerator';
+import * as FileSystemLegacy from 'expo-file-system/legacy';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import React from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { BusRentalRequestItem } from './BusRentalRequestCard';
@@ -115,10 +120,12 @@ export function BusRentalRequestDetailModal({
 }: BusRentalRequestDetailModalProps) {
     const colors = useAppColors();
     const insets = useSafeAreaInsets();
+    const [isGeneratingReceipt, setIsGeneratingReceipt] = React.useState(false);
     const status = item?.status ?? 'PENDING';
     const statusBadge = STATUS_BADGE_LABELS[status] ?? status;
     const statusColors = STATUS_BADGE_COLORS[status] ?? { bg: '#F5E6C8', text: '#5C4A32' };
     const isPayable = status === 'ACCEPTED' && onPayRequest && item;
+    const canDownloadReceipt = status === 'CONFIRMED' && item;
 
     const quoteAmount = item?.quotedAmount ?? item?.quoteAmount ?? item?.amount ?? item?.totalAmount;
     const quoteCompany = (item as any)?.quote?.companyName ?? (item as any)?.company?.name ?? (item as any)?.companyName;
@@ -129,6 +136,49 @@ export function BusRentalRequestDetailModal({
     const formatDate = (d: string | undefined) => (d ? formatBookingDate(d) : '—');
 
     if (!item) return null;
+
+    /**
+     * Télécharge le reçu PDF d'une location de bus confirmée.
+     */
+    const handleDownloadReceipt = async () => {
+        if (!item) return;
+
+        setIsGeneratingReceipt(true);
+        try {
+            const html = generateBusRentalReceiptHTML(item);
+            const dateFormatted = formatDateForFileName();
+            const receiptReference = String(getBusRentalReceiptReference(item)).replace(/[^a-zA-Z0-9_-]/g, '-');
+            const finalFileName = `BusRental-Receipt-${receiptReference}-${dateFormatted}.pdf`;
+
+            const { uri } = await Print.printToFileAsync({
+                html,
+                base64: false,
+                width: 595,
+                height: 842,
+                fileName: finalFileName,
+            });
+
+            const finalFileUri = `${FileSystemLegacy.documentDirectory}${finalFileName}`;
+            await FileSystemLegacy.copyAsync({
+                from: uri,
+                to: finalFileUri,
+            });
+
+            if (await Sharing.isAvailableAsync()) {
+                await Sharing.shareAsync(finalFileUri, {
+                    mimeType: 'application/pdf',
+                    dialogTitle: 'Télécharger le reçu',
+                });
+            } else {
+                Alert.alert('Succès', `Le reçu a été sauvegardé dans vos documents.\n\nFichier: ${finalFileName}`);
+            }
+        } catch (error) {
+            console.error('Erreur lors de la génération du reçu de location:', error);
+            Alert.alert('Erreur', 'Une erreur est survenue lors de la génération du reçu. Veuillez réessayer.');
+        } finally {
+            setIsGeneratingReceipt(false);
+        }
+    };
 
     const clientName = ([item.firstName, item.lastName].filter(Boolean).join(' ') || (item as any)?.customerName) ?? '—';
     const phone = (item as any)?.phone?.number ?? (item as any)?.phone ?? (item as any)?.customerPhone ?? '—';
@@ -258,6 +308,23 @@ export function BusRentalRequestDetailModal({
                                 <MaterialCommunityIcons name="chevron-right" size={20} color="#FFF" />
                             </Pressable>
                         )}
+
+                        {canDownloadReceipt && (
+                            <Pressable
+                                style={[styles.receiptButton, { borderColor: colors.activeTabColor }]}
+                                onPress={handleDownloadReceipt}
+                                disabled={isGeneratingReceipt}
+                            >
+                                {isGeneratingReceipt ? (
+                                    <ActivityIndicator size="small" color={colors.activeTabColor} />
+                                ) : (
+                                    <MaterialCommunityIcons name="download" size={20} color={colors.activeTabColor} />
+                                )}
+                                <Text style={[styles.receiptButtonText, { color: colors.activeTabColor }]}>
+                                    {isGeneratingReceipt ? 'Génération...' : 'Télécharger le reçu'}
+                                </Text>
+                            </Pressable>
+                        )}
                     </ScrollView>
                 </View>
             </View>
@@ -310,4 +377,16 @@ const styles = StyleSheet.create({
         marginBottom: 24,
     },
     payButtonText: { fontSize: 16, fontFamily: 'Ubuntu_Bold', color: '#FFFFFF' },
+    receiptButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 14,
+        borderRadius: 8,
+        borderWidth: 1,
+        gap: 8,
+        marginTop: 8,
+        marginBottom: 24,
+    },
+    receiptButtonText: { fontSize: 16, fontFamily: 'Ubuntu_Bold' },
 });

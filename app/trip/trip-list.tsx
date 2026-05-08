@@ -202,6 +202,8 @@ const TripList = () => {
     const totalTrips = departures?.total || 0;
     const filters = departures?.filters;
 
+    console.log('trips result query => ', trips);
+
     // États pour les dropdowns et modals
     const [showFiltersModal, setShowFiltersModal] = useState(false);
     const [showDisplayModal, setShowDisplayModal] = useState(false);

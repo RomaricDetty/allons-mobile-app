@@ -208,6 +208,8 @@ const TripSummary = () => {
                     paymentChannel: 'MOBILE_APP',
                     passengers: buildFeesPassengersPayload(),
                     outboundDepartureId: trip.id,
+                    // departureTripId: trip.departureTripId ?? null,
+                    // ...(isRoundTrip && returnTrip?.departureTripId ? { returnDepartureTripId: returnTrip.departureTripId } : {}),
                     ...(isRoundTrip && returnTrip?.id ? { returnDepartureId: returnTrip.id } : {}),
                 },
                 token || undefined

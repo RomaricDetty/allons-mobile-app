@@ -116,6 +116,8 @@ export const createRebookingBooking = async (
         departureId: string;
         returnDepartureId?: string | null;
         passengers: RebookingPassengerPayload[];
+        departureTripId?: string | null;
+        returnDepartureTripId?: string | null;
     },
     token?: string
 ): Promise<AxiosResponse<any>> => {
@@ -130,6 +132,12 @@ export const createRebookingBooking = async (
     };
     if (payload.returnDepartureId) {
         body.returnDepartureId = payload.returnDepartureId;
+    }
+    if (payload.departureTripId) {
+        body.departureTripId = payload.departureTripId;
+    }
+    if (payload.returnDepartureTripId) {
+        body.returnDepartureTripId = payload.returnDepartureTripId;
     }
     return await axios.post(`${baseUrl}/customers/bookings/rebook`, body, { headers });
 };

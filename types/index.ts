@@ -49,6 +49,7 @@ export type City = {
  * Type pour un trajet (départ)
  */
 export type Trip = {
+    departureTripId: string;
     id: string;
     departureCity: string;
     arrivalCity: string;
