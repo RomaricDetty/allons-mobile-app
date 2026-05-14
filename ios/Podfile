@@ -20,8 +20,8 @@ platform :ios, podfile_properties['ios.deploymentTarget'] || '15.1'
 
 prepare_react_native_project!
 
-# @generated begin @rnmapbox/maps-rnmapboxmapsimpl - expo prebuild (DO NOT MODIFY) sync-a4ed08016e4c6e474898943b3e9c34c444d59175
-$RNMapboxMapsVersion = '11.15.2'
+# @generated begin @rnmapbox/maps-rnmapboxmapsimpl - expo prebuild (DO NOT MODIFY) sync-fe6fad86736b6a8e2c834aeebca1d5562ca7cef9
+$RNMapboxMapsVersion = '11.18.2'
 # @generated end @rnmapbox/maps-rnmapboxmapsimpl
 target 'AllOn' do
   use_expo_modules!
@@ -30,7 +30,10 @@ target 'AllOn' do
     config_command = ['node', '-e', "process.argv=['', '', 'config'];require('@react-native-community/cli').run()"];
   else
     config_command = [
-      'npx',
+      'node',
+      '--no-warnings',
+      '--eval',
+      'require(\'expo/bin/autolinking\')',
       'expo-modules-autolinking',
       'react-native-config',
       '--json',

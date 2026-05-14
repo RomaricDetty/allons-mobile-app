@@ -242,7 +242,7 @@ export default function HomeScreen() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [popularTrips, setPopularTrips] = useState<PopularTrip[]>([]);
-    const [nextTrip, setNextTrip] = useState<Booking | null>(null);
+    const [nextTrip, setNextTrip] = useState<Booking[]>([]);
     const [nextTripsSheetVisible, setNextTripsSheetVisible] = useState(false);
     const [user, setUser] = useState<User | null>(null);
     const [refreshTintColor, setRefreshTintColor] = useState(PRIMARY_COLOR);
@@ -308,10 +308,13 @@ export default function HomeScreen() {
             }
             const response = await getNextTrip(token);
             const raw = response.data;
-            const list = Array.isArray(raw) ? raw : (raw?.data ?? []);
-            const first = list ?? null;
-            console.log('first ==> ', first);
-            setNextTrip(first);
+            const extracted = Array.isArray(raw) ? raw : raw?.data;
+            const list: Booking[] = Array.isArray(extracted)
+                ? extracted
+                : extracted != null
+                  ? [extracted as Booking]
+                  : [];
+            setNextTrip(list);
             return true;
         } catch (error) {
             console.error('Erreur récupération prochain voyage:', error);
@@ -479,10 +482,7 @@ export default function HomeScreen() {
     const ItemSeparator = useCallback(() => <View style={styles.itemSeparator} />, []);
 
     /** Liste des prochains voyages pour le bottom sheet (tableau) */
-    const nextTripsList = useMemo(
-        () => (Array.isArray(nextTrip) ? nextTrip : nextTrip ? [nextTrip] : []),
-        [nextTrip]
-    );
+    const nextTripsList = useMemo(() => nextTrip, [nextTrip]);
 
     /** Ligne cliquable dans le bottom sheet "Voyage de la semaine" */
     const renderNextTripSheetItem = useCallback(
@@ -527,8 +527,6 @@ export default function HomeScreen() {
     if (loading) {
         return <LoadingView />;
     }
-
-    console.log('nextTrip trip ==> ', nextTrip[0]?.trip);
 
     return (
         <>
@@ -579,13 +577,13 @@ export default function HomeScreen() {
                             <View style={styles.nextTripContainer}>
                                 {/* <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Voyage de la semaine</Text> */}
                                 {/* <NextTripCard /> */}
-                                {nextTrip && nextTrip.length > 0 && (
+                                {nextTrip.length > 0 && (
                                     <View style={styles.itinerarySection}>
                                         <View style={styles.carouselWrapper}>
                                             <SectionHeader
                                                 title={nextTrip.length > 1 ? 'Voyages de la semaine' : 'Voyage de la semaine'}
                                                 onSeeMore={handleSeeMoreNextTripsPress}
-                                                showSeeMore={nextTrip && nextTrip.length > 3 ? true : false}
+                                                showSeeMore={nextTrip.length > 3}
                                             />
                                             {/* nextTrip && nextTrip.length > 3 ? true : false */}
                                             <FlatList

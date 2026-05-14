@@ -109,13 +109,13 @@ PODS:
   - libwebp/sharpyuv (1.5.0)
   - libwebp/webp (1.5.0):
     - libwebp/sharpyuv
-  - MapboxCommon (24.15.2):
+  - MapboxCommon (24.18.2):
     - Turf (= 4.0.0)
-  - MapboxCoreMaps (11.15.2):
-    - MapboxCommon (= 24.15.2)
-  - MapboxMaps (11.15.2):
-    - MapboxCommon (= 24.15.2)
-    - MapboxCoreMaps (= 11.15.2)
+  - MapboxCoreMaps (11.18.2):
+    - MapboxCommon (= 24.18.2)
+  - MapboxMaps (11.18.2):
+    - MapboxCommon (= 24.18.2)
+    - MapboxCoreMaps (= 11.18.2)
     - Turf (= 4.0.0)
   - RCTDeprecation (0.81.5)
   - RCTRequired (0.81.5)
@@ -1908,14 +1908,14 @@ PODS:
     - ReactNativeDependencies
     - Yoga
   - rnmapbox-maps (10.3.0):
-    - MapboxMaps (= 11.15.2)
+    - MapboxMaps (= 11.18.2)
     - React
     - React-Core
     - rnmapbox-maps/DynamicLibrary (= 10.3.0)
     - Turf
   - rnmapbox-maps/DynamicLibrary (10.3.0):
     - hermes-engine
-    - MapboxMaps (= 11.15.2)
+    - MapboxMaps (= 11.18.2)
     - RCTRequired
     - RCTTypeSafety
     - React
@@ -2549,9 +2549,9 @@ SPEC CHECKSUMS:
   libavif: 5f8e715bea24debec477006f21ef9e95432e254d
   libdav1d: 23581a4d8ec811ff171ed5e2e05cd27bad64c39f
   libwebp: 02b23773aedb6ff1fd38cec7a77b81414c6842a8
-  MapboxCommon: 5b702d1562a1bc56a8a9d141ebbbaa72390536c9
-  MapboxCoreMaps: ae6fcbe255e3fa9f290ee9cd72d125d1a2ecabfa
-  MapboxMaps: 7627bc07bcad10259668d83a3f0ed3920ee0eaf7
+  MapboxCommon: c9dc807d8fefcdc2ed15b8a14c68109db74ac4f5
+  MapboxCoreMaps: 2f3f01c611d2375dd3e678384d6edf39102c5194
+  MapboxMaps: bd0a24605ad74a3dd140ef7bce64f96c056fda0b
   RCTDeprecation: 943572d4be82d480a48f4884f670135ae30bf990
   RCTRequired: 8f3cfc90cc25cf6e420ddb3e7caaaabc57df6043
   RCTTypeSafety: 16a4144ca3f959583ab019b57d5633df10b5e97c
@@ -2623,7 +2623,7 @@ SPEC CHECKSUMS:
   RNCAsyncStorage: 3a4f5e2777dae1688b781a487923a08569e27fe4
   RNDateTimePicker: be0e44bcb9ed0607c7c5f47dbedd88cf091f6791
   RNGestureHandler: 2914750df066d89bf9d8f48a10ad5f0051108ac3
-  rnmapbox-maps: 9534cecb23e97079d7f0f2a6ca1377274eda60b2
+  rnmapbox-maps: b7ac8328390c77bf5a8f4df0013945ea6cbe2839
   RNReanimated: 9c6a550b41de91cf374e60afd79db93a362f1126
   RNScreens: d8d6f1792f6e7ac12b0190d33d8d390efc0c1845
   RNSVG: cf9ae78f2edf2988242c71a6392d15ff7dd62522
@@ -2636,6 +2636,6 @@ SPEC CHECKSUMS:
   Turf: c9eb11a65d96af58cac523460fd40fec5061b081
   Yoga: 5934998fbeaef7845dbf698f698518695ab4cd1a
 
-PODFILE CHECKSUM: 547c226a840932c913098be79aa34cf450de1dd6
+PODFILE CHECKSUM: 3adaad96f64da666ed6965545bad8c9829a140a9
 
 COCOAPODS: 1.16.2
