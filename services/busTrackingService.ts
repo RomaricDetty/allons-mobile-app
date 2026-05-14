@@ -29,12 +29,22 @@ class BusTrackingService {
         if (!d || typeof d !== 'object') return null;
 
         const pos = d.position as Record<string, unknown> | undefined;
-        const lat = Number(
+        let lat = Number(
             d.lat ?? d.latitude ?? pos?.lat ?? pos?.latitude,
         );
-        const lng = Number(
+        let lng = Number(
             d.lng ?? d.longitude ?? pos?.lng ?? pos?.longitude,
         );
+
+        const coords = d.coordinates as unknown;
+        if (
+            (!Number.isFinite(lat) || !Number.isFinite(lng)) &&
+            Array.isArray(coords) &&
+            coords.length >= 2
+        ) {
+            lng = Number(coords[0]);
+            lat = Number(coords[1]);
+        }
 
         if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
             this.debugLog('[SocketIO] bus:position:update ignoré (coords invalides)', data);
@@ -140,6 +150,12 @@ class BusTrackingService {
 
             this.socket.on('bus:position:update', (data: unknown) => {
                 this.debugLog('[SocketIO] bus:position:update', data);
+                const msg = this.normalizeBusPosition(data);
+                if (msg) this.handleMessage(msg);
+            });
+
+            this.socket.on('bus_position_update', (data: unknown) => {
+                this.debugLog('[SocketIO] bus_position_update', data);
                 const msg = this.normalizeBusPosition(data);
                 if (msg) this.handleMessage(msg);
             });

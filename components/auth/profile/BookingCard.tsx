@@ -12,6 +12,37 @@ interface BookingCardProps {
 }
 
 /**
+ * Construit la date d'arrivée prévue : jour du départ + heure d'arrivée ;
+ * si l'heure d'arrivée est avant celle du départ sur la même journée, l'arrivée est le lendemain.
+ */
+function getScheduledArrivalDate(booking: Booking): Date | null {
+    if (!booking.departureDateTime || !booking.arrivalTime?.trim()) return null;
+
+    const departure = new Date(booking.departureDateTime);
+    if (Number.isNaN(departure.getTime())) return null;
+
+    const arrivalParts = booking.arrivalTime.trim().split(':').map(Number);
+    const arrH = arrivalParts[0];
+    const arrM = arrivalParts[1] ?? 0;
+    if (!Number.isFinite(arrH) || !Number.isFinite(arrM)) return null;
+
+    const depParts = (booking.departureTime || '0:0').trim().split(':').map(Number);
+    const depH = depParts[0] ?? 0;
+    const depM = depParts[1] ?? 0;
+
+    const arrival = new Date(departure);
+    arrival.setHours(arrH, arrM, 0, 0);
+
+    const depMinutes = depH * 60 + depM;
+    const arrMinutes = arrH * 60 + arrM;
+    if (arrMinutes < depMinutes) {
+        arrival.setDate(arrival.getDate() + 1);
+    }
+
+    return arrival;
+}
+
+/**
  * Composant carte de réservation avec toutes les informations et actions
  */
 export const BookingCard: React.FC<BookingCardProps> = ({ booking }) => {
@@ -23,15 +54,17 @@ export const BookingCard: React.FC<BookingCardProps> = ({ booking }) => {
         navigation.navigate('trip/ticket-details' as never, { bookingId: booking.id } as never);
     }, [booking.id, navigation]);
 
-    /** Indique si la date de départ est déjà passée (bouton Itinéraire masqué) */
-    // console.log('booking.departureDateTime: ', booking.departureDateTime);
-    const isDeparturePast = booking.departureDateTime
-        ? new Date(booking.departureDateTime) < new Date()
-        : false;
+    /** Indique si l'heure d'arrivée prévue est déjà passée (bouton Itinéraire masqué). */
+    const isArrivalPast = (() => {
+        const arrival = getScheduledArrivalDate(booking);
+        if (arrival) return arrival.getTime() < Date.now();
+        return booking.departureDateTime
+            ? new Date(booking.departureDateTime).getTime() < Date.now()
+            : false;
+    })();
 
-    /** Afficher le bouton Itinéraire uniquement si non annulé et départ à venir */
-    const showItineraryButton = booking.status !== 'CANCELLED' && !isDeparturePast && booking.departure.status == 'DEPARTED';
-    console.log('booking.departure.status: ', booking.departure.status);
+    /** Afficher le bouton Itinéraire uniquement si non annulé, trajet parti et arrivée pas encore passée. */
+    const showItineraryButton = booking.status !== 'CANCELLED' && !isArrivalPast && booking.departure.status === 'DEPARTED';
 
     return (
         <View style={[styles.bookingCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>

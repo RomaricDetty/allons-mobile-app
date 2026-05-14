@@ -107,6 +107,8 @@ function computeLngLatBoundsFromRoute(
 
 // Optimisation suivi temps réel (mode équilibré)
 const LIVE_UPDATE_INTERVAL_MS = 2500;
+/** Écart minimal entre deux applications directes des coords Socket.IO sur la carte (ms). */
+const LIVE_SOCKET_MIN_APPLY_MS = 150;
 const CAMERA_UPDATE_INTERVAL_MS = 900;
 const MIN_BUS_MOVE_KM = 0.02; // 20m
 const MIN_HEADING_DELTA_DEG = 3;
@@ -200,6 +202,8 @@ export default function TripRouteViewerMapbox({
         heading?: number;
     } | null>(null);
     const hasLiveSocketUpdateRef = useRef<boolean>(false);
+    /** Limite la fréquence d’application des positions WebSocket sur la carte (ms). */
+    const liveSocketApplyThrottleRef = useRef(0);
     const smoothedRotationRef = useRef<number>(0);
     const cameraStateRef = useRef<{
         center: [number, number] | null;
@@ -244,16 +248,6 @@ export default function TripRouteViewerMapbox({
         trackingBookingId,
         trackingBusId,
     );
-
-    useEffect(() => {
-        if (__DEV__) {
-            console.log("[TripRouteViewerMapbox] ids tracking", {
-                trackingTripId,
-                trackingBookingId,
-                trackingBusId,
-            });
-        }
-    }, [trackingTripId, trackingBookingId, trackingBusId]);
 
     /**
      * Compare deux headings en tenant compte de la boucle 360°.
@@ -310,6 +304,32 @@ export default function TripRouteViewerMapbox({
             });
         },
         [],
+    );
+
+    /**
+     * Applique sur la carte une position bus reçue via Socket.IO (marqueur, cap, caméra si suivi).
+     */
+    const applyLiveBusPositionToMap = useCallback(
+        (pending: { latitude: number; longitude: number; heading?: number }) => {
+            lastAppliedLiveRef.current = { ...pending };
+            pendingLivePositionRef.current = null;
+            setBusPosition({
+                latitude: pending.latitude,
+                longitude: pending.longitude,
+            });
+            const currentRotation = smoothedRotationRef.current || 0;
+            const nextRotation = smoothAngle(
+                currentRotation,
+                pending.heading ?? 0,
+                ROTATION_SMOOTHING_ALPHA,
+            );
+            smoothedRotationRef.current = nextRotation;
+            setBusRotation(nextRotation);
+            if (isFollowingBusRef.current) {
+                updateCamera([pending.longitude, pending.latitude], 15);
+            }
+        },
+        [smoothAngle, updateCamera],
     );
 
     // Couleurs du thème mémorisées
@@ -858,24 +878,39 @@ export default function TripRouteViewerMapbox({
     }, [isFollowingBus]);
 
     /**
-     * Synchronise la position du bus depuis Socket.IO (temps réel).
+     * Synchronise la position du bus : toujours en file d’attente pour le flush ;
+     * en temps réel Socket.IO (`hasRealtimeData`), application immédiate (throttlée) + désactivation de la simulation.
      */
     useEffect(() => {
-        if (!liveBusPosition || !hasRealtimeData) return;
-        if (__DEV__) {
-            console.log("[TripRouteViewerMapbox] liveBusPosition reçue", liveBusPosition);
-        }
-        hasLiveSocketUpdateRef.current = true;
+        if (!liveBusPosition || !isValidCoordinate(liveBusPosition)) return;
+
         pendingLivePositionRef.current = {
             latitude: liveBusPosition.latitude,
             longitude: liveBusPosition.longitude,
-            heading: liveBusPosition.heading || 0,
+            heading: liveBusPosition.heading ?? 0,
         };
         setIsBusAnimationActive(false);
-    }, [liveBusPosition, hasRealtimeData]);
+
+        if (!hasRealtimeData) {
+            return;
+        }
+
+        hasLiveSocketUpdateRef.current = true;
+
+        const now = Date.now();
+        if (now - liveSocketApplyThrottleRef.current < LIVE_SOCKET_MIN_APPLY_MS) {
+            return;
+        }
+        liveSocketApplyThrottleRef.current = now;
+
+        const pending = pendingLivePositionRef.current;
+        if (pending) {
+            applyLiveBusPositionToMap(pending);
+        }
+    }, [liveBusPosition, hasRealtimeData, isValidCoordinate, applyLiveBusPositionToMap]);
 
     /**
-     * Flush des updates live toutes les 2.5s (mode équilibré).
+     * Flush des positions en attente (API ou complément si le throttle Socket.IO a sauté une frame).
      */
     useEffect(() => {
         liveFlushIntervalRef.current = setInterval(() => {
@@ -890,28 +925,14 @@ export default function TripRouteViewerMapbox({
                   )
                 : 999;
             const headingDelta = getHeadingDelta(previous?.heading, pending.heading);
-            const shouldApply = movedKm >= MIN_BUS_MOVE_KM || headingDelta >= MIN_HEADING_DELTA_DEG;
+            const shouldApply =
+                hasLiveSocketUpdateRef.current ||
+                movedKm >= MIN_BUS_MOVE_KM ||
+                headingDelta >= MIN_HEADING_DELTA_DEG;
 
             if (!shouldApply) return;
 
-            pendingLivePositionRef.current = null;
-            lastAppliedLiveRef.current = pending;
-            setBusPosition({
-                latitude: pending.latitude,
-                longitude: pending.longitude,
-            });
-            const currentRotation = smoothedRotationRef.current || 0;
-            const nextRotation = smoothAngle(
-                currentRotation,
-                pending.heading || 0,
-                ROTATION_SMOOTHING_ALPHA,
-            );
-            smoothedRotationRef.current = nextRotation;
-            setBusRotation(nextRotation);
-
-            if (isFollowingBusRef.current) {
-                updateCamera([pending.longitude, pending.latitude], 15);
-            }
+            applyLiveBusPositionToMap(pending);
         }, LIVE_UPDATE_INTERVAL_MS);
 
         return () => {
@@ -920,7 +941,7 @@ export default function TripRouteViewerMapbox({
                 liveFlushIntervalRef.current = null;
             }
         };
-    }, [getHeadingDelta, updateCamera, smoothAngle]);
+    }, [getHeadingDelta, applyLiveBusPositionToMap]);
 
     /**
      * Gère l'animation du bus le long de l'itinéraire
