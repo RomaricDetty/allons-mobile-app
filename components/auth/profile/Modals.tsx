@@ -88,7 +88,7 @@ export const LogoutModal: React.FC<LogoutModalProps> = ({ visible, onClose, onCo
                             style={[styles.logoutModalButton, styles.logoutModalButtonConfirm]}
                             onPress={onConfirm}
                         >
-                            <Text style={styles.logoutModalButtonTextConfirm}>Déconnexion</Text>
+                            <Text style={styles.logoutModalButtonTextConfirm}>Se déconnecter</Text>
                         </Pressable>
                     </View>
                 </View>

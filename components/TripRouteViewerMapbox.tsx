@@ -2,6 +2,7 @@
 import { ControlButtons } from "@/components/trip-route-viewer-mapbox/ControlButtons";
 import { InfoPanel } from "@/components/trip-route-viewer-mapbox/InfoPanel";
 import { MapScene } from "@/components/trip-route-viewer-mapbox/MapScene";
+import { resolveMapboxAccessToken } from "@/constants/mapbox";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useBusTracking } from "@/hooks/useBusTracking";
@@ -11,6 +12,7 @@ import { routingService } from "@/services/routingService";
 import { PassengerLocation } from "@/types/tracking";
 import { Ionicons } from "@expo/vector-icons";
 import Mapbox, {
+    Camera,
     MapView,
 } from "@rnmapbox/maps";
 import * as Location from "expo-location";
@@ -21,16 +23,19 @@ import {
     useMemo,
     useRef,
     useState,
+    type ElementRef,
 } from "react";
 import {
     ActivityIndicator,
     Alert,
     Animated,
+    InteractionManager,
     PanResponder,
     Platform,
     StyleSheet,
     Text,
     TouchableOpacity,
+    useWindowDimensions,
     View,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -48,6 +53,7 @@ const COLORS = {
     ACCENT_LIGHT: "rgba(106, 90, 205, 0.1)",
     START_MARKER: "#4CAF50",
     END_MARKER: "#F44336",
+    ROUTE_BLUE: "#2196F3",
     ERROR: "#F44336",
     WHITE: "#fff",
     DARK_CARD: "#1C1C1E",
@@ -60,12 +66,51 @@ const COLORS = {
     LIGHT_BADGE: "#F0F4F8",
 } as const;
 
+/**
+ * Calcule les coins nord-est et sud-ouest Mapbox ([lng, lat]) pour englober tous les points du tracé.
+ */
+function computeLngLatBoundsFromRoute(
+    points: { latitude: number; longitude: number }[],
+): { ne: [number, number]; sw: [number, number] } | null {
+    if (!points.length) return null;
+    let minLat = Infinity;
+    let maxLat = -Infinity;
+    let minLng = Infinity;
+    let maxLng = -Infinity;
+    for (const p of points) {
+        const { latitude: lat, longitude: lng } = p;
+        if (
+            typeof lat !== "number" ||
+            typeof lng !== "number" ||
+            Number.isNaN(lat) ||
+            Number.isNaN(lng)
+        ) {
+            continue;
+        }
+        minLat = Math.min(minLat, lat);
+        maxLat = Math.max(maxLat, lat);
+        minLng = Math.min(minLng, lng);
+        maxLng = Math.max(maxLng, lng);
+    }
+    if (!Number.isFinite(minLat)) return null;
+
+    const latSpan = Math.max(maxLat - minLat, 1e-5);
+    const lngSpan = Math.max(maxLng - minLng, 1e-5);
+    const latMargin = Math.max(latSpan * 0.02, 0.004);
+    const lngMargin = Math.max(lngSpan * 0.02, 0.004);
+
+    return {
+        ne: [maxLng + lngMargin, maxLat + latMargin],
+        sw: [minLng - lngMargin, minLat - latMargin],
+    };
+}
+
 // Optimisation suivi temps réel (mode équilibré)
 const LIVE_UPDATE_INTERVAL_MS = 2500;
 const CAMERA_UPDATE_INTERVAL_MS = 900;
 const MIN_BUS_MOVE_KM = 0.02; // 20m
 const MIN_HEADING_DELTA_DEG = 3;
-const SIM_UPDATE_INTERVAL_MS = 120;
+const SIM_UPDATE_INTERVAL_MS = 220;
 const SIM_MIN_DURATION_SECONDS = 180; // 3 min
 const SIM_MAX_DURATION_SECONDS = 600; // 10 min
 const POSITION_SMOOTHING_ALPHA = 0.28;
@@ -74,13 +119,14 @@ const PANEL_EXPANDED_VALUE = 1;
 const PANEL_COLLAPSED_VALUE = 0.2;
 const PANEL_SWIPE_THRESHOLD = 24;
 
+/** Espace vertical entre le bas des boutons carte et le haut du contenu du panneau. */
+const CONTROL_BUTTONS_GAP_ABOVE_PANEL = 10;
+
 interface TripRouteViewerMapboxProps {
     booking: Booking;
 }
 
-Mapbox.setAccessToken(
-    "sk.eyJ1IjoiZGV0dHktcm9tYXJpYyIsImEiOiJjbWtxMzRmbzkwam5pM2dzOTkxbDBxOHF0In0.FTLTCaKPMw8mPG_9CvIhiw",
-);
+Mapbox.setAccessToken(resolveMapboxAccessToken());
 
 /**
  * Composant pour afficher l'itinéraire d'un trajet sur une carte Mapbox
@@ -92,6 +138,7 @@ export default function TripRouteViewerMapbox({
     const router = useRouter();
     const colorScheme = useColorScheme() ?? "light";
     const insets = useSafeAreaInsets();
+    const { height: windowHeight } = useWindowDimensions();
 
     const [passengerLocation, setPassengerLocation] =
         useState<PassengerLocation | null>(null);
@@ -112,6 +159,7 @@ export default function TripRouteViewerMapbox({
     const [error, setError] = useState<string | null>(null);
     const [isManualMode, setIsManualMode] = useState<boolean>(false);
     const [routeDuration, setRouteDuration] = useState<number | null>(null);
+    const [routeDistanceKm, setRouteDistanceKm] = useState<number | null>(null);
     const [busPosition, setBusPosition] = useState<{
         latitude: number;
         longitude: number;
@@ -120,16 +168,13 @@ export default function TripRouteViewerMapbox({
     const [isBusAnimationActive, setIsBusAnimationActive] =
         useState<boolean>(false);
     const [isFollowingBus, setIsFollowingBus] = useState<boolean>(false);
-    const [animationProgress, setAnimationProgress] = useState<number>(0);
     const [isPanelCollapsed, setIsPanelCollapsed] = useState<boolean>(false);
-    const [cameraCenter, setCameraCenter] = useState<[number, number] | null>(
-        null,
-    );
-    const [cameraZoom, setCameraZoom] = useState<number>(13);
 
     const panelHeightAnim = useRef(new Animated.Value(1)).current;
 
     const mapRef = useRef<MapView>(null);
+    const cameraRef = useRef<ElementRef<typeof Camera> | null>(null);
+    const animationProgressRef = useRef(0);
     const locationSubscription = useRef<Location.LocationSubscription | null>(
         null,
     );
@@ -256,8 +301,13 @@ export default function TripRouteViewerMapbox({
                 zoom,
                 lastUpdateAt: now,
             };
-            setCameraCenter(center);
-            setCameraZoom(zoom);
+
+            cameraRef.current?.setCamera({
+                centerCoordinate: center,
+                zoomLevel: zoom,
+                animationDuration: force ? 520 : 400,
+                animationMode: force ? "flyTo" : "easeTo",
+            });
         },
         [],
     );
@@ -272,8 +322,6 @@ export default function TripRouteViewerMapbox({
             cardBackground:
                 colorScheme === "dark" ? COLORS.DARK_CARD : COLORS.LIGHT_CARD,
             border: colorScheme === "dark" ? COLORS.DARK_BORDER : COLORS.LIGHT_BORDER,
-            panelBackground:
-                colorScheme === "dark" ? COLORS.DARK_CARD : COLORS.LIGHT_CARD,
             listItemBackground:
                 colorScheme === "dark" ? COLORS.DARK_LIST_ITEM : COLORS.LIGHT_LIST_ITEM,
             iconCircleBackground:
@@ -423,17 +471,23 @@ export default function TripRouteViewerMapbox({
             setStartPoint(startCoords);
             setEndPoint(endCoords);
 
+            await new Promise<void>((resolve) => {
+                InteractionManager.runAfterInteractions(() => resolve());
+            });
+
             const routeDetails = await routingService.getRouteWithDetails(
                 startCoords,
                 endCoords,
             );
             setRoutePath(routeDetails.coordinates);
             setRouteDuration(routeDetails.duration);
+            setRouteDistanceKm(routeDetails.distance);
         } catch {
             setError("Impossible de calculer l'itinéraire");
             if (isValidCoordinate(startCoords) && isValidCoordinate(endCoords)) {
                 setRoutePath([startCoords, endCoords]);
                 setRouteDuration(null);
+                setRouteDistanceKm(null);
             }
         } finally {
             setIsLoading(false);
@@ -541,38 +595,53 @@ export default function TripRouteViewerMapbox({
     }, [getAddressFromCoordinates, stopLocationTracking]);
 
     /**
-     * Centre la carte sur l'itinéraire
+     * Cadre toute la polyline sur l’écran via Mapbox fitBounds (marges pour en-tête, boutons à droite, panneau bas).
      */
     const centerMapOnRoute = useCallback(() => {
-        if (!startPoint) return;
+        const coords =
+            routePath.length >= 2
+                ? routePath
+                : startPoint && endPoint
+                  ? [startPoint, endPoint]
+                  : startPoint
+                    ? [startPoint]
+                    : endPoint
+                      ? [endPoint]
+                      : [];
 
-        const coordinates = [startPoint];
-        if (endPoint) {
-            coordinates.push(endPoint);
-        }
-        if (passengerLocation) {
-            coordinates.push({
-                latitude: passengerLocation.latitude,
-                longitude: passengerLocation.longitude,
-            });
-        }
+        if (coords.length === 0) return;
 
-        // Calculer le centre et le zoom pour inclure tous les points
-        const lats = coordinates.map((c) => c.latitude);
-        const lngs = coordinates.map((c) => c.longitude);
-        const centerLat = (Math.min(...lats) + Math.max(...lats)) / 2;
-        const centerLng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
+        const bounds = computeLngLatBoundsFromRoute(coords);
+        if (!bounds) return;
 
-        const latDelta = Math.max(...lats) - Math.min(...lats);
-        const lngDelta = Math.max(...lngs) - Math.min(...lngs);
-        const maxDelta = Math.max(latDelta, lngDelta);
-        const zoom =
-            maxDelta > 0
-                ? Math.max(8, Math.min(15, 15 - Math.log2(maxDelta * 100)))
-                : 13;
+        const padTop = Math.round(insets.top + 54);
+        const padRight = 62;
+        const padBottom = Math.round(
+            windowHeight * 0.44 + Math.max(insets.bottom, 10),
+        );
+        const padLeft = 18;
 
-            updateCamera([centerLng, centerLat], zoom, true);
-    }, [startPoint, endPoint, passengerLocation, updateCamera]);
+        cameraRef.current?.fitBounds(
+            bounds.ne,
+            bounds.sw,
+            [padTop, padRight, padBottom, padLeft],
+            650,
+        );
+
+        const cx = (bounds.ne[0] + bounds.sw[0]) / 2;
+        const cy = (bounds.ne[1] + bounds.sw[1]) / 2;
+        const span = Math.max(
+            Math.abs(bounds.ne[1] - bounds.sw[1]),
+            Math.abs(bounds.ne[0] - bounds.sw[0]),
+        );
+        const approxZoom =
+            span > 1e-6 ? Math.max(2.5, Math.min(18, 9 - Math.log2(span * 85))) : 10;
+        cameraStateRef.current = {
+            center: [cx, cy],
+            zoom: approxZoom,
+            lastUpdateAt: Date.now(),
+        };
+    }, [routePath, startPoint, endPoint, windowHeight, insets.top, insets.bottom]);
 
     /**
      * Initialise la localisation du passager et calcule l'itinéraire
@@ -602,21 +671,25 @@ export default function TripRouteViewerMapbox({
     }, [booking.id, booking.code]);
 
     /**
-     * Centre la carte sur l'itinéraire une fois chargé
+     * Cadre l’itinéraire complet une fois le tracé disponible (sans zoom fixe sur le départ seul).
      */
     useEffect(() => {
-        if (startPoint) {
-            updateCamera([startPoint.longitude, startPoint.latitude], 13, true);
+        const hasGeometry =
+            routePath.length >= 2 || (startPoint && endPoint);
+        if (!hasGeometry) return;
 
-            if (routePath.length > 0) {
-                setTimeout(() => {
-                    centerMapOnRoute();
-                }, 500);
-            }
-        } else if (routePath.length > 0) {
-            centerMapOnRoute();
-        }
-    }, [routePath, startPoint, centerMapOnRoute, updateCamera]);
+        let timeoutId: ReturnType<typeof setTimeout> | undefined;
+        const interactionHandle = InteractionManager.runAfterInteractions(() => {
+            timeoutId = setTimeout(() => {
+                centerMapOnRoute();
+            }, 280);
+        });
+
+        return () => {
+            if (timeoutId) clearTimeout(timeoutId);
+            interactionHandle.cancel?.();
+        };
+    }, [routePath, startPoint, endPoint, centerMapOnRoute]);
 
     /**
      * Met à jour la ref du mode manuel
@@ -869,10 +942,11 @@ export default function TripRouteViewerMapbox({
         const updateInterval = SIM_UPDATE_INTERVAL_MS;
         const progressIncrement = updateInterval / (totalDurationSeconds * 1000);
 
-        let currentProgress = animationProgress;
+        let currentProgress = animationProgressRef.current;
 
         busAnimationIntervalRef.current = setInterval(() => {
             currentProgress = Math.min(currentProgress + progressIncrement, 1);
+            animationProgressRef.current = currentProgress;
 
             const position = calculateBusPosition(currentProgress);
             if (position) {
@@ -901,7 +975,6 @@ export default function TripRouteViewerMapbox({
                 );
                 smoothedRotationRef.current = nextRotation;
                 setBusRotation(nextRotation);
-                setAnimationProgress(currentProgress);
 
                 if (isFollowingBusRef.current) {
                     updateCamera([position.longitude, position.latitude], 15);
@@ -924,7 +997,6 @@ export default function TripRouteViewerMapbox({
         routeDuration,
         routePath.length,
         calculateBusPosition,
-        animationProgress,
         updateCamera,
         smoothAngle,
     ]);
@@ -940,7 +1012,7 @@ export default function TripRouteViewerMapbox({
             !busPosition
         ) {
             setBusPosition(startPoint);
-            setAnimationProgress(0);
+            animationProgressRef.current = 0;
 
             if (routePath.length > 1) {
                 const initialRotation = calculateBearing(routePath[0], routePath[1]);
@@ -1176,79 +1248,76 @@ export default function TripRouteViewerMapbox({
         [handlePanelSwipeRelease],
     );
 
+    /** GeoJSON Mapbox pour la polyline d'itinéraire (couleur carte = ACCENT). */
+    const routeGeoJSON = useMemo(() => {
+        if (routePath.length === 0) return null;
+
+        return {
+            type: "FeatureCollection" as const,
+            features: [
+                {
+                    type: "Feature" as const,
+                    properties: {},
+                    geometry: {
+                        type: "LineString" as const,
+                        coordinates: routePath.map((coord) => [
+                            coord.longitude,
+                            coord.latitude,
+                        ]),
+                    },
+                },
+            ],
+        };
+    }, [routePath]);
+
+    /** Ville affichée sous le nom de la gare de départ. */
+    const startDetailLine = useMemo(() => {
+        const city = booking.trip?.stationFrom?.city?.trim();
+        return city && city.length > 0 ? city : "—";
+    }, [booking.trip?.stationFrom?.city]);
+
+    /** Ville affichée sous le nom de la gare d'arrivée. */
+    const endDetailLine = useMemo(() => {
+        const city = booking.trip?.stationTo?.city?.trim();
+        return city && city.length > 0 ? city : "—";
+    }, [booking.trip?.stationTo?.city]);
+
     /**
-     * Calcule la durée estimée du trajet
-     * @returns La durée formatée (ex: "3h 00min") ou null si les données ne sont pas disponibles
+     * Minutes restantes avant l'heure d'arrivée affichée (même jour que le départ, +1 jour si passage minuit).
      */
-    const formattedDuration = useMemo((): string | null => {
-        if (routeDuration !== null && routeDuration > 0) {
-            const hours = Math.floor(routeDuration / 60);
-            const minutes = Math.round(routeDuration % 60);
-
-            if (hours > 0 && minutes > 0) {
-                return `${hours}h ${minutes}min`;
-            } else if (hours > 0) {
-                return `${hours}h`;
-            } else {
-                return `${minutes}min`;
-            }
-        }
-
-        if (!booking.departureTime || !booking.arrivalTime) {
+    const minutesUntilArrival = useMemo(() => {
+        if (!booking.arrivalTime || !booking.departureTime || !booking.departureDateTime) {
             return null;
         }
-
         try {
-            const [departureHours, departureMinutes] = booking.departureTime
-                .split(":")
-                .map(Number);
-            const [arrivalHours, arrivalMinutes] = booking.arrivalTime
-                .split(":")
-                .map(Number);
+            const dep = new Date(booking.departureDateTime);
+            if (Number.isNaN(dep.getTime())) return null;
 
-            const departureTotalMinutes = departureHours * 60 + departureMinutes;
-            const arrivalTotalMinutes = arrivalHours * 60 + arrivalMinutes;
+            const [ah, am] = booking.arrivalTime.split(":").map(Number);
+            const [dh, dm] = booking.departureTime.split(":").map(Number);
+            if (![ah, am, dh, dm].every((x) => Number.isFinite(x))) return null;
 
-            let diffMinutes = arrivalTotalMinutes - departureTotalMinutes;
-            if (diffMinutes < 0) {
-                diffMinutes += 24 * 60;
+            const arr = new Date(
+                dep.getFullYear(),
+                dep.getMonth(),
+                dep.getDate(),
+                ah,
+                am,
+                0,
+                0,
+            );
+            const depClock = dh * 60 + dm;
+            const arrClock = ah * 60 + am;
+            if (arrClock < depClock) {
+                arr.setDate(arr.getDate() + 1);
             }
 
-            const hours = Math.floor(diffMinutes / 60);
-            const minutes = diffMinutes % 60;
-
-            if (hours > 0 && minutes > 0) {
-                return `${hours}h ${minutes}min`;
-            } else if (hours > 0) {
-                return `${hours}h`;
-            } else {
-                return `${minutes}min`;
-            }
-        } catch (error) {
-            console.error("Erreur calcul durée:", error);
+            const diffMin = Math.round((arr.getTime() - Date.now()) / 60000);
+            return Number.isFinite(diffMin) ? diffMin : null;
+        } catch {
             return null;
         }
-    }, [routeDuration, booking.departureTime, booking.arrivalTime]);
-
-    /**
-     * Extrait un code de ville à partir du nom de la ville
-     * @param cityName Nom de la ville
-     * @returns Code de la ville (ex: "CPH" pour "Copenhagen")
-     */
-    const getCityCode = useCallback((cityName: string): string => {
-        if (!cityName) return "";
-        return cityName.substring(0, 3).toUpperCase();
-    }, []);
-
-    // Codes de ville mémorisés
-    const startCityCode = useMemo(
-        () => getCityCode(booking.trip?.stationFrom?.city || ""),
-        [booking.trip?.stationFrom?.city, getCityCode],
-    );
-    const endCityCode = useMemo(
-        () => getCityCode(booking.trip?.stationTo?.city || ""),
-        [booking.trip?.stationTo?.city, getCityCode],
-    );
+    }, [booking.arrivalTime, booking.departureTime, booking.departureDateTime]);
 
     // Styles mémorisés
     const headerStyle = useMemo(
@@ -1277,17 +1346,18 @@ export default function TripRouteViewerMapbox({
         () => [
             styles.infoPanel,
             {
-                backgroundColor: themeColors.panelBackground,
+                backgroundColor: "transparent",
                 maxHeight: panelHeightInterpolation,
             },
         ],
-        [themeColors.panelBackground, panelHeightInterpolation],
+        [panelHeightInterpolation],
     );
 
+    /** Contenu du panneau (cartes) sans scroll : padding safe area + espacement entre cartes. */
     const scrollViewContentStyle = useMemo(
         () => [
-            styles.scrollViewContent,
-            { paddingBottom: Math.max(20, insets.bottom) },
+            styles.infoPanelBody,
+            { paddingBottom: Math.max(10, insets.bottom) },
         ],
         [insets.bottom],
     );
@@ -1298,27 +1368,42 @@ export default function TripRouteViewerMapbox({
         [],
     );
 
-    // GeoJSON pour la polyline de l'itinéraire
-    const routeGeoJSON = useMemo(() => {
-        if (routePath.length === 0) return null;
+    /** Centre [lng, lat] pour l’initialisation du Camera Mapbox. */
+    const defaultCameraCenter = useMemo<[number, number]>(() => {
+        if (startPoint) {
+            return [startPoint.longitude, startPoint.latitude];
+        }
+        return [-4.00351, 5.33542];
+    }, [startPoint]);
+
+    const defaultCameraZoom = 13;
+
+    /**
+     * Position des boutons carte : juste au-dessus du panneau (hauteur estimée du contenu, pas un % d’écran).
+     */
+    const controlButtonsContainerStyle = useMemo(() => {
+        const safe = Math.max(insets.bottom, 10);
+        const handleBlock = 8 + 44;
+        const tripCardApprox = 198;
+        const betweenCards = 8;
+        const myPositionRow = isPanelCollapsed ? 0 : 94;
+        const manualRow = !isPanelCollapsed && isManualMode ? 92 : 0;
+        const bodyPadding = 12;
+
+        const panelApprox =
+            handleBlock +
+            tripCardApprox +
+            betweenCards +
+            myPositionRow +
+            manualRow +
+            safe +
+            bodyPadding;
 
         return {
-            type: "FeatureCollection" as const,
-            features: [
-                {
-                    type: "Feature" as const,
-                    properties: {},
-                    geometry: {
-                        type: "LineString" as const,
-                        coordinates: routePath.map((coord) => [
-                            coord.longitude,
-                            coord.latitude,
-                        ]),
-                    },
-                },
-            ],
+            bottom:
+                Math.round(panelApprox + CONTROL_BUTTONS_GAP_ABOVE_PANEL),
         };
-    }, [routePath]);
+    }, [isPanelCollapsed, isManualMode, insets.bottom]);
 
     // Callback mémorisé pour le retour en arrière
     const handleBackPress = useCallback(() => {
@@ -1377,12 +1462,14 @@ export default function TripRouteViewerMapbox({
     return (
         <SafeAreaView style={[styles.container, { backgroundColor }]} edges={['bottom']}>
             <MapScene
+                key={`map-${String(booking?.id ?? "")}-${trackingTripId}`}
                 mapRef={mapRef}
+                cameraRef={cameraRef}
+                defaultCameraCenter={defaultCameraCenter}
+                defaultCameraZoom={defaultCameraZoom}
                 styles={styles}
                 isManualMode={isManualMode}
                 handleMapPress={handleMapPress}
-                cameraCenter={cameraCenter}
-                cameraZoom={cameraZoom}
                 routeGeoJSON={routeGeoJSON}
                 isValidCoordinate={isValidCoordinate}
                 startPoint={startPoint}
@@ -1403,13 +1490,20 @@ export default function TripRouteViewerMapbox({
 
             {/* En-tête de navigation */}
             <View style={headerStyle}>
-                <TouchableOpacity style={headerButtonStyle} onPress={handleBackPress}>
+                <TouchableOpacity
+                    style={headerButtonStyle}
+                    onPress={handleBackPress}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Retour"
+                >
                     <Ionicons name="arrow-back" size={20} color={textColor} />
                 </TouchableOpacity>
             </View>
 
             <ControlButtons
                 styles={styles}
+                containerStyle={controlButtonsContainerStyle}
                 themeColors={themeColors}
                 isManualMode={isManualMode}
                 toggleLocationMode={toggleLocationMode}
@@ -1432,10 +1526,7 @@ export default function TripRouteViewerMapbox({
                 scrollViewContentStyle={scrollViewContentStyle}
                 textColor={textColor}
                 secondaryTextColor={secondaryTextColor}
-                startCityCode={startCityCode}
-                endCityCode={endCityCode}
                 booking={booking}
-                formattedDuration={formattedDuration}
                 isManualMode={isManualMode}
                 isPanelCollapsed={isPanelCollapsed}
                 centerOnMe={centerOnMe}
@@ -1443,6 +1534,10 @@ export default function TripRouteViewerMapbox({
                 centerOnEndPoint={centerOnEndPoint}
                 currentAddress={currentAddress}
                 colors={COLORS}
+                startDetailLine={startDetailLine}
+                endDetailLine={endDetailLine}
+                minutesUntilArrival={minutesUntilArrival}
+                routeDistanceKm={routeDistanceKm}
             />
         </SafeAreaView>
     );
@@ -1519,7 +1614,6 @@ const styles = StyleSheet.create({
     },
     controlButtonsContainer: {
         position: "absolute",
-        bottom: "46%",
         right: 20,
         flexDirection: "column",
         gap: 12,
@@ -1552,23 +1646,170 @@ const styles = StyleSheet.create({
         width: 56,
         height: 56,
     },
+    designCard: {
+        borderRadius: 16,
+        borderWidth: 1,
+        paddingVertical: 12,
+        paddingHorizontal: 12,
+        elevation: 0,
+    },
+    designCardRow: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+    },
+    designTimeline: {
+        flex: 1,
+        marginRight: 8,
+    },
+    designTimelineBlock: {
+        flexDirection: "row",
+        alignItems: "flex-start",
+    },
+    designRingGreen: {
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        borderWidth: 3,
+        borderColor: "#4CAF50",
+        justifyContent: "center",
+        alignItems: "center",
+        marginRight: 10,
+        marginTop: 2,
+    },
+    designRingGreenInner: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: "#4CAF50",
+    },
+    designRingBlue: {
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        borderWidth: 3,
+        borderColor: "#ff0000",
+        justifyContent: "center",
+        alignItems: "center",
+        marginRight: 10,
+        marginTop: 2,
+    },
+    designRingBlueInner: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: "#ff0000",
+    },
+    designTimelineText: {
+        flex: 1,
+        paddingRight: 4,
+    },
+    designPlaceTitle: {
+        fontSize: 14,
+        fontWeight: "700",
+        lineHeight: 18,
+    },
+    designPlaceSub: {
+        fontSize: 12,
+        marginTop: 4,
+        lineHeight: 16,
+    },
+    designTimelineConnector: {
+        width: 2,
+        height: 16,
+        borderRadius: 1,
+        backgroundColor: "#BDBDBD",
+        marginLeft: 10,
+        marginVertical: 2,
+        opacity: 0.75,
+    },
+    designTimeColumn: {
+        alignItems: "flex-end",
+        justifyContent: "flex-start",
+        minWidth: 72,
+        paddingTop: 4,
+    },
+    designTimeLabel: {
+        fontSize: 12,
+        marginBottom: 2,
+    },
+    designTimeValue: {
+        fontSize: 40,
+        fontWeight: "800",
+        lineHeight: 44,
+    },
+    designTimeUnit: {
+        fontSize: 16,
+        fontWeight: "700",
+    },
+    designFooter: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginTop: 2,
+        paddingTop: 10,
+        borderTopWidth: 1,
+    },
+    designFooterLabel: {
+        fontSize: 12,
+    },
+    designFooterValue: {
+        fontSize: 16,
+        fontWeight: "700",
+        marginTop: 2,
+    },
+    designFooterSchedule: {
+        flexDirection: "row",
+        alignItems: "center",
+        flexShrink: 1,
+        gap: 6,
+    },
+    designFooterDots: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 3,
+        paddingHorizontal: 2,
+    },
+    designFooterDot: {
+        width: 3,
+        height: 3,
+        borderRadius: 2,
+    },
+    designFooterTime: {
+        fontSize: 13,
+        fontWeight: "600",
+    },
+    designSecondaryRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        borderRadius: 14,
+        borderWidth: 1,
+        elevation: 0,
+    },
+    designSecondaryTitle: {
+        fontSize: 14,
+        fontWeight: "600",
+    },
+    designSecondarySub: {
+        fontSize: 11,
+        marginTop: 2,
+        lineHeight: 14,
+    },
     infoPanel: {
         position: "absolute",
         bottom: 0,
         left: 0,
         right: 0,
-        borderTopLeftRadius: 32,
-        borderTopRightRadius: 32,
-        paddingTop: 20,
-        paddingBottom: 20,
+        paddingTop: 8,
+        paddingBottom: 8,
         maxHeight: "45%",
     },
-    scrollView: {
-        flex: 1,
-    },
-    scrollViewContent: {
+    /** Colonne des cartes : pas de flex:1 pour éviter de forcer la hauteur et le scroll. */
+    infoPanelBody: {
         paddingHorizontal: 15,
-        paddingBottom: 10,
+        gap: 8,
     },
     panelHeader: {
         marginBottom: 16,
@@ -1577,7 +1818,7 @@ const styles = StyleSheet.create({
     },
     panelHandleContainer: {
         width: "100%",
-        paddingVertical: 10,
+        paddingVertical: 6,
         alignItems: "center",
         justifyContent: "center",
     },
@@ -1586,7 +1827,7 @@ const styles = StyleSheet.create({
         height: 6,
         alignSelf: "center",
         borderRadius: 15,
-        marginBottom: 20,
+        marginBottom: 8,
         borderWidth: 1.5,
         marginTop: 0,
     },
@@ -1670,12 +1911,11 @@ const styles = StyleSheet.create({
     modeIndicator: {
         flexDirection: "row",
         alignItems: "center",
-        padding: 14,
-        borderRadius: 16,
-        marginBottom: 16,
-        marginHorizontal: 15,
-        borderWidth: 1.5,
-        gap: 12,
+        padding: 10,
+        borderRadius: 14,
+        marginBottom: 0,
+        borderWidth: 1,
+        gap: 10,
     },
     modeIndicatorIconContainer: {
         width: 32,

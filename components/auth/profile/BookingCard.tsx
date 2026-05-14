@@ -38,13 +38,13 @@ export const BookingCard: React.FC<BookingCardProps> = ({ booking }) => {
             {/* Route et date */}
             <View style={styles.bookingHeader}>
                 <Text style={[styles.routeText, { color: colors.text }]}>
-                    {booking.trip.stationFrom.city} → {booking.trip.stationTo.city}
+                    {booking?.trip?.stationFrom?.city} → {booking?.trip?.stationTo?.city}
                 </Text>
                 <Text style={[styles.dateText, { color: colors.secondaryText }]}>
                     {formatBookingDate(booking.departureDateTime)}
                 </Text>
                 <Text style={[styles.timeText, { color: colors.secondaryText }]}>
-                    {booking.departureTime} - {booking.arrivalTime}
+                    {booking?.departureTime} - {booking?.arrivalTime}
                 </Text>
             </View>
 
@@ -52,7 +52,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({ booking }) => {
             <View style={styles.bookingInfo}>
                 <Text style={[styles.companyText, { color: colors.text }]}>{booking.companyName}</Text>
                 <Text style={[styles.passengersText, { color: colors.secondaryText }]}>
-                    {booking.passengers.length} passager(s)
+                    {booking?.passengers?.length} passager(s)
                 </Text>
             </View>
 

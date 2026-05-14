@@ -5,14 +5,14 @@ import { StyleSheet, View } from 'react-native';
 export default function LiveTrackingScreen() {
     const { tripId, bookingDetails } = useLocalSearchParams();
 
-    // console.log('bookingDetails ===>, ', JSON.stringify(bookingDetails, null, 2));
-    // console.log('tripId ===>, ', tripId);
+    const tripIdParam = Array.isArray(tripId) ? tripId[0] : tripId;
+    const bookingDetailsParam = Array.isArray(bookingDetails) ? bookingDetails[0] : bookingDetails;
 
     return (
         <View style={styles.container}>
             <OSMBusTracker
-                tripId={tripId as string}
-                bookingDetails={bookingDetails as Object | any}
+                tripId={String(tripIdParam ?? '')}
+                bookingDetails={bookingDetailsParam as string | object}
             />
 
             {/* Bouton retour */}

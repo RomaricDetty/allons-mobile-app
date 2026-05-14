@@ -140,7 +140,13 @@ const Departures = () => {
     const handleViewBooking = async (searchedBooking: Object | any) => {
 
         console.log('searchedBooking in handleViewBooking ===>, ', JSON.stringify(searchedBooking, null, 2));
-        navigation.navigate('trip/live-tracking' as never, { bookingDetails: JSON.stringify(searchedBooking), tripId: searchedBooking.id as string } as never);
+        const tripIdForTracking = String(
+            searchedBooking?.trip?.id ?? searchedBooking?.trip?._id ?? searchedBooking?.tripId ?? '',
+        );
+        navigation.navigate('trip/live-tracking' as never, {
+            bookingDetails: JSON.stringify(searchedBooking),
+            tripId: tripIdForTracking || (searchedBooking.id as string),
+        } as never);
         return true;
         /*try {
             setIsLoadingBooking(bookingId);

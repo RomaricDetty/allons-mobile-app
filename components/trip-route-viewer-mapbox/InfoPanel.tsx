@@ -1,12 +1,12 @@
 // @ts-nocheck
 import { Ionicons } from "@expo/vector-icons";
-import React from "react";
-import { Animated, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import React, { memo } from "react";
+import { Animated, Text, TouchableOpacity, View } from "react-native";
 
 /**
- * Rendu du panneau bas (résumé trajet + informations détaillées).
+ * Panneau flottant type maquette : timeline départ/arrivée, temps restant, distance et horaires.
  */
-export function InfoPanel({
+function InfoPanelInner({
     infoPanelStyle,
     styles,
     togglePanelCollapse,
@@ -15,10 +15,7 @@ export function InfoPanel({
     scrollViewContentStyle,
     textColor,
     secondaryTextColor,
-    startCityCode,
-    endCityCode,
     booking,
-    formattedDuration,
     isManualMode,
     isPanelCollapsed,
     centerOnMe,
@@ -26,7 +23,25 @@ export function InfoPanel({
     centerOnEndPoint,
     currentAddress,
     colors,
+    /** Ville de la gare de départ (sous-titre sous le nom de la gare). */
+    startDetailLine,
+    /** Ville de la gare d'arrivée. */
+    endDetailLine,
+    /** Minutes restantes avant l'arrivée prévue (null si inconnu). */
+    minutesUntilArrival,
+    /** Distance totale du trajet en km (affichage). */
+    routeDistanceKm,
 }: any) {
+    const startTitle =
+        booking.trip?.stationFrom?.name || booking.trip?.stationFrom?.city || "Départ";
+    const endTitle =
+        booking.trip?.stationTo?.name || booking.trip?.stationTo?.city || "Arrivée";
+
+    const distanceLabel =
+        routeDistanceKm != null && routeDistanceKm > 0
+            ? `${Number(routeDistanceKm).toFixed(0)} km`
+            : "—";
+
     return (
         <Animated.View style={infoPanelStyle}>
             <TouchableOpacity
@@ -46,74 +61,110 @@ export function InfoPanel({
                 />
             </TouchableOpacity>
 
-            <ScrollView
-                style={styles.scrollView}
-                contentContainerStyle={scrollViewContentStyle}
-                showsVerticalScrollIndicator={!isPanelCollapsed}
-            >
-                <View style={[styles.panelHeader, { backgroundColor: themeColors.cardBackground }]}>
-                    <View
-                        style={[
-                            styles.headerContent,
-                            styles.headerContentBorder,
-                            {
-                                borderColor: themeColors.border,
-                                backgroundColor: themeColors.cardBackground,
-                            },
-                        ]}
-                    >
-                        <View style={styles.headerColumn}>
-                            <View style={[styles.cityCodeBadge, { backgroundColor: themeColors.badgeBackground }]}>
-                                <Text style={[styles.headerCityCode, { color: textColor }]}>{startCityCode}</Text>
-                            </View>
-                            <Text style={[styles.headerCityName, { color: textColor }]} numberOfLines={1}>
-                                {booking.trip?.stationFrom?.city || ""}
-                            </Text>
-                            <View style={styles.timezoneContainer}>
-                                <Text style={[styles.headerTimezone, { color: secondaryTextColor }]}>
-                                    {booking.trip?.stationFrom?.name || ""}
-                                </Text>
-                            </View>
+            <View style={scrollViewContentStyle}>
+                <View
+                    style={[
+                        styles.designCard,
+                        {
+                            backgroundColor: themeColors.cardBackground,
+                            borderColor: themeColors.border,
+                        },
+                    ]}
+                >
+                    <View style={styles.designCardRow}>
+                        {/* Timeline gauche */}
+                        <View style={[styles.designTimeline, { paddingVertical: 10 }]}>
+                            <TouchableOpacity
+                                style={styles.designTimelineBlock}
+                                onPress={centerOnStartPoint}
+                                activeOpacity={0.75}
+                            >
+                                <View style={styles.designRingGreen}>
+                                    <View style={styles.designRingGreenInner} />
+                                </View>
+                                <View style={styles.designTimelineText}>
+                                    <Text
+                                        style={[styles.designPlaceTitle, { color: textColor }]}
+                                        numberOfLines={2}
+                                    >
+                                        {startTitle}
+                                    </Text>
+                                    <Text
+                                        style={[styles.designPlaceSub, { color: secondaryTextColor }]}
+                                        numberOfLines={2}
+                                    >
+                                        {startDetailLine}
+                                    </Text>
+                                </View>
+                            </TouchableOpacity>
+
+                            <View style={styles.designTimelineConnector} />
+
+                            <TouchableOpacity
+                                style={styles.designTimelineBlock}
+                                onPress={centerOnEndPoint}
+                                activeOpacity={0.75}
+                            >
+                                <View style={styles.designRingBlue}>
+                                    <View style={styles.designRingBlueInner} />
+                                </View>
+                                <View style={styles.designTimelineText}>
+                                    <Text
+                                        style={[styles.designPlaceTitle, { color: textColor }]}
+                                        numberOfLines={2}
+                                    >
+                                        {endTitle}
+                                    </Text>
+                                    <Text
+                                        style={[styles.designPlaceSub, { color: secondaryTextColor }]}
+                                        numberOfLines={2}
+                                    >
+                                        {endDetailLine}
+                                    </Text>
+                                </View>
+                            </TouchableOpacity>
                         </View>
 
-                        <View style={styles.headerCenterSection}>
-                            <View style={[styles.headerIconContainer, { backgroundColor: colors.ACCENT }]}>
-                                <Ionicons name="bus-outline" size={20} color={colors.WHITE} />
-                            </View>
-                            <View style={[styles.headerConnectorLine, { backgroundColor: themeColors.border }]} />
-                        </View>
-
-                        <View style={styles.headerColumn}>
-                            <View style={[styles.cityCodeBadge, { backgroundColor: themeColors.badgeBackground }]}>
-                                <Text style={[styles.headerCityCode, { color: textColor }]}>{endCityCode}</Text>
-                            </View>
-                            <Text style={[styles.headerCityName, { color: textColor }]} numberOfLines={1}>
-                                {booking.trip?.stationTo?.city || ""}
+                        {/* Temps restant droite */}
+                        {/* <View style={styles.designTimeColumn}>
+                            <Text style={[styles.designTimeLabel, { color: secondaryTextColor }]}>
+                                Temps restant
                             </Text>
-                            <View style={styles.timezoneContainer}>
-                                <Text style={[styles.headerTimezone, { color: secondaryTextColor }]}>
-                                    {booking.trip?.stationTo?.name || ""}
-                                </Text>
-                            </View>
-                        </View>
+                            <Text style={[styles.designTimeValue, { color: textColor }]}>
+                                {timeLeftMain}
+                            </Text>
+                            <Text style={[styles.designTimeUnit, { color: textColor }]}>min</Text>
+                        </View> */}
                     </View>
 
-                    {formattedDuration && booking.arrivalTime && (
-                        <View
-                            style={[
-                                styles.durationBadge,
-                                {
-                                    backgroundColor: colors.ACCENT,
-                                    borderColor: colors.ACCENT,
-                                },
-                            ]}
-                        >
-                            <Ionicons name="time" size={18} color={colors.WHITE} />
-                            <Text style={[styles.headerDuration, { color: colors.WHITE }]}>
-                                Durée estimée du trajet : {formattedDuration}
+                    <View style={[styles.designFooter, { borderTopColor: themeColors.border }]}>
+                        <View>
+                            <Text style={[styles.designFooterLabel, { color: secondaryTextColor }]}>
+                                Distance
+                            </Text>
+                            <Text style={[styles.designFooterValue, { color: textColor }]}>
+                                {distanceLabel}
                             </Text>
                         </View>
-                    )}
+                        <View style={styles.designFooterSchedule}>
+                            <Ionicons name="bus" size={18} color={colors.START_MARKER} />
+                            <Text style={[styles.designFooterTime, { color: textColor }]}>
+                                {booking.departureTime || "—"}
+                            </Text>
+                            <View style={styles.designFooterDots}>
+                                {[0, 1, 2, 3, 4, 5].map((i) => (
+                                    <View
+                                        key={i}
+                                        style={[styles.designFooterDot, { backgroundColor: secondaryTextColor }]}
+                                    />
+                                ))}
+                            </View>
+                            <Ionicons name="bus" size={18} color={colors.ROUTE_BLUE} />
+                            <Text style={[styles.designFooterTime, { color: textColor }]}>
+                                {booking.arrivalTime || "—"}
+                            </Text>
+                        </View>
+                    </View>
                 </View>
 
                 {isManualMode && !isPanelCollapsed && (
@@ -146,146 +197,33 @@ export function InfoPanel({
                 )}
 
                 {!isPanelCollapsed && (
-                    <View style={styles.stepsContainer}>
-                        <View style={styles.stepItem}>
-                            <View style={styles.stepLeft}>
-                                <TouchableOpacity onPress={centerOnMe} activeOpacity={0.7}>
-                                    <View
-                                        style={[
-                                            styles.stepIconContainer,
-                                            { backgroundColor: colors.ACCENT },
-                                        ]}
-                                    >
-                                        <Ionicons name="locate" size={16} color={colors.WHITE} />
-                                    </View>
-                                </TouchableOpacity>
-                                <View style={[styles.stepLine, { backgroundColor: themeColors.border }]} />
-                            </View>
-                            <TouchableOpacity
-                                style={[
-                                    styles.stepCard,
-                                    styles.stepCardRow,
-                                    { backgroundColor: themeColors.listItemBackground },
-                                ]}
-                                activeOpacity={0.7}
-                                onPress={centerOnMe}
+                    <TouchableOpacity
+                        style={[
+                            styles.designSecondaryRow,
+                            { backgroundColor: themeColors.listItemBackground, borderColor: themeColors.border },
+                        ]}
+                        onPress={centerOnMe}
+                        activeOpacity={0.75}
+                    >
+                        <Ionicons name="navigate" size={18} color={colors.ACCENT} />
+                        <View style={{ flex: 1, marginLeft: 10 }}>
+                            <Text style={[styles.designSecondaryTitle, { color: textColor }]}>
+                                Ma position
+                            </Text>
+                            <Text
+                                style={[styles.designSecondarySub, { color: secondaryTextColor }]}
+                                numberOfLines={2}
+                                ellipsizeMode="tail"
                             >
-                                <View style={{ width: "90%" }}>
-                                    <View style={styles.stepCardHeader}>
-                                        <Text style={[styles.stepMainText, { color: textColor }]} numberOfLines={2}>
-                                            Position actuelle
-                                        </Text>
-                                    </View>
-                                    <Text
-                                        style={[styles.stepSubText, { color: secondaryTextColor }]}
-                                        numberOfLines={2}
-                                    >
-                                        {currentAddress}
-                                    </Text>
-                                </View>
-                                <Ionicons name="chevron-forward" size={16} color={secondaryTextColor} />
-                            </TouchableOpacity>
+                                {currentAddress}
+                            </Text>
                         </View>
-
-                        <View style={styles.stepItem}>
-                            <View style={styles.stepLeft}>
-                                <TouchableOpacity onPress={centerOnStartPoint} activeOpacity={0.7}>
-                                    <View
-                                        style={[
-                                            styles.stepIconContainer,
-                                            { backgroundColor: colors.START_MARKER },
-                                        ]}
-                                    >
-                                        <Ionicons name="bus-outline" size={16} color={colors.WHITE} />
-                                    </View>
-                                </TouchableOpacity>
-                                <View style={[styles.stepLine, { backgroundColor: themeColors.border }]} />
-                            </View>
-                            <TouchableOpacity
-                                style={[
-                                    styles.stepCard,
-                                    styles.stepCardRow,
-                                    { backgroundColor: themeColors.listItemBackground },
-                                ]}
-                                activeOpacity={0.7}
-                                onPress={centerOnStartPoint}
-                            >
-                                <View style={{ width: "90%" }}>
-                                    <View style={styles.stepCardHeader}>
-                                        <Text style={[styles.stepMainText, { color: textColor }]} numberOfLines={1}>
-                                            Ville de départ
-                                        </Text>
-                                    </View>
-                                    <View style={styles.stepCardDetails}>
-                                        <Ionicons name="location" size={12} color={secondaryTextColor} />
-                                        <Text
-                                            style={[styles.stepSubText, { color: secondaryTextColor }]}
-                                            numberOfLines={1}
-                                        >
-                                            {booking.trip.stationFrom.city}
-                                        </Text>
-                                    </View>
-                                    <View style={styles.stepCardDetails}>
-                                        <Ionicons name="time-outline" size={12} color={secondaryTextColor} />
-                                        <Text style={[styles.stepSubText, { color: secondaryTextColor }]}>
-                                            Départ prévu à {booking.departureTime}
-                                        </Text>
-                                    </View>
-                                </View>
-                                <Ionicons name="chevron-forward" size={16} color={secondaryTextColor} />
-                            </TouchableOpacity>
-                        </View>
-
-                        <View style={styles.stepItem}>
-                            <View style={styles.stepLeft}>
-                                <TouchableOpacity onPress={centerOnEndPoint} activeOpacity={0.7}>
-                                    <View
-                                        style={[
-                                            styles.stepIconContainer,
-                                            { backgroundColor: colors.END_MARKER },
-                                        ]}
-                                    >
-                                        <Ionicons name="stop-outline" size={16} color={colors.WHITE} />
-                                    </View>
-                                </TouchableOpacity>
-                            </View>
-                            <TouchableOpacity
-                                style={[
-                                    styles.stepCard,
-                                    styles.stepCardRow,
-                                    { backgroundColor: themeColors.listItemBackground },
-                                ]}
-                                activeOpacity={0.7}
-                                onPress={centerOnEndPoint}
-                            >
-                                <View style={{ width: "90%" }}>
-                                    <View style={styles.stepCardHeader}>
-                                        <Text style={[styles.stepMainText, { color: textColor }]} numberOfLines={1}>
-                                            Ville d'arrivée
-                                        </Text>
-                                    </View>
-                                    <View style={styles.stepCardDetails}>
-                                        <Ionicons name="location" size={12} color={secondaryTextColor} />
-                                        <Text
-                                            style={[styles.stepSubText, { color: secondaryTextColor }]}
-                                            numberOfLines={1}
-                                        >
-                                            {booking.trip.stationTo.city}
-                                        </Text>
-                                    </View>
-                                    <View style={styles.stepCardDetails}>
-                                        <Ionicons name="time-outline" size={12} color={secondaryTextColor} />
-                                        <Text style={[styles.stepSubText, { color: secondaryTextColor }]}>
-                                            Arrivée prévue à {booking.arrivalTime}
-                                        </Text>
-                                    </View>
-                                </View>
-                                <Ionicons name="chevron-forward" size={16} color={secondaryTextColor} />
-                            </TouchableOpacity>
-                        </View>
-                    </View>
+                        <Ionicons name="chevron-forward" size={18} color={secondaryTextColor} />
+                    </TouchableOpacity>
                 )}
-            </ScrollView>
+            </View>
         </Animated.View>
     );
 }
+
+export const InfoPanel = memo(InfoPanelInner);

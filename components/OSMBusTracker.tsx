@@ -27,7 +27,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface OSMBusTrackerProps {
     tripId: string;
-    bookingDetails: Object | any;
+    bookingDetails: string | object;
 }
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
@@ -59,9 +59,42 @@ const DEFAULT_LOCATION = {
 };
 
 export default function OSMBusTracker({ tripId, bookingDetails }: OSMBusTrackerProps) {
+    /** Parse le booking (JSON ou objet) pour en extraire tripId / bookingId réels du Socket.IO. */
+    const parsedBooking = useMemo(() => {
+        try {
+            if (bookingDetails == null) return null;
+            if (typeof bookingDetails === 'string') return JSON.parse(bookingDetails);
+            return bookingDetails;
+        } catch (error) {
+            console.error('Erreur parsing bookingDetails:', error);
+            return null;
+        }
+    }, [bookingDetails]);
+
+    const trackingTripId = useMemo(() => {
+        const b = parsedBooking as Record<string, unknown> | null;
+        const trip = b?.trip as Record<string, unknown> | undefined;
+        const fromBooking = trip?.id ?? trip?._id ?? b?.tripId;
+        return String(fromBooking || tripId || '').trim();
+    }, [parsedBooking, tripId]);
+
+    const trackingBookingId = useMemo(() => {
+        const b = parsedBooking as Record<string, unknown> | null;
+        return String(b?.id ?? '').trim();
+    }, [parsedBooking]);
+
+    const trackingBusId = useMemo(() => {
+        const b = parsedBooking as Record<string, unknown> | null;
+        const trip = b?.trip as Record<string, unknown> | undefined;
+        const id = (b?.bus as Record<string, unknown> | undefined)?.id ?? b?.busId ?? trip?.busId;
+        const s = id != null ? String(id).trim() : '';
+        return s !== '' ? s : undefined;
+    }, [parsedBooking]);
+
     const { busPosition, busStops, trip, isConnected, isLoading, error } = useBusTracking(
-        tripId,
-        bookingDetails
+        trackingTripId,
+        trackingBookingId,
+        trackingBusId,
     );
     const router = useRouter();
     const colorScheme = useColorScheme() ?? 'light';
@@ -84,16 +117,6 @@ export default function OSMBusTracker({ tripId, bookingDetails }: OSMBusTrackerP
     const panelHeight = useRef(new Animated.Value(PANEL_MAX_HEIGHT)).current;
     const [isPanelExpanded, setIsPanelExpanded] = useState(true);
     const lastBusPosition = useRef<{ latitude: number; longitude: number } | null>(null);
-
-    // Parse bookingDetails une seule fois
-    const parsedBooking = useMemo(() => {
-        try {
-            return JSON.parse(bookingDetails);
-        } catch (error) {
-            console.error('Erreur parsing bookingDetails:', error);
-            return null;
-        }
-    }, [bookingDetails]);
 
     // Couleurs du thème (mémorisées)
     const themeColors = useMemo(() => ({

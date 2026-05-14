@@ -222,18 +222,20 @@ export function useBusTracking(tripId: string, bookingId: string, preferredBusId
         };
 
         const handleBusStopUpdate = (message: any) => {
+            const stop = message?.data?.stop;
+            if (!stop?.id) return;
             setBusStops((prevStops) =>
-                prevStops.map((stop) =>
-                    stop.id === message.data.stop.id ? message.data.stop : stop
-                )
+                prevStops.map((s) => (s.id === stop.id ? { ...s, ...stop } : s)),
             );
         };
 
         const handleTripUpdate = (message: any) => {
-            setTrip((prevTrip) => ({
-                ...prevTrip!,
-                ...message.data.trip,
-            }));
+            const next = message?.data?.trip;
+            if (!next || typeof next !== 'object') return;
+            setTrip((prevTrip) => {
+                if (!prevTrip) return next as Trip;
+                return { ...prevTrip, ...next };
+            });
         };
 
         // Enregistrer les handlers
@@ -242,8 +244,12 @@ export function useBusTracking(tripId: string, bookingId: string, preferredBusId
         busTrackingService.on('bus_stop_update', handleBusStopUpdate);
         busTrackingService.on('trip_update', handleTripUpdate);
 
-        // Connexion au WebSocket
-        busTrackingService.connect(tripId, bookingId);
+        let cancelled = false;
+        void (async () => {
+            const token = await getAuthToken();
+            if (cancelled) return;
+            await busTrackingService.connect(tripId, bookingId, token);
+        })();
 
         // Simulation de mouvement du bus le long de l'itinéraire (si pas de connexion WebSocket)
         const testData = getDefaultTestData(tripId);
@@ -336,6 +342,7 @@ export function useBusTracking(tripId: string, bookingId: string, preferredBusId
 
         // Nettoyage
         return () => {
+            cancelled = true;
             clearInterval(testInterval);
             hasRealtimeUpdateRef.current = false;
             setHasRealtimeData(false);

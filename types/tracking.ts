@@ -45,6 +45,12 @@ export interface PassengerLocation extends Coordinate {
 }
 
 export interface WebSocketMessage {
-    type: 'bus_position_update' | 'bus_stop_update' | 'bus_status_update' | 'trip_update';
+    type:
+        | 'bus_position_update'
+        | 'bus_stop_update'
+        | 'bus_status_update'
+        | 'trip_update'
+        | 'connection'
+        | 'error';
     data: any;
 }

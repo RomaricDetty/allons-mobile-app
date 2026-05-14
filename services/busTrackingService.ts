@@ -1,31 +1,45 @@
+import { socketBaseUrl } from '@/api/config';
 import { WebSocketMessage } from '@/types/tracking';
 import { io, Socket } from 'socket.io-client';
 
 type MessageHandler = (message: WebSocketMessage) => void;
 
+/**
+ * Service singleton Socket.IO pour le suivi bus en temps réel (positions, arrêts, voyage).
+ */
 class BusTrackingService {
     private socket: Socket | null = null;
-    private reconnectTimeout: NodeJS.Timeout | null = null;
     private messageHandlers: Map<string, MessageHandler[]> = new Map();
     private isConnecting = false;
-    private reconnectAttempts = 0;
-    private maxReconnectAttempts = 5;
-    private baseUrl = 'https://dev-allon-backend.onrender.com';
-    private activeBusRoomId: string | null = null;
+    private readonly joinedRoomIds = new Set<string>();
+    private lastAuthToken: string | null = null;
 
     /**
      * Log uniquement en mode développement pour limiter la charge JS en production.
      */
-    private debugLog(...args: any[]): void {
+    private debugLog(...args: unknown[]): void {
         if (__DEV__) console.log(...args);
     }
 
     /**
-     * Normalise un payload Socket.IO en position bus.
+     * Normalise un payload Socket.IO en position bus (ignore les coordonnées invalides).
      */
-    private normalizeBusPosition(data: any): WebSocketMessage {
-        const lat = Number(data?.lat ?? data?.latitude ?? data?.position?.lat ?? data?.position?.latitude);
-        const lng = Number(data?.lng ?? data?.longitude ?? data?.position?.lng ?? data?.position?.longitude);
+    private normalizeBusPosition(data: unknown): WebSocketMessage | null {
+        const d = data as Record<string, unknown> | null;
+        if (!d || typeof d !== 'object') return null;
+
+        const pos = d.position as Record<string, unknown> | undefined;
+        const lat = Number(
+            d.lat ?? d.latitude ?? pos?.lat ?? pos?.latitude,
+        );
+        const lng = Number(
+            d.lng ?? d.longitude ?? pos?.lng ?? pos?.longitude,
+        );
+
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+            this.debugLog('[SocketIO] bus:position:update ignoré (coords invalides)', data);
+            return null;
+        }
 
         return {
             type: 'bus_position_update',
@@ -33,10 +47,10 @@ class BusTrackingService {
                 position: {
                     latitude: lat,
                     longitude: lng,
-                    speed: Number(data?.speed ?? data?.velocity ?? 0),
-                    heading: Number(data?.heading ?? data?.bearing ?? 0),
-                    accuracy: Number(data?.accuracy ?? 20),
-                    timestamp: data?.timestamp ?? new Date().toISOString(),
+                    speed: Number(d.speed ?? d.velocity ?? pos?.speed ?? 0) || 0,
+                    heading: Number(d.heading ?? d.bearing ?? pos?.heading ?? 0) || 0,
+                    accuracy: Number(d.accuracy ?? pos?.accuracy ?? 20) || 20,
+                    timestamp: (typeof d.timestamp === 'string' ? d.timestamp : null) ?? new Date().toISOString(),
                 },
                 raw: data,
             },
@@ -44,139 +58,177 @@ class BusTrackingService {
     }
 
     /**
-     * Connecte au serveur Socket.IO puis rejoint la room du bus.
+     * Réémet tous les `bus:join` après une reconnexion Socket.IO.
      */
-    async connect(tripId: string, bookingId: string): Promise<void> {
-        this.debugLog('[SocketIO] connect() appelé', { tripId, bookingId });
-        if (this.isConnecting || (this.socket && this.socket.connected)) {
-            this.debugLog('Déjà connecté ou connexion en cours');
+    private emitAllJoins(): void {
+        if (!this.socket?.connected) return;
+        for (const busId of this.joinedRoomIds) {
+            this.debugLog('[SocketIO] bus:join emit', { busId });
+            this.socket.emit('bus:join', { busId });
+        }
+    }
+
+    /**
+     * Envoie l’auth au backend (événements usuels + payload legacy `message`).
+     */
+    private emitAuthenticate(tripId: string, bookingId: string): void {
+        if (!this.socket?.connected) return;
+        const payload = { bookingId, tripId, token: this.lastAuthToken };
+        this.socket.emit('authenticate', payload);
+        this.send({ type: 'authenticate', data: { bookingId, tripId, token: this.lastAuthToken } });
+    }
+
+    /**
+     * Connecte au serveur Socket.IO (même origine que l’API, sans `/api`).
+     */
+    async connect(tripId: string, bookingId: string, authToken?: string | null): Promise<void> {
+        const tid = tripId?.trim() ?? '';
+        const bid = bookingId?.trim() ?? '';
+        if (!tid || !bid) {
+            this.debugLog('[SocketIO] connect ignoré (tripId ou bookingId vide)', { tid, bid });
             return;
         }
 
+        this.lastAuthToken = authToken?.trim() || null;
+
+        if (this.socket?.connected) {
+            this.joinedRoomIds.add(tid);
+            this.emitAllJoins();
+            this.emitAuthenticate(tid, bid);
+            return;
+        }
+
+        if (this.isConnecting) {
+            this.debugLog('[SocketIO] connexion déjà en cours');
+            return;
+        }
+
+        if (this.socket && !this.socket.connected) {
+            this.joinedRoomIds.add(tid);
+            this.socket.auth = { token: this.lastAuthToken, tripId: tid, bookingId: bid };
+            this.socket.connect();
+            return;
+        }
+
+        this.destroySocket();
         this.isConnecting = true;
+        this.joinedRoomIds.add(tid);
 
         try {
-            this.socket = io(this.baseUrl, {
-                transports: ['websocket'],
+            this.socket = io(socketBaseUrl, {
+                transports: ['websocket', 'polling'],
                 reconnection: true,
-                reconnectionAttempts: this.maxReconnectAttempts,
+                reconnectionAttempts: Infinity,
+                reconnectionDelayMax: 15000,
+                auth: {
+                    token: this.lastAuthToken,
+                    tripId: tid,
+                    bookingId: bid,
+                },
             });
 
             this.socket.on('connect', () => {
-                this.debugLog('Connecté au tracking du bus');
-                this.debugLog('[SocketIO] socket connect', { socketId: this.socket?.id });
+                this.debugLog('[SocketIO] connect', { socketId: this.socket?.id });
                 this.isConnecting = false;
-                this.reconnectAttempts = 0;
-                this.joinBusRoom(tripId);
-                this.send({ type: 'authenticate', data: { bookingId, tripId } });
-
-                // @ts-ignore
-                this.notifyHandlers('connection' as any, { type: 'connection', data: { connected: true } });
+                this.emitAllJoins();
+                this.emitAuthenticate(tid, bid);
+                this.notifyHandlers('connection', {
+                    type: 'connection',
+                    data: { connected: true },
+                });
             });
 
-            this.socket.on('bus:position:update', (data: any) => {
-                this.debugLog('[SocketIO] bus:position:update reçu', data);
-                this.handleMessage(this.normalizeBusPosition(data));
+            this.socket.on('bus:position:update', (data: unknown) => {
+                this.debugLog('[SocketIO] bus:position:update', data);
+                const msg = this.normalizeBusPosition(data);
+                if (msg) this.handleMessage(msg);
             });
 
-            this.socket.on('bus:stop:update', (data: any) => {
-                this.debugLog('[SocketIO] bus:stop:update reçu', data);
-                this.handleMessage({ type: 'bus_stop_update', data: { stop: data } } as WebSocketMessage);
+            this.socket.on('bus:stop:update', (data: unknown) => {
+                this.debugLog('[SocketIO] bus:stop:update', data);
+                const stop =
+                    data && typeof data === 'object' && 'stop' in (data as object)
+                        ? (data as { stop: unknown }).stop
+                        : data;
+                this.handleMessage({
+                    type: 'bus_stop_update',
+                    data: { stop },
+                } as WebSocketMessage);
             });
 
-            this.socket.on('trip:update', (data: any) => {
-                this.debugLog('[SocketIO] trip:update reçu', data);
+            this.socket.on('trip:update', (data: unknown) => {
+                this.debugLog('[SocketIO] trip:update', data);
                 this.handleMessage({ type: 'trip_update', data: { trip: data } } as WebSocketMessage);
             });
 
-            this.socket.on('connect_error', (error) => {
-                console.error('Erreur WebSocket:', error);
+            this.socket.on('connect_error', (error: unknown) => {
+                const err = error instanceof Error ? error : new Error(String(error));
+                console.error('[SocketIO] connect_error', err.message);
                 this.isConnecting = false;
-                this.notifyHandlers('error', { type: 'error' as any, data: { error } });
+                this.notifyHandlers('error', {
+                    type: 'error',
+                    data: { error: err },
+                });
             });
 
-            this.socket.on('disconnect', () => {
-                this.debugLog('Déconnecté du tracking');
+            this.socket.on('disconnect', (reason: string) => {
+                this.debugLog('[SocketIO] disconnect', reason);
                 this.isConnecting = false;
-                this.socket = null;
-                this.activeBusRoomId = null;
-                // @ts-ignore
-                this.notifyHandlers('connection' as any, { type: 'connection', data: { connected: false } });
-
-                // Tentative de reconnexion
-                this.attemptReconnect(tripId, bookingId);
+                this.notifyHandlers('connection', {
+                    type: 'connection',
+                    data: { connected: false },
+                });
             });
         } catch (error) {
-            console.error('Erreur lors de la connexion:', error);
+            console.error('[SocketIO] erreur init:', error);
             this.isConnecting = false;
             throw error;
         }
     }
 
     /**
-     * Rejoint la room Socket.IO d'un bus donné.
+     * Rejoint la room Socket.IO d’un bus / trajet (réappliqué après chaque reconnexion).
      */
     joinBusRoom(busId: string): void {
-        if (!this.socket || !this.socket.connected || !busId) return;
-        if (this.activeBusRoomId === busId) return;
-        this.activeBusRoomId = busId;
-        this.debugLog('[SocketIO] bus:join emit', { busId });
-        this.socket.emit('bus:join', { busId });
+        const id = busId?.trim();
+        if (!id) return;
+        this.joinedRoomIds.add(id);
+        if (!this.socket?.connected) return;
+        this.debugLog('[SocketIO] bus:join emit', { busId: id });
+        this.socket.emit('bus:join', { busId: id });
     }
 
     /**
-     * Tente de se reconnecter automatiquement
-     */
-    private attemptReconnect(tripId: string, bookingId: string): void {
-        if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-            this.debugLog('Nombre maximum de tentatives de reconnexion atteint');
-            return;
-        }
-
-        this.reconnectAttempts++;
-        const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000); // Exponential backoff
-
-        this.debugLog(`Tentative de reconnexion ${this.reconnectAttempts}/${this.maxReconnectAttempts} dans ${delay}ms`);
-
-        this.reconnectTimeout = setTimeout((delay: number | any): void => {
-            this.connect(tripId, bookingId);
-        }, delay);
-    }
-
-    /**
-     * Déconnecte du serveur WebSocket
+     * Coupe le socket, vide les rooms suivies et retire les handlers.
      */
     disconnect(): void {
-        if (this.reconnectTimeout) {
-            clearTimeout(this.reconnectTimeout);
-            this.reconnectTimeout = null;
-        }
-
-        if (this.socket) {
-            this.socket.removeAllListeners();
-            this.socket.disconnect();
-            this.socket = null;
-        }
-
-        this.activeBusRoomId = null;
+        this.joinedRoomIds.clear();
+        this.destroySocket();
         this.messageHandlers.clear();
-        this.reconnectAttempts = 0;
+    }
+
+    /** Ferme proprement l’instance Socket.IO courante. */
+    private destroySocket(): void {
+        if (!this.socket) return;
+        this.socket.removeAllListeners();
+        this.socket.disconnect();
+        this.socket = null;
     }
 
     /**
-     * Envoie un message au serveur
+     * Envoie un message au serveur (canal legacy `message`).
      */
-    send(message: any): void {
-        if (this.socket && this.socket.connected) {
-            this.debugLog('[SocketIO] message emit', message);
+    send(message: { type: string; data?: unknown }): void {
+        if (this.socket?.connected) {
+            this.debugLog('[SocketIO] emit message', message);
             this.socket.emit('message', message);
         } else {
-            console.warn('WebSocket non connecté, impossible d\'envoyer le message');
+            if (__DEV__) console.warn('[SocketIO] non connecté, emit message ignoré');
         }
     }
 
     /**
-     * Enregistre un handler pour un type de message
+     * Enregistre un handler pour un type de message normalisé.
      */
     on(type: string, handler: MessageHandler): void {
         if (!this.messageHandlers.has(type)) {
@@ -186,38 +238,27 @@ class BusTrackingService {
     }
 
     /**
-     * Supprime un handler
+     * Supprime un handler.
      */
     off(type: string, handler: MessageHandler): void {
         const handlers = this.messageHandlers.get(type);
-        if (handlers) {
-            const index = handlers.indexOf(handler);
-            if (index > -1) {
-                handlers.splice(index, 1);
-            }
-        }
+        if (!handlers) return;
+        const index = handlers.indexOf(handler);
+        if (index > -1) handlers.splice(index, 1);
     }
 
-    /**
-     * Gère les messages reçus
-     */
     private handleMessage(message: WebSocketMessage): void {
-        this.debugLog('Message reçu:', message.type);
+        this.debugLog('[SocketIO] message', message.type);
         this.notifyHandlers(message.type, message);
     }
 
-    /**
-     * Notifie tous les handlers d'un type de message
-     */
     private notifyHandlers(type: string, message: WebSocketMessage): void {
         const handlers = this.messageHandlers.get(type);
-        if (handlers) {
-            handlers.forEach((handler) => handler(message));
-        }
+        handlers?.forEach((handler) => handler(message));
     }
 
     /**
-     * Vérifie si le WebSocket est connecté
+     * Indique si le socket est connecté.
      */
     isConnected(): boolean {
         return this.socket !== null && this.socket.connected;

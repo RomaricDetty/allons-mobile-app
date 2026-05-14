@@ -1,5 +1,3 @@
-// @ts-nocheck
-import { Ionicons } from "@expo/vector-icons";
 import {
     Camera,
     LineLayer,
@@ -7,19 +5,43 @@ import {
     MarkerView,
     ShapeSource,
 } from "@rnmapbox/maps";
-import React from "react";
+import React, { memo, type RefObject } from "react";
 import { Image, View } from "react-native";
 
+type MapSceneProps = {
+    mapRef: RefObject<MapView | null>;
+    cameraRef: RefObject<React.ElementRef<typeof Camera> | null>;
+    defaultCameraCenter: [number, number];
+    defaultCameraZoom: number;
+    styles: Record<string, any>;
+    isManualMode: boolean;
+    handleMapPress: (coords: [number, number]) => void;
+    routeGeoJSON: any;
+    isValidCoordinate: (coord: unknown) => boolean;
+    startPoint: { latitude: number; longitude: number } | null;
+    endPoint: { latitude: number; longitude: number } | null;
+    passengerLocation: { latitude: number; longitude: number } | null;
+    busPosition: { latitude: number; longitude: number } | null;
+    busRotation: number;
+    busMarkerImageStyle: any;
+    toMapboxCoordinates: (coord: {
+        latitude: number;
+        longitude: number;
+    }) => [number, number];
+    colors: Record<string, any>;
+};
+
 /**
- * Rendu de la carte Mapbox (itinéraire, marqueurs départ/arrivée, bus, passager).
+ * Carte Mapbox : itinéraire, drapeaux départ/arrivée, position passager et bus (assets inchangés).
  */
-export function MapScene({
+function MapSceneInner({
     mapRef,
+    cameraRef,
+    defaultCameraCenter,
+    defaultCameraZoom,
     styles,
     isManualMode,
     handleMapPress,
-    cameraCenter,
-    cameraZoom,
     routeGeoJSON,
     isValidCoordinate,
     startPoint,
@@ -30,7 +52,7 @@ export function MapScene({
     busMarkerImageStyle,
     toMapboxCoordinates,
     colors,
-}: any) {
+}: MapSceneProps) {
     return (
         <MapView
             ref={mapRef}
@@ -56,14 +78,13 @@ export function MapScene({
                 if (coords) handleMapPress(coords);
             }}
         >
-            {cameraCenter && (
-                <Camera
-                    centerCoordinate={cameraCenter}
-                    zoomLevel={cameraZoom}
-                    animationMode="flyTo"
-                    animationDuration={500}
-                />
-            )}
+            <Camera
+                ref={cameraRef}
+                defaultSettings={{
+                    centerCoordinate: defaultCameraCenter,
+                    zoomLevel: defaultCameraZoom,
+                }}
+            />
 
             {routeGeoJSON && (
                 <ShapeSource id="routeSource" shape={routeGeoJSON}>
@@ -81,13 +102,21 @@ export function MapScene({
 
             {isValidCoordinate(startPoint) && (
                 <MarkerView id="start-point" coordinate={toMapboxCoordinates(startPoint)}>
-                    <Image source={colors.flagStartImage} style={styles.flagMarker} resizeMode="contain" />
+                    <Image
+                        source={colors.flagStartImage}
+                        style={styles.flagMarker}
+                        resizeMode="contain"
+                    />
                 </MarkerView>
             )}
 
             {isValidCoordinate(endPoint) && (
                 <MarkerView id="end-point" coordinate={toMapboxCoordinates(endPoint)}>
-                    <Image source={colors.flagEndImage} style={styles.flagMarker} resizeMode="contain" />
+                    <Image
+                        source={colors.flagEndImage}
+                        style={styles.flagMarker}
+                        resizeMode="contain"
+                    />
                 </MarkerView>
             )}
 
@@ -107,7 +136,11 @@ export function MapScene({
                 <MarkerView id="bus-marker" coordinate={toMapboxCoordinates(busPosition)}>
                     <View style={styles.busMarkerContainer}>
                         <View style={[{ transform: [{ rotate: `${busRotation}deg` }] }]}>
-                            <Image source={colors.busImage} style={busMarkerImageStyle} resizeMode="contain" />
+                            <Image
+                                source={colors.busImage}
+                                style={busMarkerImageStyle}
+                                resizeMode="contain"
+                            />
                         </View>
                     </View>
                 </MarkerView>
@@ -115,3 +148,5 @@ export function MapScene({
         </MapView>
     );
 }
+
+export const MapScene = memo(MapSceneInner);
