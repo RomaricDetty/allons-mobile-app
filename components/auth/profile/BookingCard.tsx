@@ -111,7 +111,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({ booking }) => {
                     <MaterialCommunityIcons name="eye-outline" size={20} color="#ffffff" />
                     <Text style={styles.actionButtonText}>Ticket</Text>
                 </Pressable>
-                {/* {showItineraryButton && ( */}
+                {showItineraryButton && (
                     <Pressable
                         style={[styles.actionButton, { backgroundColor: 'transparent', borderColor: colors.border }]}
                         onPress={() => {
@@ -121,7 +121,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({ booking }) => {
                         <MaterialCommunityIcons name="map-marker-outline" size={20} color={colors.secondaryText} />
                         <Text style={[styles.actionButtonText, { color: colors.secondaryText }]}>Itinéraire</Text>
                     </Pressable>
-                {/* )} */}
+                )}
             </View>
         </View>
     );
