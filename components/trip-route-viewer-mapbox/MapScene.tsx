@@ -16,6 +16,8 @@ type MapSceneProps = {
     styles: Record<string, any>;
     isManualMode: boolean;
     handleMapPress: (coords: [number, number]) => void;
+    /** Déplacement manuel de la carte (pincer / glisser). */
+    onRegionWillChange?: (event: { properties?: { isUserInteraction?: boolean } }) => void;
     routeGeoJSON: any;
     isValidCoordinate: (coord: unknown) => boolean;
     startPoint: { latitude: number; longitude: number } | null;
@@ -42,6 +44,7 @@ function MapSceneInner({
     styles,
     isManualMode,
     handleMapPress,
+    onRegionWillChange,
     routeGeoJSON,
     isValidCoordinate,
     startPoint,
@@ -57,6 +60,7 @@ function MapSceneInner({
         <MapView
             ref={mapRef}
             style={styles.map}
+            onRegionWillChange={onRegionWillChange}
             onPress={(feature: any) => {
                 if (!isManualMode) return;
                 let coords: [number, number] | null = null;

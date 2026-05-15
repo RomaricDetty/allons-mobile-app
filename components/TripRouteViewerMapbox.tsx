@@ -2,6 +2,7 @@
 import { ControlButtons } from "@/components/trip-route-viewer-mapbox/ControlButtons";
 import { InfoPanel } from "@/components/trip-route-viewer-mapbox/InfoPanel";
 import { MapScene } from "@/components/trip-route-viewer-mapbox/MapScene";
+import { RecenterRouteButton } from "@/components/trip-route-viewer-mapbox/RecenterRouteButton";
 import { resolveMapboxAccessToken } from "@/constants/mapbox";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useThemeColor } from "@/hooks/use-theme-color";
@@ -112,10 +113,6 @@ const LIVE_SOCKET_MIN_APPLY_MS = 150;
 const CAMERA_UPDATE_INTERVAL_MS = 900;
 const MIN_BUS_MOVE_KM = 0.02; // 20m
 const MIN_HEADING_DELTA_DEG = 3;
-const SIM_UPDATE_INTERVAL_MS = 220;
-const SIM_MIN_DURATION_SECONDS = 180; // 3 min
-const SIM_MAX_DURATION_SECONDS = 600; // 10 min
-const POSITION_SMOOTHING_ALPHA = 0.28;
 const ROTATION_SMOOTHING_ALPHA = 0.22;
 const PANEL_EXPANDED_VALUE = 1;
 const PANEL_COLLAPSED_VALUE = 0.2;
@@ -123,6 +120,8 @@ const PANEL_SWIPE_THRESHOLD = 24;
 
 /** Espace vertical entre le bas des boutons carte et le haut du contenu du panneau. */
 const CONTROL_BUTTONS_GAP_ABOVE_PANEL = 10;
+/** Espace entre le haut de la carte trajet et le bouton « Recentrer ». */
+const RECENTER_GAP_ABOVE_TRIP_CARD = 8;
 
 interface TripRouteViewerMapboxProps {
     booking: Booking;
@@ -167,8 +166,6 @@ export default function TripRouteViewerMapbox({
         longitude: number;
     } | null>(null);
     const [busRotation, setBusRotation] = useState<number>(0);
-    const [isBusAnimationActive, setIsBusAnimationActive] =
-        useState<boolean>(false);
     const [isFollowingBus, setIsFollowingBus] = useState<boolean>(false);
     const [isPanelCollapsed, setIsPanelCollapsed] = useState<boolean>(false);
 
@@ -176,15 +173,10 @@ export default function TripRouteViewerMapbox({
 
     const mapRef = useRef<MapView>(null);
     const cameraRef = useRef<ElementRef<typeof Camera> | null>(null);
-    const animationProgressRef = useRef(0);
     const locationSubscription = useRef<Location.LocationSubscription | null>(
         null,
     );
     const isManualModeRef = useRef<boolean>(false);
-    const busAnimationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
-        null,
-    );
-    const routeDistancesRef = useRef<number[]>([]);
     const addressUpdateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
         null,
     );
@@ -202,6 +194,8 @@ export default function TripRouteViewerMapbox({
         heading?: number;
     } | null>(null);
     const hasLiveSocketUpdateRef = useRef<boolean>(false);
+    /** Ignore les mouvements caméra programmés pour ne pas couper le suivi bus. */
+    const isProgrammaticCameraMoveRef = useRef(false);
     /** Limite la fréquence d’application des positions WebSocket sur la carte (ms). */
     const liveSocketApplyThrottleRef = useRef(0);
     const smoothedRotationRef = useRef<number>(0);
@@ -247,6 +241,7 @@ export default function TripRouteViewerMapbox({
         trackingTripId,
         trackingBookingId,
         trackingBusId,
+        { realtimeOnly: true },
     );
 
     /**
@@ -295,6 +290,13 @@ export default function TripRouteViewerMapbox({
                 zoom,
                 lastUpdateAt: now,
             };
+
+            if (force) {
+                isProgrammaticCameraMoveRef.current = true;
+                setTimeout(() => {
+                    isProgrammaticCameraMoveRef.current = false;
+                }, 800);
+            }
 
             cameraRef.current?.setCamera({
                 centerCoordinate: center,
@@ -618,9 +620,9 @@ export default function TripRouteViewerMapbox({
      * Cadre toute la polyline sur l’écran via Mapbox fitBounds (marges pour en-tête, boutons à droite, panneau bas).
      */
     const centerMapOnRoute = useCallback(() => {
-        const coords =
+        const coords: { latitude: number; longitude: number }[] =
             routePath.length >= 2
-                ? routePath
+                ? [...routePath]
                 : startPoint && endPoint
                   ? [startPoint, endPoint]
                   : startPoint
@@ -629,7 +631,26 @@ export default function TripRouteViewerMapbox({
                       ? [endPoint]
                       : [];
 
+        if (
+            busPosition &&
+            isValidCoordinate(busPosition) &&
+            !coords.some(
+                (c) =>
+                    c.latitude === busPosition.latitude &&
+                    c.longitude === busPosition.longitude,
+            )
+        ) {
+            coords.push(busPosition);
+        }
+
         if (coords.length === 0) return;
+
+        setIsFollowingBus(false);
+        isFollowingBusRef.current = false;
+        isProgrammaticCameraMoveRef.current = true;
+        setTimeout(() => {
+            isProgrammaticCameraMoveRef.current = false;
+        }, 800);
 
         const bounds = computeLngLatBoundsFromRoute(coords);
         if (!bounds) return;
@@ -661,7 +682,16 @@ export default function TripRouteViewerMapbox({
             zoom: approxZoom,
             lastUpdateAt: Date.now(),
         };
-    }, [routePath, startPoint, endPoint, windowHeight, insets.top, insets.bottom]);
+    }, [
+        routePath,
+        startPoint,
+        endPoint,
+        busPosition,
+        isValidCoordinate,
+        windowHeight,
+        insets.top,
+        insets.bottom,
+    ]);
 
     /**
      * Initialise la localisation du passager et calcule l'itinéraire
@@ -719,158 +749,6 @@ export default function TripRouteViewerMapbox({
     }, [isManualMode]);
 
     /**
-     * Calcule les distances cumulées le long de l'itinéraire
-     */
-    const calculateRouteDistances = useCallback(() => {
-        if (routePath.length < 2) {
-            routeDistancesRef.current = [0];
-            return;
-        }
-
-        const distances: number[] = [0];
-        let totalDistance = 0;
-
-        for (let i = 1; i < routePath.length; i++) {
-            const distance = routingService.calculateDistance(
-                routePath[i - 1],
-                routePath[i],
-            );
-            totalDistance += distance;
-            distances.push(totalDistance);
-        }
-
-        routeDistancesRef.current = distances;
-    }, [routePath]);
-
-    /**
-     * Calcule l'angle de rotation (bearing) entre deux points
-     * @param point1 Point de départ
-     * @param point2 Point d'arrivée
-     * @returns Angle en degrés (0-360)
-     */
-    const calculateBearing = useCallback(
-        (
-            point1: { latitude: number; longitude: number },
-            point2: { latitude: number; longitude: number },
-        ): number => {
-            const lat1 = (point1.latitude * Math.PI) / 180;
-            const lat2 = (point2.latitude * Math.PI) / 180;
-            const dLon = ((point2.longitude - point1.longitude) * Math.PI) / 180;
-
-            const y = Math.sin(dLon) * Math.cos(lat2);
-            const x =
-                Math.cos(lat1) * Math.sin(lat2) -
-                Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
-
-            const bearing = Math.atan2(y, x);
-            const bearingDegrees = (bearing * 180) / Math.PI;
-
-            return (bearingDegrees + 360) % 360;
-        },
-        [],
-    );
-
-    /**
-     * Calcule la position du bus le long de l'itinéraire en fonction de la progression
-     * @param progression Progression entre 0 (départ) et 1 (arrivée)
-     * @returns Coordonnées du bus et angle de rotation, ou null si l'itinéraire n'est pas disponible
-     */
-    const calculateBusPosition = useCallback(
-        (
-            progression: number,
-        ): { latitude: number; longitude: number; rotation: number } | null => {
-            if (routePath.length === 0) return null;
-
-            if (
-                routeDistancesRef.current.length === 0 ||
-                routeDistancesRef.current.length !== routePath.length
-            ) {
-                calculateRouteDistances();
-            }
-
-            const clampedProgression = Math.max(0, Math.min(1, progression));
-
-            const totalDistance =
-                routeDistancesRef.current[routeDistancesRef.current.length - 1];
-            if (totalDistance === 0 || routeDistancesRef.current.length < 2) {
-                const exactIndex = clampedProgression * (routePath.length - 1);
-                const currentIndex = Math.floor(exactIndex);
-                const nextIndex = Math.min(currentIndex + 1, routePath.length - 1);
-                const fraction = exactIndex - currentIndex;
-                const currentPoint = routePath[currentIndex];
-                const nextPoint = routePath[nextIndex];
-                const rotation = calculateBearing(currentPoint, nextPoint);
-                return {
-                    latitude:
-                        currentPoint.latitude +
-                        (nextPoint.latitude - currentPoint.latitude) * fraction,
-                    longitude:
-                        currentPoint.longitude +
-                        (nextPoint.longitude - currentPoint.longitude) * fraction,
-                    rotation,
-                };
-            }
-
-            const targetDistance = clampedProgression * totalDistance;
-
-            let segmentIndex = 0;
-            for (let i = 0; i < routeDistancesRef.current.length - 1; i++) {
-                if (
-                    targetDistance >= routeDistancesRef.current[i] &&
-                    targetDistance <= routeDistancesRef.current[i + 1]
-                ) {
-                    segmentIndex = i;
-                    break;
-                }
-            }
-
-            if (clampedProgression >= 1) {
-                const lastPoint = routePath[routePath.length - 1];
-                const secondLastPoint = routePath[routePath.length - 2];
-                const rotation = calculateBearing(secondLastPoint, lastPoint);
-                return {
-                    latitude: lastPoint.latitude,
-                    longitude: lastPoint.longitude,
-                    rotation,
-                };
-            }
-
-            const segmentStartDistance = routeDistancesRef.current[segmentIndex];
-            const segmentEndDistance = routeDistancesRef.current[segmentIndex + 1];
-            const segmentLength = segmentEndDistance - segmentStartDistance;
-            const fraction =
-                segmentLength > 0
-                    ? (targetDistance - segmentStartDistance) / segmentLength
-                    : 0;
-
-            const currentPoint = routePath[segmentIndex];
-            const nextPoint = routePath[segmentIndex + 1];
-
-            const rotation = calculateBearing(currentPoint, nextPoint);
-
-            return {
-                latitude:
-                    currentPoint.latitude +
-                    (nextPoint.latitude - currentPoint.latitude) * fraction,
-                longitude:
-                    currentPoint.longitude +
-                    (nextPoint.longitude - currentPoint.longitude) * fraction,
-                rotation,
-            };
-        },
-        [routePath, calculateRouteDistances, calculateBearing],
-    );
-
-    /**
-     * Calcule les distances de l'itinéraire quand le routePath change
-     */
-    useEffect(() => {
-        if (routePath.length > 0) {
-            calculateRouteDistances();
-        }
-    }, [routePath, calculateRouteDistances]);
-
-    /**
      * Met à jour la ref du suivi du bus
      */
     useEffect(() => {
@@ -878,35 +756,28 @@ export default function TripRouteViewerMapbox({
     }, [isFollowingBus]);
 
     /**
-     * Synchronise la position du bus : toujours en file d’attente pour le flush ;
-     * en temps réel Socket.IO (`hasRealtimeData`), application immédiate (throttlée) + désactivation de la simulation.
+     * Position du bus : uniquement les coordonnées Socket.IO (`liveBusPosition` via `realtimeOnly`).
      */
     useEffect(() => {
         if (!liveBusPosition || !isValidCoordinate(liveBusPosition)) return;
 
-        pendingLivePositionRef.current = {
+        if (hasRealtimeData) {
+            hasLiveSocketUpdateRef.current = true;
+        }
+
+        const pending = {
             latitude: liveBusPosition.latitude,
             longitude: liveBusPosition.longitude,
             heading: liveBusPosition.heading ?? 0,
         };
-        setIsBusAnimationActive(false);
-
-        if (!hasRealtimeData) {
-            return;
-        }
-
-        hasLiveSocketUpdateRef.current = true;
+        pendingLivePositionRef.current = pending;
 
         const now = Date.now();
         if (now - liveSocketApplyThrottleRef.current < LIVE_SOCKET_MIN_APPLY_MS) {
             return;
         }
         liveSocketApplyThrottleRef.current = now;
-
-        const pending = pendingLivePositionRef.current;
-        if (pending) {
-            applyLiveBusPositionToMap(pending);
-        }
+        applyLiveBusPositionToMap(pending);
     }, [liveBusPosition, hasRealtimeData, isValidCoordinate, applyLiveBusPositionToMap]);
 
     /**
@@ -925,10 +796,12 @@ export default function TripRouteViewerMapbox({
                   )
                 : 999;
             const headingDelta = getHeadingDelta(previous?.heading, pending.heading);
+            const isFirstLiveFix = !previous;
             const shouldApply =
-                hasLiveSocketUpdateRef.current ||
-                movedKm >= MIN_BUS_MOVE_KM ||
-                headingDelta >= MIN_HEADING_DELTA_DEG;
+                hasLiveSocketUpdateRef.current &&
+                (isFirstLiveFix ||
+                    movedKm >= MIN_BUS_MOVE_KM ||
+                    headingDelta >= MIN_HEADING_DELTA_DEG);
 
             if (!shouldApply) return;
 
@@ -944,123 +817,10 @@ export default function TripRouteViewerMapbox({
     }, [getHeadingDelta, applyLiveBusPositionToMap]);
 
     /**
-     * Gère l'animation du bus le long de l'itinéraire
-     */
-    useEffect(() => {
-        if (
-            !isBusAnimationActive ||
-            hasLiveSocketUpdateRef.current ||
-            !routeDuration ||
-            routePath.length === 0
-        ) {
-            return;
-        }
-
-        const totalDurationSeconds = Math.max(
-            SIM_MIN_DURATION_SECONDS,
-            Math.min(SIM_MAX_DURATION_SECONDS, routeDuration * 60),
-        );
-        const updateInterval = SIM_UPDATE_INTERVAL_MS;
-        const progressIncrement = updateInterval / (totalDurationSeconds * 1000);
-
-        let currentProgress = animationProgressRef.current;
-
-        busAnimationIntervalRef.current = setInterval(() => {
-            currentProgress = Math.min(currentProgress + progressIncrement, 1);
-            animationProgressRef.current = currentProgress;
-
-            const position = calculateBusPosition(currentProgress);
-            if (position) {
-                setBusPosition((prev) => {
-                    if (!prev) {
-                        return {
-                            latitude: position.latitude,
-                            longitude: position.longitude,
-                        };
-                    }
-                    return {
-                        latitude:
-                            prev.latitude +
-                            (position.latitude - prev.latitude) * POSITION_SMOOTHING_ALPHA,
-                        longitude:
-                            prev.longitude +
-                            (position.longitude - prev.longitude) * POSITION_SMOOTHING_ALPHA,
-                    };
-                });
-
-                const currentRotation = smoothedRotationRef.current || position.rotation;
-                const nextRotation = smoothAngle(
-                    currentRotation,
-                    position.rotation,
-                    ROTATION_SMOOTHING_ALPHA,
-                );
-                smoothedRotationRef.current = nextRotation;
-                setBusRotation(nextRotation);
-
-                if (isFollowingBusRef.current) {
-                    updateCamera([position.longitude, position.latitude], 15);
-                }
-            }
-
-            if (currentProgress >= 1) {
-                setIsBusAnimationActive(false);
-            }
-        }, updateInterval);
-
-        return () => {
-            if (busAnimationIntervalRef.current) {
-                clearInterval(busAnimationIntervalRef.current);
-                busAnimationIntervalRef.current = null;
-            }
-        };
-    }, [
-        isBusAnimationActive,
-        routeDuration,
-        routePath.length,
-        calculateBusPosition,
-        updateCamera,
-        smoothAngle,
-    ]);
-
-    /**
-     * Initialise la position du bus au point de départ quand l'itinéraire est chargé
-     */
-    useEffect(() => {
-        if (
-            startPoint &&
-            routePath.length > 0 &&
-            !isBusAnimationActive &&
-            !busPosition
-        ) {
-            setBusPosition(startPoint);
-            animationProgressRef.current = 0;
-
-            if (routePath.length > 1) {
-                const initialRotation = calculateBearing(routePath[0], routePath[1]);
-                smoothedRotationRef.current = initialRotation;
-                setBusRotation(initialRotation);
-            } else {
-                smoothedRotationRef.current = 0;
-                setBusRotation(0);
-            }
-        }
-    }, [
-        startPoint,
-        routePath,
-        isBusAnimationActive,
-        busPosition,
-        calculateBearing,
-    ]);
-
-    /**
      * Nettoie tous les intervalles lors du démontage
      */
     useEffect(() => {
         return () => {
-            if (busAnimationIntervalRef.current) {
-                clearInterval(busAnimationIntervalRef.current);
-                busAnimationIntervalRef.current = null;
-            }
             if (liveFlushIntervalRef.current) {
                 clearInterval(liveFlushIntervalRef.current);
                 liveFlushIntervalRef.current = null;
@@ -1200,6 +960,20 @@ export default function TripRouteViewerMapbox({
     }, [busPosition, updateCamera]);
 
     /**
+     * Désactive le suivi bus si l’utilisateur déplace la carte manuellement.
+     */
+    const handleMapRegionWillChange = useCallback(
+        (event: { properties?: { isUserInteraction?: boolean } }) => {
+            if (isProgrammaticCameraMoveRef.current) return;
+            if (!event?.properties?.isUserInteraction) return;
+            if (!isFollowingBusRef.current) return;
+            setIsFollowingBus(false);
+            isFollowingBusRef.current = false;
+        },
+        [],
+    );
+
+    /**
      * Active ou désactive le suivi automatique du bus
      */
     const toggleFollowBus = useCallback(() => {
@@ -1303,43 +1077,6 @@ export default function TripRouteViewerMapbox({
         return city && city.length > 0 ? city : "—";
     }, [booking.trip?.stationTo?.city]);
 
-    /**
-     * Minutes restantes avant l'heure d'arrivée affichée (même jour que le départ, +1 jour si passage minuit).
-     */
-    const minutesUntilArrival = useMemo(() => {
-        if (!booking.arrivalTime || !booking.departureTime || !booking.departureDateTime) {
-            return null;
-        }
-        try {
-            const dep = new Date(booking.departureDateTime);
-            if (Number.isNaN(dep.getTime())) return null;
-
-            const [ah, am] = booking.arrivalTime.split(":").map(Number);
-            const [dh, dm] = booking.departureTime.split(":").map(Number);
-            if (![ah, am, dh, dm].every((x) => Number.isFinite(x))) return null;
-
-            const arr = new Date(
-                dep.getFullYear(),
-                dep.getMonth(),
-                dep.getDate(),
-                ah,
-                am,
-                0,
-                0,
-            );
-            const depClock = dh * 60 + dm;
-            const arrClock = ah * 60 + am;
-            if (arrClock < depClock) {
-                arr.setDate(arr.getDate() + 1);
-            }
-
-            const diffMin = Math.round((arr.getTime() - Date.now()) / 60000);
-            return Number.isFinite(diffMin) ? diffMin : null;
-        } catch {
-            return null;
-        }
-    }, [booking.arrivalTime, booking.departureTime, booking.departureDateTime]);
-
     // Styles mémorisés
     const headerStyle = useMemo(
         () => [
@@ -1399,10 +1136,8 @@ export default function TripRouteViewerMapbox({
 
     const defaultCameraZoom = 13;
 
-    /**
-     * Position des boutons carte : juste au-dessus du panneau (hauteur estimée du contenu, pas un % d’écran).
-     */
-    const controlButtonsContainerStyle = useMemo(() => {
+    /** Distance au-dessus du panneau d’infos pour les contrôles flottants (px). */
+    const floatingControlsBottom = useMemo(() => {
         const safe = Math.max(insets.bottom, 10);
         const handleBlock = 8 + 44;
         const tripCardApprox = 198;
@@ -1420,11 +1155,40 @@ export default function TripRouteViewerMapbox({
             safe +
             bodyPadding;
 
-        return {
-            bottom:
-                Math.round(panelApprox + CONTROL_BUTTONS_GAP_ABOVE_PANEL),
-        };
+        return Math.round(panelApprox + CONTROL_BUTTONS_GAP_ABOVE_PANEL);
     }, [isPanelCollapsed, isManualMode, insets.bottom]);
+
+    const controlButtonsContainerStyle = useMemo(
+        () => ({ bottom: floatingControlsBottom }),
+        [floatingControlsBottom],
+    );
+
+    /** Position du bouton « Recentrer » juste au-dessus de la carte trajet (aligné à gauche). */
+    const recenterButtonBottom = useMemo(() => {
+        const infoPanelPaddingBottom = 8;
+        const scrollPaddingBottom = Math.max(10, insets.bottom);
+        const tripCardApprox = 198;
+        const betweenCards = 8;
+        const myPositionRow = isPanelCollapsed ? 0 : 94;
+        const manualRow = !isPanelCollapsed && isManualMode ? 92 : 0;
+
+        return Math.round(
+            infoPanelPaddingBottom +
+                scrollPaddingBottom +
+                myPositionRow +
+                betweenCards +
+                manualRow +
+                tripCardApprox +
+                RECENTER_GAP_ABOVE_TRIP_CARD,
+        );
+    }, [isPanelCollapsed, isManualMode, insets.bottom]);
+
+    const recenterButtonContainerStyle = useMemo(
+        () => ({ bottom: recenterButtonBottom }),
+        [recenterButtonBottom],
+    );
+
+    const showRecenterButton = routePath.length >= 2 || !!(startPoint && endPoint);
 
     // Callback mémorisé pour le retour en arrière
     const handleBackPress = useCallback(() => {
@@ -1491,6 +1255,7 @@ export default function TripRouteViewerMapbox({
                 styles={styles}
                 isManualMode={isManualMode}
                 handleMapPress={handleMapPress}
+                onRegionWillChange={handleMapRegionWillChange}
                 routeGeoJSON={routeGeoJSON}
                 isValidCoordinate={isValidCoordinate}
                 startPoint={startPoint}
@@ -1522,20 +1287,24 @@ export default function TripRouteViewerMapbox({
                 </TouchableOpacity>
             </View>
 
+            <RecenterRouteButton
+                visible={showRecenterButton}
+                onPress={centerMapOnRoute}
+                styles={styles}
+                containerStyle={recenterButtonContainerStyle}
+                themeColors={themeColors}
+                textColor={textColor}
+            />
+
             <ControlButtons
                 styles={styles}
                 containerStyle={controlButtonsContainerStyle}
                 themeColors={themeColors}
-                isManualMode={isManualMode}
-                toggleLocationMode={toggleLocationMode}
                 textColor={textColor}
                 busPosition={busPosition}
-                isFollowingBus={isFollowingBus}
-                toggleFollowBus={toggleFollowBus}
                 centerOnBus={centerOnBus}
                 centerOnMe={centerOnMe}
                 centerMapOnRoute={centerMapOnRoute}
-                colors={COLORS}
             />
 
             <InfoPanel
@@ -1557,7 +1326,6 @@ export default function TripRouteViewerMapbox({
                 colors={COLORS}
                 startDetailLine={startDetailLine}
                 endDetailLine={endDetailLine}
-                minutesUntilArrival={minutesUntilArrival}
                 routeDistanceKm={routeDistanceKm}
             />
         </SafeAreaView>
@@ -1633,10 +1401,29 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
     },
+    recenterButtonContainer: {
+        position: "absolute",
+        left: 15,
+        zIndex: 10,
+    },
+    recenterButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        paddingVertical: 10,
+        paddingHorizontal: 14,
+        borderRadius: 24,
+        borderWidth: 1,
+    },
+    recenterLabel: {
+        fontSize: 14,
+        fontFamily: "Ubuntu_Medium",
+    },
     controlButtonsContainer: {
         position: "absolute",
         right: 20,
         flexDirection: "column",
+        alignItems: "flex-end",
         gap: 12,
         zIndex: 10,
     },
@@ -1755,9 +1542,9 @@ const styles = StyleSheet.create({
         marginBottom: 2,
     },
     designTimeValue: {
-        fontSize: 40,
+        fontSize: 30,
         fontWeight: "800",
-        lineHeight: 44,
+        lineHeight: 36,
     },
     designTimeUnit: {
         fontSize: 16,
@@ -1825,7 +1612,7 @@ const styles = StyleSheet.create({
         right: 0,
         paddingTop: 8,
         paddingBottom: 8,
-        maxHeight: "45%",
+        maxHeight: "50%",
     },
     /** Colonne des cartes : pas de flex:1 pour éviter de forcer la hauteur et le scroll. */
     infoPanelBody: {

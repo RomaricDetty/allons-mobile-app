@@ -4,7 +4,49 @@ import React, { memo } from "react";
 import { Animated, Text, TouchableOpacity, View } from "react-native";
 
 /**
- * Panneau flottant type maquette : timeline départ/arrivée, temps restant, distance et horaires.
+ * Durée estimée du trajet en minutes à partir des horaires HH:MM (passage minuit si besoin).
+ */
+function getEstimatedTripDurationMinutes(
+    departureTime?: string,
+    arrivalTime?: string,
+): number | null {
+    if (!departureTime?.trim() || !arrivalTime?.trim()) return null;
+
+    const [dh, dm] = departureTime.trim().split(":").map(Number);
+    const [ah, am] = arrivalTime.trim().split(":").map(Number);
+    if (![dh, dm, ah, am].every((x) => Number.isFinite(x))) return null;
+
+    const depMinutes = dh * 60 + dm;
+    const arrMinutes = ah * 60 + am;
+    let diff = arrMinutes - depMinutes;
+    if (diff < 0) diff += 24 * 60;
+
+    return diff > 0 ? diff : null;
+}
+
+/**
+ * Formate une durée en minutes pour l'affichage en heures (valeur + unité).
+ */
+function formatEstimatedDurationHours(totalMinutes: number): { value: string; unit: string } {
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+
+    if (hours > 0 && minutes > 0) {
+        return { value: String(hours), unit: `h ${minutes}` };
+    }
+    if (hours > 0) {
+        return { value: String(hours), unit: "h" };
+    }
+
+    const decimalHours = Math.round((totalMinutes / 60) * 10) / 10;
+    return {
+        value: String(decimalHours).replace(".", ","),
+        unit: "h",
+    };
+}
+
+/**
+ * Panneau flottant type maquette : timeline départ/arrivée, temps estimé, distance et horaires.
  */
 function InfoPanelInner({
     infoPanelStyle,
@@ -27,8 +69,6 @@ function InfoPanelInner({
     startDetailLine,
     /** Ville de la gare d'arrivée. */
     endDetailLine,
-    /** Minutes restantes avant l'arrivée prévue (null si inconnu). */
-    minutesUntilArrival,
     /** Distance totale du trajet en km (affichage). */
     routeDistanceKm,
 }: any) {
@@ -42,11 +82,21 @@ function InfoPanelInner({
             ? `${Number(routeDistanceKm).toFixed(0)} km`
             : "—";
 
+    const estimatedDurationMin = getEstimatedTripDurationMinutes(
+        booking.departureTime,
+        booking.arrivalTime,
+    );
+    const estimatedDuration =
+        estimatedDurationMin != null
+            ? formatEstimatedDurationHours(estimatedDurationMin)
+            : null;
+    const timeLeftMain = estimatedDuration?.value ?? "—";
+    const timeLeftUnit = estimatedDuration?.unit ?? "";
+
     return (
         <Animated.View style={infoPanelStyle}>
             <TouchableOpacity
                 style={styles.panelHandleContainer}
-                onPress={togglePanelCollapse}
                 activeOpacity={0.7}
                 {...panelHandlePanHandlers}
             >
@@ -126,15 +176,21 @@ function InfoPanelInner({
                         </View>
 
                         {/* Temps restant droite */}
-                        {/* <View style={styles.designTimeColumn}>
+                        <View style={styles.designTimeColumn}>
                             <Text style={[styles.designTimeLabel, { color: secondaryTextColor }]}>
-                                Temps restant
+                                Temps estimé
                             </Text>
-                            <Text style={[styles.designTimeValue, { color: textColor }]}>
-                                {timeLeftMain}
-                            </Text>
-                            <Text style={[styles.designTimeUnit, { color: textColor }]}>min</Text>
-                        </View> */}
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: 4, }}>
+                                <Text style={[styles.designTimeValue, { color: textColor }]}>
+                                    {timeLeftMain}
+                                </Text>
+                                {timeLeftUnit ? (
+                                    <Text style={[styles.designTimeValue, { color: textColor }]}>
+                                        {timeLeftUnit}
+                                    </Text>
+                                ) : null}
+                            </View>
+                        </View>
                     </View>
 
                     <View style={[styles.designFooter, { borderTopColor: themeColors.border }]}>

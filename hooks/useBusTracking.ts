@@ -5,6 +5,11 @@ import { getAuthToken } from '@/utils/storage';
 import { BusPosition, BusStop, Trip } from '@/types/tracking';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+interface UseBusTrackingOptions {
+    /** Ne positionne le bus que via Socket.IO (pas de simulation ni position de test / API). */
+    realtimeOnly?: boolean;
+}
+
 interface UseBusTrackingResult {
     busPosition: BusPosition | null;
     busStops: BusStop[];
@@ -117,7 +122,13 @@ const getDefaultTestData = (tripId: string): { trip: Trip; busPosition: BusPosit
     };
 };
 
-export function useBusTracking(tripId: string, bookingId: string, preferredBusId?: string): UseBusTrackingResult {
+export function useBusTracking(
+    tripId: string,
+    bookingId: string,
+    preferredBusId?: string,
+    options?: UseBusTrackingOptions,
+): UseBusTrackingResult {
+    const realtimeOnly = options?.realtimeOnly === true;
     const logDev = (...args: any[]) => {
         if (__DEV__) console.log(...args);
     };
@@ -146,6 +157,10 @@ export function useBusTracking(tripId: string, bookingId: string, preferredBusId
             setError(null);
 
             if (!tripId || tripId.trim() === '') {
+                if (realtimeOnly) {
+                    setIsLoading(false);
+                    return;
+                }
                 logDev('tripId manquant, utilisation des données de test');
                 const testData = getDefaultTestData('trip-test');
                 setTrip(testData.trip);
@@ -160,6 +175,10 @@ export function useBusTracking(tripId: string, bookingId: string, preferredBusId
             
             // Si pas de token, utiliser les données de test
             if (!token || token.trim() === '') {
+                if (realtimeOnly) {
+                    setIsLoading(false);
+                    return;
+                }
                 logDev('Token d\'authentification manquant, utilisation des données de test');
                 const testData = getDefaultTestData(tripId);
                 setTrip(testData.trip);
@@ -187,22 +206,23 @@ export function useBusTracking(tripId: string, bookingId: string, preferredBusId
             setTrip(data);
             setBusStops(data.stops);
 
-            if (data.currentPosition) {
+            if (!realtimeOnly && data.currentPosition) {
                 setBusPosition(data.currentPosition);
             }
         } catch (err) {
             console.error('Erreur fetchTripDetails:', err);
-            // Utiliser les données de test par défaut en cas d'erreur
-            logDev('Utilisation des données de test par défaut');
-            const testData = getDefaultTestData(tripId);
-            setTrip(testData.trip);
-            setBusStops(testData.busStops);
-            setBusPosition(testData.busPosition);
-            setIsConnected(true); // Simuler une connexion pour les tests
+            if (!realtimeOnly) {
+                logDev('Utilisation des données de test par défaut');
+                const testData = getDefaultTestData(tripId);
+                setTrip(testData.trip);
+                setBusStops(testData.busStops);
+                setBusPosition(testData.busPosition);
+                setIsConnected(true);
+            }
         } finally {
             setIsLoading(false);
         }
-    }, [tripId]);
+    }, [tripId, realtimeOnly]);
 
     // Initialiser la connexion WebSocket
     useEffect(() => {
@@ -251,12 +271,14 @@ export function useBusTracking(tripId: string, bookingId: string, preferredBusId
             await busTrackingService.connect(tripId, bookingId, token);
         })();
 
-        // Simulation de mouvement du bus le long de l'itinéraire (si pas de connexion WebSocket)
+        let testInterval: ReturnType<typeof setInterval> | undefined;
+
+        if (!realtimeOnly) {
         const testData = getDefaultTestData(tripId);
         const routePath = testData.trip.routePath;
-        routeProgressRef.current = 0; // Réinitialiser la progression
-        
-        const testInterval = setInterval(() => {
+        routeProgressRef.current = 0;
+
+        testInterval = setInterval(() => {
             setBusPosition((prev) => {
                 if (isConnectedRef.current || hasRealtimeUpdateRef.current) {
                     return prev;
@@ -338,12 +360,12 @@ export function useBusTracking(tripId: string, bookingId: string, preferredBusId
                     };
                 }
             });
-        }, 3000); // Mise à jour toutes les 3 secondes
+        }, 3000);
+        }
 
-        // Nettoyage
         return () => {
             cancelled = true;
-            clearInterval(testInterval);
+            if (testInterval) clearInterval(testInterval);
             hasRealtimeUpdateRef.current = false;
             setHasRealtimeData(false);
             busTrackingService.off('connection', handleConnection);
@@ -352,7 +374,7 @@ export function useBusTracking(tripId: string, bookingId: string, preferredBusId
             busTrackingService.off('trip_update', handleTripUpdate);
             busTrackingService.disconnect();
         };
-    }, [tripId, bookingId, fetchTripDetails]);
+    }, [tripId, bookingId, fetchTripDetails, realtimeOnly]);
 
     /**
      * Rejoint explicitement la room du bus dès que son identifiant est connu.
