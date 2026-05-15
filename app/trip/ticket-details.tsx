@@ -125,6 +125,7 @@ const TicketDetails = () => {
             const response = await getBookingDetails(bookingId, token);
             if (response.status === 200) {
                 setTicketFetched(response.data as TicketDetails);
+                console.log('Ticket fetched:', response.data);
             } else {
                 setFetchError('Impossible de charger les détails du ticket.');
             }
