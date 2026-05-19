@@ -6,7 +6,9 @@ import {
     ShapeSource,
 } from "@rnmapbox/maps";
 import React, { memo, type RefObject } from "react";
-import { Image, View } from "react-native";
+import { Image, TouchableOpacity, View } from "react-native";
+
+const FLAG_HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
 
 type MapSceneProps = {
     mapRef: RefObject<MapView | null>;
@@ -31,6 +33,10 @@ type MapSceneProps = {
         longitude: number;
     }) => [number, number];
     colors: Record<string, any>;
+    /** Clic sur le drapeau de départ. */
+    onStartMarkerPress?: () => void;
+    /** Clic sur le drapeau d'arrivée. */
+    onEndMarkerPress?: () => void;
 };
 
 /**
@@ -55,6 +61,8 @@ function MapSceneInner({
     busMarkerImageStyle,
     toMapboxCoordinates,
     colors,
+    onStartMarkerPress,
+    onEndMarkerPress,
 }: MapSceneProps) {
     return (
         <MapView
@@ -106,21 +114,37 @@ function MapSceneInner({
 
             {isValidCoordinate(startPoint) && (
                 <MarkerView id="start-point" coordinate={toMapboxCoordinates(startPoint)}>
-                    <Image
-                        source={colors.flagStartImage}
-                        style={styles.flagMarker}
-                        resizeMode="contain"
-                    />
+                    <TouchableOpacity
+                        onPress={onStartMarkerPress}
+                        activeOpacity={0.85}
+                        hitSlop={FLAG_HIT_SLOP}
+                        accessibilityRole="button"
+                        accessibilityLabel="Point de départ"
+                    >
+                        <Image
+                            source={colors.flagStartImage}
+                            style={styles.flagMarker}
+                            resizeMode="contain"
+                        />
+                    </TouchableOpacity>
                 </MarkerView>
             )}
 
             {isValidCoordinate(endPoint) && (
                 <MarkerView id="end-point" coordinate={toMapboxCoordinates(endPoint)}>
-                    <Image
-                        source={colors.flagEndImage}
-                        style={styles.flagMarker}
-                        resizeMode="contain"
-                    />
+                    <TouchableOpacity
+                        onPress={onEndMarkerPress}
+                        activeOpacity={0.85}
+                        hitSlop={FLAG_HIT_SLOP}
+                        accessibilityRole="button"
+                        accessibilityLabel="Point d'arrivée"
+                    >
+                        <Image
+                            source={colors.flagEndImage}
+                            style={styles.flagMarker}
+                            resizeMode="contain"
+                        />
+                    </TouchableOpacity>
                 </MarkerView>
             )}
 

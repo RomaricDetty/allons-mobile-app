@@ -115,6 +115,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({ booking }) => {
                     <Pressable
                         style={[styles.actionButton, { backgroundColor: 'transparent', borderColor: colors.border }]}
                         onPress={() => {
+                            // console.log('booking in BookingCard ===>, ', JSON.stringify(booking, null, 2));
                             navigation.navigate('trip/route-viewer' as never, { booking: JSON.stringify(booking) } as never);
                         }}
                     >

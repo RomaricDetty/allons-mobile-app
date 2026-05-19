@@ -85,8 +85,7 @@ export default function OSMBusTracker({ tripId, bookingDetails }: OSMBusTrackerP
 
     const trackingBusId = useMemo(() => {
         const b = parsedBooking as Record<string, unknown> | null;
-        const trip = b?.trip as Record<string, unknown> | undefined;
-        const id = (b?.bus as Record<string, unknown> | undefined)?.id ?? b?.busId ?? trip?.busId;
+        const id = (b?.bus as Record<string, unknown> | undefined)?.id;
         const s = id != null ? String(id).trim() : '';
         return s !== '' ? s : undefined;
     }, [parsedBooking]);

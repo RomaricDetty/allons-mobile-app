@@ -67,9 +67,10 @@ export const useProfileData = () => {
             }
 
             const response = await bookingListInfo(userId, token);
-            console.log('response bookingListInfo ==> ', response.data.items[0].departure);
+            console.log('response bookingListInfo ==> ', response.data.items[0].bus);
             if (response.status === 200 && response.data?.items) {
                 setBookingList(response.data.items);
+                // console.log('bookingList[0] in getBookingList ===>, ', JSON.stringify(response.data.items[0], null, 2));
             } else {
                 Alert.alert('Erreur', 'Une erreur est survenue lors de la récupération de la liste des réservations');
             }

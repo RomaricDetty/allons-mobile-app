@@ -71,6 +71,12 @@ export interface Booking {
         firstName: string;
         lastName: string;
     }>;
+    bus: {
+        id: string;
+        busType: string;
+        licencePlate: string;
+        capacity: number;
+    };
     trip: {
         label: string;
         stationFrom: {

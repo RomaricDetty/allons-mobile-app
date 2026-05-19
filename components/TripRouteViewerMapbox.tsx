@@ -227,14 +227,8 @@ export default function TripRouteViewerMapbox({
     );
 
     const trackingBusId = useMemo(
-        () =>
-            String(
-                booking?.bus?.id ||
-                    booking?.busId ||
-                    booking?.trip?.busId ||
-                    "",
-            ),
-        [booking],
+        () => String(booking?.bus?.id ?? "").trim(),
+        [booking?.bus?.id],
     );
 
     const { busPosition: liveBusPosition, hasRealtimeData } = useBusTracking(
@@ -910,6 +904,38 @@ export default function TripRouteViewerMapbox({
         }
     }, [endPoint, updateCamera]);
 
+    /** Libellé de la gare de départ pour les messages au clic. */
+    const startStationMessage = useMemo(() => {
+        const name = booking.trip?.stationFrom?.name?.trim();
+        const city = booking.trip?.stationFrom?.city?.trim();
+        if (name && city) return `${name}\n${city}`;
+        return name || city || "Point de départ";
+    }, [booking.trip?.stationFrom?.name, booking.trip?.stationFrom?.city]);
+
+    /** Libellé de la gare d'arrivée pour les messages au clic. */
+    const endStationMessage = useMemo(() => {
+        const name = booking.trip?.stationTo?.name?.trim();
+        const city = booking.trip?.stationTo?.city?.trim();
+        if (name && city) return `${name}\n${city}`;
+        return name || city || "Point d'arrivée";
+    }, [booking.trip?.stationTo?.name, booking.trip?.stationTo?.city]);
+
+    /**
+     * Affiche les infos de la gare de départ et centre la carte sur le drapeau.
+     */
+    const handleStartPointPress = useCallback(() => {
+        Alert.alert("Point de départ", startStationMessage);
+        centerOnStartPoint();
+    }, [startStationMessage, centerOnStartPoint]);
+
+    /**
+     * Affiche les infos de la gare d'arrivée et centre la carte sur le drapeau.
+     */
+    const handleEndPointPress = useCallback(() => {
+        Alert.alert("Point d'arrivée", endStationMessage);
+        centerOnEndPoint();
+    }, [endStationMessage, centerOnEndPoint]);
+
     /**
      * Gère la sélection manuelle d'une position sur la carte
      * @param coordinate Coordonnées de la position sélectionnée au format [longitude, latitude]
@@ -1272,6 +1298,8 @@ export default function TripRouteViewerMapbox({
                     flagEndImage,
                     userLocationPinImage,
                 }}
+                onStartMarkerPress={handleStartPointPress}
+                onEndMarkerPress={handleEndPointPress}
             />
 
             {/* En-tête de navigation */}
@@ -1320,8 +1348,8 @@ export default function TripRouteViewerMapbox({
                 isManualMode={isManualMode}
                 isPanelCollapsed={isPanelCollapsed}
                 centerOnMe={centerOnMe}
-                centerOnStartPoint={centerOnStartPoint}
-                centerOnEndPoint={centerOnEndPoint}
+                centerOnStartPoint={handleStartPointPress}
+                centerOnEndPoint={handleEndPointPress}
                 currentAddress={currentAddress}
                 colors={COLORS}
                 startDetailLine={startDetailLine}

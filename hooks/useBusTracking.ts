@@ -1,8 +1,8 @@
 import { baseUrl } from '@/api/config';
 import { busTrackingService } from '@/services/busTrackingService';
 import { routingService } from '@/services/routingService';
-import { getAuthToken } from '@/utils/storage';
 import { BusPosition, BusStop, Trip } from '@/types/tracking';
+import { getAuthToken } from '@/utils/storage';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface UseBusTrackingOptions {
@@ -150,17 +150,18 @@ export function useBusTracking(
         isConnectedRef.current = isConnected;
     }, [isConnected]);
 
-    // Charger les détails du voyage
+    // Charger les détails du voyage (ignoré en mode temps réel passager : positions via Socket.IO uniquement)
     const fetchTripDetails = useCallback(async () => {
+        if (realtimeOnly) {
+            setIsLoading(false);
+            return;
+        }
+
         try {
             setIsLoading(true);
             setError(null);
 
             if (!tripId || tripId.trim() === '') {
-                if (realtimeOnly) {
-                    setIsLoading(false);
-                    return;
-                }
                 logDev('tripId manquant, utilisation des données de test');
                 const testData = getDefaultTestData('trip-test');
                 setTrip(testData.trip);
@@ -224,9 +225,13 @@ export function useBusTracking(
         }
     }, [tripId, realtimeOnly]);
 
-    // Initialiser la connexion WebSocket
+    // Initialiser la connexion WebSocket (auth JWT + room bus, comme l’app pro)
     useEffect(() => {
-        fetchTripDetails();
+        if (!realtimeOnly) {
+            fetchTripDetails();
+        } else {
+            setIsLoading(false);
+        }
 
         // Handlers pour les messages WebSocket
         const handleConnection = (message: any) => {
@@ -268,7 +273,11 @@ export function useBusTracking(
         void (async () => {
             const token = await getAuthToken();
             if (cancelled) return;
-            await busTrackingService.connect(tripId, bookingId, token);
+            await busTrackingService.connect(
+                realtimeOnly ? '' : tripId,
+                realtimeOnly ? '' : bookingId,
+                token,
+            );
         })();
 
         let testInterval: ReturnType<typeof setInterval> | undefined;
@@ -377,22 +386,19 @@ export function useBusTracking(
     }, [tripId, bookingId, fetchTripDetails, realtimeOnly]);
 
     /**
-     * Rejoint explicitement la room du bus dès que son identifiant est connu.
+     * Rejoint la room Socket.IO du bus (`booking.bus.id`) — même flux que l’app pro.
      */
     useEffect(() => {
-        const candidateBusIds = [
-            preferredBusId,
-            trip?.busId,
-            tripId,
-        ].filter((value): value is string => !!value && value.trim() !== '');
+        const busId = preferredBusId?.trim();
+        if (!busId) return;
 
-        if (candidateBusIds.length === 0) return;
+        logDev('[useBusTracking] bus:join', { busId });
+        busTrackingService.joinBusRoom(busId);
 
-        candidateBusIds.forEach((busId) => {
-            logDev('[useBusTracking] tentative bus:join', { busId });
-            busTrackingService.joinBusRoom(busId);
-        });
-    }, [preferredBusId, trip?.busId, tripId]);
+        return () => {
+            busTrackingService.leaveBusRoom(busId);
+        };
+    }, [preferredBusId]);
 
     return {
         busPosition,
