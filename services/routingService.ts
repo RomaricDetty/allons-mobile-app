@@ -220,6 +220,50 @@ class RoutingService {
     }
 
     /**
+     * Itinéraire multi-points avec distance (km) et durée (minutes), comme getRouteWithDetails.
+     */
+    async getRouteWithWaypointsDetails(waypoints: Coordinate[]): Promise<{
+        coordinates: Coordinate[];
+        distance: number;
+        duration: number;
+    }> {
+        const validWaypoints = waypoints
+            .filter((point) => this.isValidCoordinate(point))
+            .map((point) => point as Coordinate);
+
+        if (validWaypoints.length < 2) {
+            return this.getRouteWithDetails(this.defaultStart, this.defaultEnd);
+        }
+
+        const coords = validWaypoints
+            .map((point) => `${point.longitude},${point.latitude}`)
+            .join(';');
+
+        const url = `${this.baseUrl}/route/v1/driving/${coords}?overview=full&geometries=geojson`;
+
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.code !== 'Ok' || !data.routes?.length) {
+            throw new Error('Impossible de calculer l\'itinéraire avec waypoints');
+        }
+
+        const route = data.routes[0];
+        const coordinates = route.geometry.coordinates.map(
+            ([lng, lat]: [number, number]) => ({
+                latitude: lat,
+                longitude: lng,
+            }),
+        );
+
+        return {
+            coordinates,
+            distance: route.distance / 1000,
+            duration: route.duration / 60,
+        };
+    }
+
+    /**
      * Calcule la distance et la durée entre deux points
      * Utilise les coordonnées par défaut si les paramètres sont invalides
      */

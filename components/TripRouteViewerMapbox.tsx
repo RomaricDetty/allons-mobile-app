@@ -196,6 +196,10 @@ export default function TripRouteViewerMapbox({
     const hasLiveSocketUpdateRef = useRef<boolean>(false);
     /** Ignore les mouvements caméra programmés pour ne pas couper le suivi bus. */
     const isProgrammaticCameraMoveRef = useRef(false);
+    /** Évite un second fitBounds automatique à chaque mise à jour du bus. */
+    const hasInitialRouteFitRef = useRef(false);
+    /** Itinéraire bus → départ → arrivée recalculé une seule fois quand la position bus arrive. */
+    const routeBuiltWithBusRef = useRef(false);
     /** Limite la fréquence d’application des positions WebSocket sur la carte (ms). */
     const liveSocketApplyThrottleRef = useRef(0);
     const smoothedRotationRef = useRef<number>(0);
@@ -260,9 +264,10 @@ export default function TripRouteViewerMapbox({
      * Met à jour la caméra avec throttling pour éviter les re-renders excessifs.
      */
     const updateCamera = useCallback(
-        (center: [number, number], zoom: number, force = false) => {
+        (center: [number, number], zoom?: number, force = false) => {
             const now = Date.now();
             const previous = cameraStateRef.current;
+            const zoomToUse = zoom ?? previous.zoom ?? 13;
 
             if (!force && now - previous.lastUpdateAt < CAMERA_UPDATE_INTERVAL_MS) {
                 return;
@@ -273,7 +278,7 @@ export default function TripRouteViewerMapbox({
                     { latitude: previous.center[1], longitude: previous.center[0] },
                     { latitude: center[1], longitude: center[0] },
                 );
-                const zoomDelta = Math.abs(previous.zoom - zoom);
+                const zoomDelta = Math.abs(previous.zoom - zoomToUse);
                 if (movedKm < MIN_BUS_MOVE_KM && zoomDelta < 0.05) {
                     return;
                 }
@@ -281,7 +286,7 @@ export default function TripRouteViewerMapbox({
 
             cameraStateRef.current = {
                 center,
-                zoom,
+                zoom: zoomToUse,
                 lastUpdateAt: now,
             };
 
@@ -294,7 +299,7 @@ export default function TripRouteViewerMapbox({
 
             cameraRef.current?.setCamera({
                 centerCoordinate: center,
-                zoomLevel: zoom,
+                zoomLevel: zoomToUse,
                 animationDuration: force ? 520 : 400,
                 animationMode: force ? "flyTo" : "easeTo",
             });
@@ -322,7 +327,7 @@ export default function TripRouteViewerMapbox({
             smoothedRotationRef.current = nextRotation;
             setBusRotation(nextRotation);
             if (isFollowingBusRef.current) {
-                updateCamera([pending.longitude, pending.latitude], 15);
+                updateCamera([pending.longitude, pending.latitude]);
             }
         },
         [smoothAngle, updateCamera],
@@ -611,7 +616,53 @@ export default function TripRouteViewerMapbox({
     }, [getAddressFromCoordinates, stopLocationTracking]);
 
     /**
-     * Cadre toute la polyline sur l’écran via Mapbox fitBounds (marges pour en-tête, boutons à droite, panneau bas).
+     * Cadre une liste de coordonnées sur l’écran (fitBounds Mapbox).
+     */
+    const fitMapToCoordinates = useCallback(
+        (coords: { latitude: number; longitude: number }[]) => {
+            if (coords.length === 0) return;
+
+            const bounds = computeLngLatBoundsFromRoute(coords);
+            if (!bounds) return;
+
+            isProgrammaticCameraMoveRef.current = true;
+            setTimeout(() => {
+                isProgrammaticCameraMoveRef.current = false;
+            }, 800);
+
+            const padTop = Math.round(insets.top + 54);
+            const padRight = 62;
+            const padBottom = Math.round(
+                windowHeight * 0.44 + Math.max(insets.bottom, 10),
+            );
+            const padLeft = 18;
+
+            cameraRef.current?.fitBounds(
+                bounds.ne,
+                bounds.sw,
+                [padTop, padRight, padBottom, padLeft],
+                650,
+            );
+
+            const cx = (bounds.ne[0] + bounds.sw[0]) / 2;
+            const cy = (bounds.ne[1] + bounds.sw[1]) / 2;
+            const span = Math.max(
+                Math.abs(bounds.ne[1] - bounds.sw[1]),
+                Math.abs(bounds.ne[0] - bounds.sw[0]),
+            );
+            const approxZoom =
+                span > 1e-6 ? Math.max(2.5, Math.min(18, 9 - Math.log2(span * 85))) : 10;
+            cameraStateRef.current = {
+                center: [cx, cy],
+                zoom: approxZoom,
+                lastUpdateAt: Date.now(),
+            };
+        },
+        [windowHeight, insets.top, insets.bottom],
+    );
+
+    /**
+     * Cadre toute la polyline sur l’écran (action utilisateur « Recentrer »).
      */
     const centerMapOnRoute = useCallback(() => {
         const coords: { latitude: number; longitude: number }[] =
@@ -641,50 +692,14 @@ export default function TripRouteViewerMapbox({
 
         setIsFollowingBus(false);
         isFollowingBusRef.current = false;
-        isProgrammaticCameraMoveRef.current = true;
-        setTimeout(() => {
-            isProgrammaticCameraMoveRef.current = false;
-        }, 800);
-
-        const bounds = computeLngLatBoundsFromRoute(coords);
-        if (!bounds) return;
-
-        const padTop = Math.round(insets.top + 54);
-        const padRight = 62;
-        const padBottom = Math.round(
-            windowHeight * 0.44 + Math.max(insets.bottom, 10),
-        );
-        const padLeft = 18;
-
-        cameraRef.current?.fitBounds(
-            bounds.ne,
-            bounds.sw,
-            [padTop, padRight, padBottom, padLeft],
-            650,
-        );
-
-        const cx = (bounds.ne[0] + bounds.sw[0]) / 2;
-        const cy = (bounds.ne[1] + bounds.sw[1]) / 2;
-        const span = Math.max(
-            Math.abs(bounds.ne[1] - bounds.sw[1]),
-            Math.abs(bounds.ne[0] - bounds.sw[0]),
-        );
-        const approxZoom =
-            span > 1e-6 ? Math.max(2.5, Math.min(18, 9 - Math.log2(span * 85))) : 10;
-        cameraStateRef.current = {
-            center: [cx, cy],
-            zoom: approxZoom,
-            lastUpdateAt: Date.now(),
-        };
+        fitMapToCoordinates(coords);
     }, [
         routePath,
         startPoint,
         endPoint,
         busPosition,
         isValidCoordinate,
-        windowHeight,
-        insets.top,
-        insets.bottom,
+        fitMapToCoordinates,
     ]);
 
     /**
@@ -699,6 +714,8 @@ export default function TripRouteViewerMapbox({
             return;
         }
         bookingIdRef.current = currentBookingId;
+        hasInitialRouteFitRef.current = false;
+        routeBuiltWithBusRef.current = false;
 
         initPassengerLocation();
         calculateRouteFromBooking();
@@ -715,17 +732,27 @@ export default function TripRouteViewerMapbox({
     }, [booking.id, booking.code]);
 
     /**
-     * Cadre l’itinéraire complet une fois le tracé disponible (sans zoom fixe sur le départ seul).
+     * Cadre l’itinéraire une seule fois au chargement (pas à chaque position bus).
      */
     useEffect(() => {
+        if (hasInitialRouteFitRef.current) return;
+
         const hasGeometry =
             routePath.length >= 2 || (startPoint && endPoint);
         if (!hasGeometry) return;
 
+        hasInitialRouteFitRef.current = true;
+
         let timeoutId: ReturnType<typeof setTimeout> | undefined;
         const interactionHandle = InteractionManager.runAfterInteractions(() => {
             timeoutId = setTimeout(() => {
-                centerMapOnRoute();
+                const coords =
+                    routePath.length >= 2
+                        ? [...routePath]
+                        : startPoint && endPoint
+                          ? [startPoint, endPoint]
+                          : [];
+                fitMapToCoordinates(coords);
             }, 280);
         });
 
@@ -733,7 +760,41 @@ export default function TripRouteViewerMapbox({
             if (timeoutId) clearTimeout(timeoutId);
             interactionHandle.cancel?.();
         };
-    }, [routePath, startPoint, endPoint, centerMapOnRoute]);
+    }, [routePath, startPoint, endPoint, fitMapToCoordinates]);
+
+    /**
+     * Recalcule l’itinéraire bus → départ → arrivée dès que la position temps réel du bus est connue.
+     */
+    useEffect(() => {
+        if (routeBuiltWithBusRef.current) return;
+        if (!busPosition || !startPoint || !endPoint) return;
+        if (!isValidCoordinate(busPosition)) return;
+
+        routeBuiltWithBusRef.current = true;
+        let cancelled = false;
+
+        void (async () => {
+            try {
+                const routeDetails = await routingService.getRouteWithWaypointsDetails([
+                    busPosition,
+                    startPoint,
+                    endPoint,
+                ]);
+                if (cancelled) return;
+                setRoutePath(routeDetails.coordinates);
+                setRouteDuration(routeDetails.duration);
+                setRouteDistanceKm(routeDetails.distance);
+            } catch {
+                if (!cancelled) {
+                    routeBuiltWithBusRef.current = false;
+                }
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [busPosition, startPoint, endPoint, isValidCoordinate]);
 
     /**
      * Met à jour la ref du mode manuel
@@ -989,8 +1050,19 @@ export default function TripRouteViewerMapbox({
      * Désactive le suivi bus si l’utilisateur déplace la carte manuellement.
      */
     const handleMapRegionWillChange = useCallback(
-        (event: { properties?: { isUserInteraction?: boolean } }) => {
+        (event: {
+            properties?: { isUserInteraction?: boolean; zoomLevel?: number };
+        }) => {
             if (isProgrammaticCameraMoveRef.current) return;
+
+            const zoom = event?.properties?.zoomLevel;
+            if (typeof zoom === "number" && Number.isFinite(zoom)) {
+                cameraStateRef.current = {
+                    ...cameraStateRef.current,
+                    zoom,
+                };
+            }
+
             if (!event?.properties?.isUserInteraction) return;
             if (!isFollowingBusRef.current) return;
             setIsFollowingBus(false);
