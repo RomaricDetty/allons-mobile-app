@@ -51,8 +51,12 @@ export const BookingCard: React.FC<BookingCardProps> = ({ booking }) => {
 
     /** Ouvre l’écran détails du ticket (l’API est appelée sur l’écran ticket-details) */
     const handleViewBooking = useCallback(() => {
-        navigation.navigate('trip/ticket-details' as never, { bookingId: booking.id } as never);
-    }, [booking.id, navigation]);
+        navigation.navigate('trip/ticket-details' as never, {
+            bookingId: booking.id,
+            departureCity: booking.trip?.stationFrom?.city ?? '',
+            arrivalCity: booking.trip?.stationTo?.city ?? '',
+        } as never);
+    }, [booking.id, booking.trip?.stationFrom?.city, booking.trip?.stationTo?.city, navigation]);
 
     /** Indique si l'heure d'arrivée prévue est déjà passée (bouton Itinéraire masqué). */
     const isArrivalPast = (() => {

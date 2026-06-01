@@ -139,15 +139,15 @@ const PassengersInfo = () => {
     const getFeesPaymentConfig = useCallback((method: string | null) => {
         switch (method) {
             // case 'credit-card':
-            //     return { paymentMethod: 'CREDIT_CARD', provider: null };
+            //     return { method: 'CREDIT_CARD', provider: null };
             case 'wave':
-                return { paymentMethod: 'MOBILE_MONEY', provider: 'WAVE' };
+                return { method: 'MOBILE_MONEY', provider: 'WAVE' };
             case 'orange-money':
-                return { paymentMethod: 'MOBILE_MONEY', provider: 'ORANGE_MONEY' };
+                return { method: 'MOBILE_MONEY', provider: 'ORANGE_MONEY' };
             case 'mtn-money':
-                return { paymentMethod: 'MOBILE_MONEY', provider: 'MTN_MONEY' };
+                return { method: 'MOBILE_MONEY', provider: 'MTN_MONEY' };
             default:
-                return { paymentMethod: 'MOBILE_MONEY', provider: null };
+                return { method: 'MOBILE_MONEY', provider: null };
         }
     }, []);
 
@@ -171,13 +171,13 @@ const PassengersInfo = () => {
     const fetchFeesAndTaxes = useCallback(async () => {
         if (!trip?.id || !trip?.companyId) return;
         try {
-            const { paymentMethod, provider } = getFeesPaymentConfig(selectedPaymentMethod);
+            const { method, provider } = getFeesPaymentConfig(selectedPaymentMethod);
             const token = await getAuthToken();
             const response = await getFeesAndTaxesQuote(
                 {
                     companyId: trip.companyId,
                     channel: 'MOBILE_APP',
-                    paymentMethod,
+                    paymentMethod: method,
                     paymentChannel: 'MOBILE_APP',
                     // ...(provider ? { provider } : {}),
                     passengers: buildFeesPassengersPayload(),

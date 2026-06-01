@@ -32,6 +32,40 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { captureRef } from 'react-native-view-shot';
 
 /**
+ * Retourne la première ville non vide parmi les candidats.
+ */
+const pickCity = (...values: (string | undefined | null)[]): string | null => {
+    for (const value of values) {
+        const trimmed = value?.trim();
+        if (trimmed && trimmed !== '—') return trimmed;
+    }
+    return null;
+};
+
+/**
+ * Construit le libellé de route (départ → arrivée) avec repli sur les villes de l'écran précédent.
+ */
+const buildRouteText = (
+    ticket: TicketDetails,
+    fallbackDepartureCity?: string,
+    fallbackArrivalCity?: string
+): string => {
+    const fromCity = pickCity(
+        ticket.trip?.stationFrom?.city,
+        (ticket.trip?.stationFrom as { cityName?: string })?.cityName,
+        fallbackDepartureCity
+    );
+    const toCity = pickCity(
+        ticket.trip?.stationTo?.city,
+        (ticket.trip?.stationTo as { cityName?: string })?.cityName,
+        fallbackArrivalCity
+    );
+    if (fromCity && toCity) return `${fromCity} → ${toCity}`;
+    if (fromCity || toCity) return `${fromCity ?? '—'} → ${toCity ?? '—'}`;
+    return '';
+};
+
+/**
  * Interface pour les détails complets d'un ticket
  */
 interface TicketDetails {
@@ -97,6 +131,8 @@ const TicketDetails = () => {
     const [fetchError, setFetchError] = useState<string | null>(null);
 
     const bookingId = route.params?.bookingId as string | undefined;
+    const fallbackDepartureCity = route.params?.departureCity as string | undefined;
+    const fallbackArrivalCity = route.params?.arrivalCity as string | undefined;
     const ticketParam = route.params?.ticketDetails;
 
     /** Ticket issu des params (legacy) */
@@ -175,11 +211,11 @@ const TicketDetails = () => {
         return {
             statusColor: getStatusColor(ticket.status),
             formattedStatus: formatStatus(ticket.status),
-            routeText: `${(ticket.trip.stationFrom as any)?.city ?? (ticket.trip.stationFrom as any)?.cityName ?? '—'} → ${(ticket.trip.stationTo as any)?.city ?? (ticket.trip.stationTo as any)?.cityName ?? '—'}`,
+            routeText: buildRouteText(ticket, fallbackDepartureCity, fallbackArrivalCity),
             passengerCountText: ticket.passengers.length > 1 ? 'Passagers' : 'Passager',
             formattedPaymentMethod: formatPaymentMethod(ticket.paymentProvider),
         };
-    }, [ticket]);
+    }, [ticket, fallbackDepartureCity, fallbackArrivalCity]);
 
     /**
      * Vérifie si l'annulation est possible
@@ -414,9 +450,11 @@ const TicketDetails = () => {
                 <View ref={ticketViewRef} collapsable={false}>
                     {/* Header bleu avec route et référence */}
                     <View style={[styles.blueHeader, { backgroundColor: themeColors.primaryBlue }]}>
-                        <Text style={[styles.routeTitle, { width: '80%', textAlign: 'left' }]}>
-                            {ticketDerivedValues.routeText}
-                        </Text>
+                        {ticketDerivedValues.routeText ? (
+                            <Text style={[styles.routeTitle, { width: '80%', textAlign: 'left' }]}>
+                                {ticketDerivedValues.routeText}
+                            </Text>
+                        ) : null}
                         <Text style={[styles.referenceText, { width: '80%', textAlign: 'left' }]}>
                             Référence: {ticket.code}
                         </Text>

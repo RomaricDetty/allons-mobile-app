@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { getAvailableDepartures } from '@/api/departure';
 import { BottomSheet } from '@/components/bottom-sheet';
+import { CompanyLogoBadge, getTripCompanyLogoUrl } from '@/components/trip/CompanyLogoBadge';
 import { capitalizeBusType } from '@/constants/functions';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
@@ -1044,19 +1045,6 @@ const styles = StyleSheet.create({
         gap: 12,
         flex: 1,
     },
-    companyLogoContainer: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#1776BA',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    companyLogoText: {
-        fontSize: 12,
-        fontFamily: 'Ubuntu_Bold',
-        color: '#FFFFFF',
-    },
     companyDetails: {
         flex: 1,
     },
@@ -1386,11 +1374,10 @@ const TripCard = React.memo<TripCardProps>(({
             {/* En-tête de la carte : Logo compagnie et Prix */}
             <View style={styles.cardHeader}>
                 <View style={styles.companyInfo}>
-                    <View style={styles.companyLogoContainer}>
-                        <Text style={styles.companyLogoText}>
-                            {item.companyAbbreviation}
-                        </Text>
-                    </View>
+                    <CompanyLogoBadge
+                        logoUrl={getTripCompanyLogoUrl(item)}
+                        abbreviation={item.companyAbbreviation}
+                    />
                     <View style={styles.companyDetails}>
                         <Text style={[styles.companyName, { color: textColor }]}>{item.company}</Text>
                         <Text style={[styles.licencePlate, { color: secondaryTextColor }]}>{item.licencePlate}</Text>

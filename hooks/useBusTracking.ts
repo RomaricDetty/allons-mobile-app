@@ -196,7 +196,7 @@ export function useBusTracking(
                     headers: {
                         Authorization: `Bearer ${token}`,
                     },
-                }
+                },
             );
 
             if (!response.ok) {

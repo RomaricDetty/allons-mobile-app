@@ -1,26 +1,9 @@
 import { createBooking, createBookingPayment, createRebookingBooking, RebookingPassengerPayload } from '@/api/booking';
+import { mapUiPaymentMethod } from '@/constants/paymentMethods';
 import { getAuthToken, getUserId } from '@/utils/storage';
 import { CommonActions } from '@react-navigation/native';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert } from 'react-native';
-
-/**
- * Mapper pour les méthodes de paiement
- */
-const mapPaymentMethod = (method: string | null): { method: string; provider: string | null } => {
-    switch (method) {
-        case 'credit-card':
-            return { method: 'CREDIT_CARD', provider: null };
-        case 'wave':
-            return { method: 'MOBILE_MONEY', provider: 'WAVE' };
-        case 'orange-money':
-            return { method: 'MOBILE_MONEY', provider: 'ORANGE_MONEY' };
-        case 'mtn-money':
-            return { method: 'MOBILE_MONEY', provider: 'MTN_MONEY' };
-        default:
-            return { method: 'MOBILE_MONEY', provider: null };
-    }
-};
 
 /**
  * Hook pour gérer le paiement
@@ -180,6 +163,7 @@ export const usePaymentManagement = (defaultCountryCode: string = '+225') => {
                     channel: 'MOBILE_APP',
                     paymentMethod: 'MOBILE_MONEY',
                     paymentChannel: 'MOBILE_APP',
+                    paymentProvider: mapUiPaymentMethod(selectedPaymentMethod).provider,
                     contact,
                     passengers: passengersData,
                     totalAmount: pricing.totalAmount
@@ -228,7 +212,7 @@ export const usePaymentManagement = (defaultCountryCode: string = '+225') => {
                 return;
             }
 
-            const { method: paymentMethod, provider } = mapPaymentMethod(selectedPaymentMethod);
+            const { method: paymentMethod, provider } = mapUiPaymentMethod(selectedPaymentMethod);
             const phoneNumber = passengers[0]?.phone?.trim() || emergencyContact.phone.trim();
             const paymentData = {
                 bookingId,

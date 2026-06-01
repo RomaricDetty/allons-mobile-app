@@ -420,7 +420,11 @@ export default function HomeScreen() {
     const handleNextTripPress = useCallback(
         (booking: Booking) => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            navigation.navigate('trip/ticket-details' as never, { bookingId: booking.id } as never);
+            navigation.navigate('trip/ticket-details' as never, {
+                bookingId: booking.id,
+                departureCity: booking.trip?.stationFrom?.city ?? '',
+                arrivalCity: booking.trip?.stationTo?.city ?? '',
+            } as never);
         },
         [navigation]
     );

@@ -27,6 +27,7 @@ export const authRegister = async (data: any): Promise<AxiosResponse<any>> => {
  * @returns AxiosResponse<any>
  */
 export const authLogin = async (data: any): Promise<AxiosResponse<any>> => {
+    console.log('data => ', `${baseUrl}/auth/login`);
     return await axios.post(`${baseUrl}/auth/login`, data,
         {
             headers: {
