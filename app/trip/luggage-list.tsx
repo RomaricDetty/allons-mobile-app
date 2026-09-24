@@ -9,18 +9,19 @@ import { router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     Modal,
     Pressable,
     RefreshControl,
     ScrollView,
     StyleSheet,
     Text,
-    View
+    View,
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { showAlert } from '@/utils/alert';
+import { BackButton } from '@/components/ui/BackButton';
 
 /**
  * Mapping des couleurs pour les statuts de bagage
@@ -349,7 +350,7 @@ const LuggageListScreen = () => {
             console.error('Erreur lors du chargement des bagages:', error);
             // Ne pas afficher d'erreur si c'est juste qu'il n'y a pas de bagages
             if (error.response?.status !== 404) {
-                Alert.alert(
+                showAlert(
                     'Erreur',
                     error.response?.data?.message || 'Une erreur est survenue lors du chargement des bagages.',
                     [{ text: 'OK' }]
@@ -428,9 +429,7 @@ const LuggageListScreen = () => {
                     borderBottomColor: themeColors.headerBorderColor
                 }
             ]}>
-                <Pressable onPress={() => router.back()} style={styles.backButton}>
-                    <Icon name="arrow-left" size={25} color={iconColor} />
-                </Pressable>
+                <BackButton onPress={() => router.back()} color={iconColor} />
                 <View style={styles.headerContent}>
                     <Text style={[styles.headerTitle, { color: textColor }]}>
                         Bagages
@@ -545,11 +544,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingBottom: 16,
         borderBottomWidth: 1,
-    },
-    backButton: {
-        padding: 8,
-        marginRight: 8,
-        marginTop: 4,
     },
     headerContent: {
         flex: 1,

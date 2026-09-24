@@ -5,9 +5,23 @@ import { useThemeColor } from '@/hooks/use-theme-color';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Image, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+    Animated,
+    Image,
+    Keyboard,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
+} from 'react-native';
 import { AuthFormField } from './AuthFormField';
 import { PasswordField } from './PasswordField';
+import { showAlert } from '@/utils/alert';
+import { useAuth } from '@/contexts/AuthContext';
+import { AppButton } from '@/components/ui/AppButton';
 // const logoImage = require('@/assets/images/allon-logo.png');
 // const logoImageWhite = require('@/assets/images/allon-logo-white.png');
 
@@ -47,6 +61,7 @@ interface SignInScreenProps {
  * Écran de connexion avec formulaire et options de connexion sociale
  */
 export const SignInScreen = ({ onSignIn, onSwitchToSignUp, onForgotPassword }: SignInScreenProps) => {
+    const { setSessionUser } = useAuth();
     const colorScheme = useColorScheme() ?? 'light';
     const navigation = useNavigation();
     // Couleurs dynamiques basées sur le thème
@@ -147,7 +162,7 @@ export const SignInScreen = ({ onSignIn, onSwitchToSignUp, onForgotPassword }: S
     const handleSignIn = async () => {
         // Validation des champs
         if (email.trim() === '' || password.trim() === '') {
-            Alert.alert('Attention !', 'Veuillez remplir tous les champs');
+            showAlert('Attention !', 'Veuillez remplir tous les champs');
             return;
         }
 
@@ -193,14 +208,15 @@ export const SignInScreen = ({ onSignIn, onSwitchToSignUp, onForgotPassword }: S
                     await AsyncStorage.setItem('user_id', user.id);
                     console.log('user_id : ', user.id);
 
+                    await setSessionUser(user);
                     onSignIn();
                 } catch (storageError) {
                     console.error('Erreur lors du stockage des données:', storageError);
-                    Alert.alert('Erreur', 'Impossible de sauvegarder les informations de connexion. Veuillez réessayer.');
+                    showAlert('Erreur', 'Impossible de sauvegarder les informations de connexion. Veuillez réessayer.');
                 }
             } else {
                 const errorMessage = response?.data?.message || 'Erreur lors de la connexion';
-                Alert.alert('Attention !', errorMessage);
+                showAlert('Attention !', errorMessage);
                 console.log('Erreur lors de la connexion : ', response?.data);
             }
         } catch (error: any) {
@@ -223,13 +239,11 @@ export const SignInScreen = ({ onSignIn, onSwitchToSignUp, onForgotPassword }: S
                 errorMessage = error.message;
             }
 
-            Alert.alert('Attention !', errorMessage);
+            showAlert('Attention !', errorMessage);
         } finally {
             setIsLoading(false);
         }
     };
-
-
 
     /**
      * Composant logo simple avec deux formes en 'C' stylisées
@@ -309,16 +323,13 @@ export const SignInScreen = ({ onSignIn, onSwitchToSignUp, onForgotPassword }: S
                     </View>
                 </View>
 
-                <Pressable
-                    style={styles.primaryButton}
+                <AppButton
+                    title="Se connecter"
                     onPress={handleSignIn}
+                    loading={isLoading}
                     disabled={isLoading}
-                >
-                    {isLoading ? <ActivityIndicator size="small" color="#FFFFFF" /> : (
-                        <Text style={styles.primaryButtonText}>Se connecter</Text>
-                    )}
-                </Pressable>
-
+                    style={{ marginBottom: 16 }}
+                />
 
                 <View style={styles.footer}>
                     <Text style={[styles.footerText, { color: secondaryTextColor }]}>Vous n'avez pas de compte ? </Text>
@@ -421,19 +432,6 @@ const styles = StyleSheet.create({
     forgotPassword: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-    },
-    primaryButton: {
-        backgroundColor: '#1776BA',
-        borderRadius: 16,
-        paddingVertical: 16,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 16,
-    },
-    primaryButtonText: {
-        fontSize: 16,
-        fontFamily: 'Ubuntu_Bold',
-        color: '#FFFFFF',
     },
     googleButton: {
         backgroundColor: '#FFFFFF',

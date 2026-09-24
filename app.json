@@ -5,7 +5,7 @@
         "version": "1.0.0",
         "orientation": "portrait",
         "icon": "./assets/images/icon.png",
-        "scheme": "allonappmobile",
+        "scheme": ["allonappmobile", "allon"],
         "userInterfaceStyle": "automatic",
         "newArchEnabled": true,
         "splash": {
@@ -19,12 +19,24 @@
         "ios": {
             "supportsTablet": true,
             "bundleIdentifier": "com.allon.app",
+            "associatedDomains": [
+                "applinks:customer.allon-apps.com"
+            ],
             "infoPlist": {
                 "UIViewControllerBasedStatusBarAppearance": false,
                 "UILaunchStoryboardName": "SplashScreen",
                 "NSLocationWhenInUseUsageDescription": "AllOn a besoin d'accéder à votre localisation pour vous montrer les arrêts de bus à proximité.",
                 "NSLocationAlwaysAndWhenInUseUsageDescription": "AllOn a besoin d'accéder à votre localisation en arrière-plan pour le suivi en temps réel de votre trajet.",
-                "NSLocationAlwaysUsageDescription": "AllOn a besoin d'accéder à votre localisation en arrière-plan pour le suivi de votre trajet."
+                "NSLocationAlwaysUsageDescription": "AllOn a besoin d'accéder à votre localisation en arrière-plan pour le suivi de votre trajet.",
+                "CFBundleURLTypes": [
+                    {
+                        "CFBundleURLSchemes": [
+                            "allonappmobile",
+                            "allon",
+                            "com.allon.app"
+                        ]
+                    }
+                ]
             }
         },
         "android": {
@@ -46,6 +58,42 @@
                 "ACCESS_COARSE_LOCATION",
                 "ACCESS_FINE_LOCATION",
                 "ACCESS_BACKGROUND_LOCATION"
+            ],
+            "intentFilters": [
+                {
+                    "action": "VIEW",
+                    "autoVerify": true,
+                    "data": [
+                        {
+                            "scheme": "https",
+                            "host": "customer.allon-apps.com",
+                            "pathPrefix": "/payment"
+                        }
+                    ],
+                    "category": [
+                        "BROWSABLE",
+                        "DEFAULT"
+                    ]
+                },
+                {
+                    "action": "VIEW",
+                    "data": [
+                        {
+                            "scheme": "allon",
+                            "host": "payment",
+                            "pathPrefix": "/"
+                        },
+                        {
+                            "scheme": "allonappmobile",
+                            "host": "payment",
+                            "pathPrefix": "/"
+                        }
+                    ],
+                    "category": [
+                        "BROWSABLE",
+                        "DEFAULT"
+                    ]
+                }
             ]
         },
         "web": {
@@ -54,6 +102,14 @@
         },
         "plugins": [
             "expo-router",
+            [
+                "expo-notifications",
+                {
+                    "icon": "./assets/images/icon.png",
+                    "color": "#1776BA",
+                    "defaultChannel": "payment-status"
+                }
+            ],
             [
                 "expo-location",
                 {

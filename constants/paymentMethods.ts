@@ -57,7 +57,7 @@ export const mapUiPaymentMethod = (
         case 'moov-money':
             return { method: 'MOBILE_MONEY', provider: PAYMENT_PROVIDER.MOOV_MONEY };
         case 'allon-coin':
-            return { method: 'OTHER', provider: PAYMENT_PROVIDER.ALLON_COIN };
+            return { method: 'ALLON_COIN', provider: PAYMENT_PROVIDER.ALLON_COIN };
         default:
             return { method: 'MOBILE_MONEY', provider: null };
     }

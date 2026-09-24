@@ -1,10 +1,15 @@
 // @ts-nocheck
-import { Colors } from '@/constants/theme';
+import {
+    Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { Icon, Label, NativeTabs, VectorIcon } from 'expo-router/unstable-native-tabs';
+import { Icon,
+    Label,
+    NativeTabs,
+    VectorIcon } from 'expo-router/unstable-native-tabs';
 import React from 'react';
-import { Platform } from 'react-native';
+import { Platform,
+} from 'react-native';
 
 /** Couleur onglet sélectionné (iOS) */
 const TAB_SELECTED_IOS = '#1776BA';
@@ -12,19 +17,18 @@ const TAB_SELECTED_IOS = '#1776BA';
 const TAB_SELECTED_BG = 'rgba(23, 118, 186, 1)';
 const TAB_SELECTED_CONTENT = '#FFFFFF';
 
-/** Ombre de la barre d'onglets (Android uniquement) */
-const TAB_BAR_SHADOW_COLOR = 'rgba(0, 0, 0, 0.5)';
-const TAB_BAR_ELEVATION = 8;
+/** Style barre d'onglets Android (sans ombre) */
+const TAB_BAR_ELEVATION = 0;
 
 /** Icônes : SF Symbols sur iOS, VectorIcon (72px) sur Android pour affichage net */
 const tabIcons = {
     home:
         Platform.OS === 'ios'
-            ? { sf: 'house.fill' as const }
+            ? { sf: { default: 'house.fill' as const, selected: 'house.fill' as const } }
             : { src: <VectorIcon family={MaterialCommunityIcons} name="home" /> },
     profile:
         Platform.OS === 'ios'
-            ? { sf: 'person.fill' as const }
+            ? { sf: { default: 'person.fill' as const, selected: 'person.fill' as const } }
             : { src: <VectorIcon family={MaterialCommunityIcons} name="account" /> },
 };
 
@@ -44,7 +48,6 @@ function getAndroidTabBarStyle(scheme: 'light' | 'dark' | null) {
             selected: { color: colors.tabIconSelected },
         },
         indicatorColor: TAB_SELECTED_BG,
-        shadowColor: TAB_BAR_SHADOW_COLOR,
         style: { elevation: TAB_BAR_ELEVATION },
     };
 }

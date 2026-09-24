@@ -87,12 +87,12 @@ export function ItineraryCard({ item, onPress }: ItineraryCardProps) {
             ? `${Math.floor(item.durationMinutes / 60)}h${item.durationMinutes % 60 ? String(item.durationMinutes % 60).padStart(2, '0') : '00'}`
             : null);
 
-    const colorScheme = useColorScheme() ?? 'dark';
+    const colorScheme = useColorScheme() ?? 'light';
     const borderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
 
     return (
         <Pressable
-            style={[styles.card, { width: cardWidth, borderWidth: 2, borderColor }]}
+            style={[styles.card, { width: cardWidth, borderColor }]}
             onPress={() => onPress?.(item)}>
             <ImageBackground
                 source={imageSource}
@@ -116,7 +116,7 @@ export function ItineraryCard({ item, onPress }: ItineraryCardProps) {
                         {duree && (
                             <View style={styles.infoBadge}>
                                 <MaterialCommunityIcons 
-                                    name="clock-outline" 
+                                    name="clock" 
                                     size={12} 
                                     color="#FFFFFF" 
                                 />
@@ -146,14 +146,10 @@ export function ItineraryCard({ item, onPress }: ItineraryCardProps) {
 
 const styles = StyleSheet.create({
     card: {
-        borderRadius: 20,
+        borderRadius: 12,
         overflow: 'hidden',
-        marginBottom: 8,
-        // shadowColor: '#000',
-        // shadowOffset: { width: 0, height: 2 },
-        // shadowOpacity: 0.15,
-        // shadowRadius: 8,
-        // elevation: 5,
+        marginBottom: 4,
+        borderWidth: 1,
         aspectRatio: 0.85,
     },
     image: {
@@ -171,9 +167,9 @@ const styles = StyleSheet.create({
     },
     priceBadge: {
         backgroundColor: 'rgba(0, 0, 0, 0.6)',
-        borderRadius: 12,
-        paddingHorizontal: 12,
-        paddingVertical: 6,
+        borderRadius: 10,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
         alignSelf: 'flex-start',
         margin: 12,
         marginBottom: 'auto',

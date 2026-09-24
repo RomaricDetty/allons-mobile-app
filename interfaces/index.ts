@@ -22,7 +22,14 @@ export interface User {
     picture?: string | null;
     role?: string | null;
     company?: string | null;
-    address?: string | null;
+    address?: string | null | {
+        street?: string | null;
+        city?: string | null;
+        zipCode?: string | null;
+        postalCode?: string | null;
+        country?: string | { id?: string | number; name?: string; label?: string } | null;
+        [key: string]: unknown;
+    };
     contactUrgent: ContactUrgent;
     phones?: any[];
     active: boolean;

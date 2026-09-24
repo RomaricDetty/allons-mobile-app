@@ -48,7 +48,11 @@ export function useAppColors() {
         progressDotBackground: theme.progressDotBackground,
         separator: theme.separator,
         secondaryButtonBackground: theme.secondaryButtonBackground,
+        success: theme.success,
+        successMuted: theme.successMuted,
+        danger: theme.danger,
+        dangerMuted: theme.dangerMuted,
+        infoMuted: theme.infoMuted,
     };
 }
-
 

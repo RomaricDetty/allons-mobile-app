@@ -1,21 +1,32 @@
 // @ts-nocheck
-import { getFeesAndTaxesQuote } from '@/api/booking';
-import { capitalizeBusType, formatFullDate, formatPrice } from '@/constants/functions';
+import {
+    getFeesAndTaxesQuote } from '@/api/booking';
+import { capitalizeBusType,
+    formatFullDate,
+    formatPrice } from '@/constants/functions';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
-import { SearchParams, Trip } from '@/types';
+import { SearchParams,
+    Trip } from '@/types';
 import { getAuthToken } from '@/utils/storage';
-import { CommonActions, useNavigation, useRoute } from '@react-navigation/native';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { CommonActions,
+    useNavigation,
+    useRoute } from '@react-navigation/native';
+import React,
+    { useCallback,
+    useEffect,
+    useMemo,
+    useState } from 'react';
 import {
-    Pressable,
     ScrollView,
     StyleSheet,
     Text,
-    View
+    View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { AppButton } from '@/components/ui/AppButton';
+import { BackButton } from '@/components/ui/BackButton';
 
 /**
  * Composant pour afficher une carte de voyage
@@ -298,12 +309,7 @@ const TripSummary = () => {
                     borderBottomColor: colors.headerBorderColor
                 }
             ]}>
-                <Pressable
-                    onPress={handleGoBack}
-                    style={styles.backButton}
-                >
-                    <Icon name="arrow-left" size={25} color={iconColor} />
-                </Pressable>
+                <BackButton onPress={handleGoBack} color={iconColor} />
 
                 <View style={styles.routeBadge}>
                     <Text style={[styles.routeBadgeText, { color: tintColor }]}>
@@ -443,26 +449,23 @@ const TripSummary = () => {
                     </View>
 
                     {/* Boutons d'action */}
-                    <Pressable style={styles.primaryButton} onPress={handleNavigateToNextStep}>
-                        <Text style={styles.primaryButtonText}>
-                            Continuer
-                        </Text>
-                    </Pressable>
+                    <AppButton
+                        title="Continuer"
+                        onPress={handleNavigateToNextStep}
+                        style={{ marginBottom: 12 }}
+                    />
 
-                    <Pressable 
-                        style={[
-                            styles.secondaryButton,
-                            { 
-                                backgroundColor: colors.secondaryButtonBackgroundColor,
-                                borderColor: colors.borderColor
-                            }
-                        ]}
+                    <AppButton
+                        title="Annuler la réservation"
                         onPress={handleNavigateToHome}
-                    >
-                        <Text style={[styles.secondaryButtonText, { color: textColor }]}>
-                            Annuler la réservation
-                        </Text>
-                    </Pressable>
+                        variant="ghost"
+                        style={{
+                            marginBottom: 16,
+                            backgroundColor: colors.secondaryButtonBackgroundColor,
+                            borderColor: colors.borderColor,
+                        }}
+                        textStyle={{ color: textColor }}
+                    />
 
                     {/* Information box */}
                     {/* <View style={styles.infoBox}>
@@ -488,9 +491,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingBottom: 12,
         borderBottomWidth: 1,
-    },
-    backButton: {
-        padding: 8,
     },
     routeBadge: {
         flexDirection: 'row',
@@ -755,40 +755,15 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontFamily: 'Ubuntu_Bold',
     },
-    primaryButton: {
-        backgroundColor: '#1776BA',
-        borderRadius: 8,
-        paddingVertical: 14,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 12,
-    },
-    primaryButtonText: {
-        fontSize: 16,
-        fontFamily: 'Ubuntu_Bold',
-        color: '#FFFFFF',
-    },
-    secondaryButton: {
-        borderRadius: 8,
-        paddingVertical: 14,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 1,
-        marginBottom: 16,
-    },
-    secondaryButtonText: {
-        fontSize: 16,
-        fontFamily: 'Ubuntu_Regular',
-    },
     infoBox: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#E3F2FD',
-        borderRadius: 8,
+        backgroundColor: 'rgba(23, 118, 186, 0.08)',
+        borderRadius: 10,
         padding: 12,
         gap: 8,
         borderWidth: 1,
-        borderColor: '#BBDEFB',
+        borderColor: '#E0E0E0',
     },
     infoBoxText: {
         fontSize: 12,

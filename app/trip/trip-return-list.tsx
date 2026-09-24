@@ -17,6 +17,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // @ts-ignore - Pas de types disponibles pour react-native-vector-icons
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { BackButton } from '@/components/ui/BackButton';
 
 /**
  * Type pour les paramètres de route
@@ -189,12 +190,7 @@ const TripReturnList = () => {
                         borderBottomColor: themeColors.headerBorderColor
                     }
                 ]}>
-                    <Pressable
-                        onPress={handleGoBack}
-                        style={styles.backButton}
-                    >
-                        <Icon name="arrow-left" size={25} color={iconColor} />
-                    </Pressable>
+                    <BackButton onPress={handleGoBack} color={iconColor} />
                 </View>
 
                 <ScrollView
@@ -303,9 +299,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingBottom: 12,
         borderBottomWidth: 1,
-    },
-    backButton: {
-        padding: 8,
     },
     scrollView: {
         flex: 1,

@@ -4,7 +4,11 @@ import { DetailRow } from '@/components/ticket/DetailRow';
 import { PassengerCard } from '@/components/ticket/PassengerCard';
 import { QrCodeSection } from '@/components/ticket/QrCodeSection';
 import { StationRow } from '@/components/ticket/StationRow';
-import { formatFullDate, formatFullDateWithTime, formatStatus, getStatusColor } from '@/constants/functions';
+import {
+    formatFullDate,
+    formatFullDateWithTime,
+    formatStatus,
+} from '@/constants/functions';
 import { formatPaymentMethod } from '@/constants/paymentMethods';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
@@ -19,17 +23,19 @@ import * as Sharing from 'expo-sharing';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     Platform,
     Pressable,
     ScrollView,
     StyleSheet,
     Text,
-    View
+    View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { captureRef } from 'react-native-view-shot';
+import { showAlert } from '@/utils/alert';
+import { AppButton } from '@/components/ui/AppButton';
+import { BackButton } from '@/components/ui/BackButton';
 
 /**
  * Retourne la première ville non vide parmi les candidats.
@@ -209,7 +215,6 @@ const TicketDetails = () => {
         if (!ticket) return null;
 
         return {
-            statusColor: getStatusColor(ticket.status),
             formattedStatus: formatStatus(ticket.status),
             routeText: buildRouteText(ticket, fallbackDepartureCity, fallbackArrivalCity),
             passengerCountText: ticket.passengers.length > 1 ? 'Passagers' : 'Passager',
@@ -351,7 +356,7 @@ const TicketDetails = () => {
                     dialogTitle: 'Télécharger le ticket',
                 });
             } else {
-                Alert.alert(
+                showAlert(
                     'Succès',
                     `Le ticket a été sauvegardé dans vos documents.\n\nFichier: ${finalFileName}`,
                     [{ text: 'OK' }]
@@ -359,7 +364,7 @@ const TicketDetails = () => {
             }
         } catch (error) {
             console.error('Erreur lors de la génération du PDF:', error);
-            Alert.alert(
+            showAlert(
                 'Erreur',
                 'Une erreur est survenue lors de la génération du PDF. Veuillez réessayer.'
             );
@@ -376,7 +381,7 @@ const TicketDetails = () => {
             // Demande la permission
             const { status } = await MediaLibrary.requestPermissionsAsync();
             if (status !== 'granted') {
-                Alert.alert(
+                showAlert(
                     'Permission requise',
                     'Veuillez autoriser l\'accès à la galerie pour sauvegarder votre billet'
                 );
@@ -395,7 +400,7 @@ const TicketDetails = () => {
             // Sauvegarde dans la galerie
             await MediaLibrary.saveToLibraryAsync(uri);
 
-            Alert.alert(
+            showAlert(
                 'Billet sauvegardé',
                 Platform.OS === 'ios'
                     ? 'Votre billet a été sauvegardé dans Photos'
@@ -404,7 +409,7 @@ const TicketDetails = () => {
             );
         } catch (error) {
             console.error('Erreur lors de la sauvegarde:', error);
-            Alert.alert(
+            showAlert(
                 'Erreur',
                 'Impossible de sauvegarder le billet. Veuillez réessayer.'
             );
@@ -428,46 +433,83 @@ const TicketDetails = () => {
 
     return (
         <View style={[styles.container, { backgroundColor: themeColors.scrollBackgroundColor }]}>
-            {/* Header avec bouton retour */}
-            <View style={[
-                styles.header,
-                {
-                    paddingTop: insets.top,
-                    backgroundColor: themeColors.headerBackgroundColor,
-                    borderBottomColor: themeColors.headerBorderColor
-                }
-            ]}>
-                <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Icon name="arrow-left" size={25} color={iconColor} />
-                </Pressable>
+            <View
+                style={[
+                    styles.header,
+                    {
+                        paddingTop: insets.top,
+                        backgroundColor: themeColors.headerBackgroundColor,
+                        borderBottomColor: themeColors.headerBorderColor,
+                    },
+                ]}
+            >
+                <BackButton onPress={() => navigation.goBack()} color={iconColor} />
+                <Text style={[styles.headerTitle, { color: textColor }]}>Mon billet</Text>
+                <View style={styles.headerSpacer} />
             </View>
 
             <ScrollView
                 style={styles.scrollView}
-                contentContainerStyle={styles.scrollContent}
+                contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom, 16) + 24 }]}
                 showsVerticalScrollIndicator={false}
             >
-                <View ref={ticketViewRef} collapsable={false}>
-                    {/* Header bleu avec route et référence */}
-                    <View style={[styles.blueHeader, { backgroundColor: themeColors.primaryBlue }]}>
-                        {ticketDerivedValues.routeText ? (
-                            <Text style={[styles.routeTitle, { width: '80%', textAlign: 'left' }]}>
-                                {ticketDerivedValues.routeText}
-                            </Text>
-                        ) : null}
-                        <Text style={[styles.referenceText, { width: '80%', textAlign: 'left' }]}>
-                            Référence: {ticket.code}
-                        </Text>
-                        <View style={[styles.statusBadge, { backgroundColor: ticketDerivedValues.statusColor }]}>
-                            <Text style={styles.statusBadgeText}>{ticketDerivedValues.formattedStatus}</Text>
+                <View ref={ticketViewRef} collapsable={false} style={styles.captureBlock}>
+                    <View style={[styles.heroCard, { backgroundColor: themeColors.primaryBlue }]}>
+                        <View style={styles.heroTop}>
+                            <View style={styles.heroRouteWrap}>
+                                {ticketDerivedValues.routeText ? (
+                                    <Text style={styles.heroRoute}>{ticketDerivedValues.routeText}</Text>
+                                ) : null}
+                                <Text style={styles.heroReference} numberOfLines={2}>
+                                    Réf. {ticket.code}
+                                </Text>
+                            </View>
+                            <View
+                                style={[
+                                    styles.statusBadge,
+                                    { backgroundColor: 'rgba(255,255,255,0.18)', borderColor: 'rgba(255,255,255,0.35)' },
+                                ]}
+                            >
+                                <Text style={styles.statusBadgeText}>{ticketDerivedValues.formattedStatus}</Text>
+                            </View>
+                        </View>
+
+                        <View style={styles.heroMetaRow}>
+                            <View style={styles.heroMetaItem}>
+                                <Text style={styles.heroMetaLabel}>Date</Text>
+                                <Text style={styles.heroMetaValue} numberOfLines={2}>
+                                    {formatFullDate(ticket.departureDateTime)}
+                                </Text>
+                            </View>
+                            <View style={styles.heroMetaDivider} />
+                            <View style={styles.heroMetaItem}>
+                                <Text style={styles.heroMetaLabel}>Départ</Text>
+                                <Text style={styles.heroMetaValue}>{ticket.departureTime}</Text>
+                            </View>
+                            <View style={styles.heroMetaDivider} />
+                            <View style={styles.heroMetaItem}>
+                                <Text style={styles.heroMetaLabel}>Durée</Text>
+                                <Text style={styles.heroMetaValue}>{ticket.duration}</Text>
+                            </View>
                         </View>
                     </View>
 
-                    {/* Section: QR Code */}
-                    <View style={[styles.sectionCard, { backgroundColor: themeColors.cardBackgroundColor, borderColor: themeColors.borderColor }]}>
+                    <View
+                        style={[
+                            styles.sectionCard,
+                            {
+                                backgroundColor: themeColors.cardBackgroundColor,
+                                borderColor: themeColors.borderColor,
+                            },
+                        ]}
+                    >
                         <View style={styles.sectionHeader}>
-                            <Icon name="qrcode" size={20} color={themeColors.primaryBlue} />
-                            <Text style={[styles.sectionTitle, { color: textColor }]}>Code QR de vérification</Text>
+                            <View style={styles.sectionIconBlock}>
+                                <Icon name="qrcode" size={22} color={themeColors.primaryBlue} />
+                            </View>
+                            <Text style={[styles.sectionTitle, { color: textColor }]}>
+                                Code QR de vérification
+                            </Text>
                         </View>
                         <QrCodeSection
                             qrCode={qrCode}
@@ -476,68 +518,37 @@ const TicketDetails = () => {
                             primaryBlue={themeColors.primaryBlue}
                             textColor={textColor}
                             secondaryTextColor={themeColors.secondaryTextColor}
+                            frameBackground={themeColors.passengerCardBackground}
+                            borderColor={themeColors.borderColor}
                             onRetry={retryQrCode}
                             onViewQRCode={handleViewQRCode}
                         />
                     </View>
                 </View>
 
-                {/* Section: Détails du voyage */}
-                <View style={[styles.sectionCard, { backgroundColor: themeColors.cardBackgroundColor, borderColor: themeColors.borderColor }]}>
-                    <View style={[styles.sectionHeader, { marginBottom: 20 }]}>
-                        <Icon name="map-outline" size={20} color={themeColors.primaryBlue} />
-                        <Text style={[styles.sectionTitle, { color: textColor }]}>Détails du voyage</Text>
-                    </View>
-                    <DetailRow
-                        label="Date"
-                        value={formatFullDate(ticket.departureDateTime)}
-                        textColor={textColor}
-                        secondaryTextColor={themeColors.secondaryTextColor}
-                        valueWidth="45%"
-                    />
-                    <DetailRow
-                        label="Heure de départ"
-                        value={ticket.departureTime}
-                        textColor={textColor}
-                        secondaryTextColor={themeColors.secondaryTextColor}
-                    />
-                    <DetailRow
-                        label="Heure d'arrivée estimée"
-                        value={ticket.arrivalTime}
-                        textColor={textColor}
-                        secondaryTextColor={themeColors.secondaryTextColor}
-                    />
-                    <DetailRow
-                        label="Durée"
-                        value={ticket.duration}
-                        textColor={textColor}
-                        secondaryTextColor={themeColors.secondaryTextColor}
-                    />
-                    <DetailRow
-                        label="Compagnie"
-                        value={ticket.companyName}
-                        textColor={textColor}
-                        secondaryTextColor={themeColors.secondaryTextColor}
-                    />
-                    <DetailRow
-                        label="Véhicule"
-                        value={ticket.bus.licencePlate}
-                        textColor={textColor}
-                        secondaryTextColor={themeColors.secondaryTextColor}
-                    />
-                </View>
-
-                {/* Section: Gares */}
-                <View style={[styles.sectionCard, { backgroundColor: themeColors.cardBackgroundColor, borderColor: themeColors.borderColor }]}>
+                <View
+                    style={[
+                        styles.sectionCard,
+                        {
+                            backgroundColor: themeColors.cardBackgroundColor,
+                            borderColor: themeColors.borderColor,
+                        },
+                    ]}
+                >
                     <View style={styles.sectionHeader}>
-                        <Icon name="map-marker-outline" size={20} color={themeColors.primaryBlue} />
-                        <Text style={[styles.sectionTitle, { color: textColor }]}>Gares</Text>
+                        <View style={styles.sectionIconBlock}>
+                            <Icon name="map-marker-path" size={22} color={themeColors.primaryBlue} />
+                        </View>
+                        <Text style={[styles.sectionTitle, { color: textColor }]}>Itinéraire</Text>
                     </View>
+
                     <View style={styles.stationsContainer}>
                         <StationRow
                             label="Départ"
                             stationName={ticket.trip.stationFrom.name}
-                            dotColor="#4CAF50"
+                            cityName={ticket.trip.stationFrom.city}
+                            time={ticket.departureTime}
+                            dotColor="#2D7A4F"
                             textColor={textColor}
                             secondaryTextColor={themeColors.secondaryTextColor}
                             borderColor={themeColors.borderColor}
@@ -545,37 +556,70 @@ const TicketDetails = () => {
                         <StationRow
                             label="Arrivée"
                             stationName={ticket.trip.stationTo.name}
-                            dotColor="#F44336"
+                            cityName={ticket.trip.stationTo.city}
+                            time={ticket.arrivalTime}
+                            dotColor="#C44747"
                             textColor={textColor}
                             secondaryTextColor={themeColors.secondaryTextColor}
                             borderColor={themeColors.borderColor}
                             isLast
                         />
                     </View>
+
+                    <View style={[styles.infoGrid, { borderColor: themeColors.borderColor }]}>
+                        <View style={styles.infoGridItem}>
+                            <Text style={[styles.infoGridLabel, { color: themeColors.secondaryTextColor }]}>
+                                Compagnie
+                            </Text>
+                            <Text style={[styles.infoGridValue, { color: textColor }]} numberOfLines={2}>
+                                {ticket.companyName}
+                            </Text>
+                        </View>
+                        <View style={[styles.infoGridDivider, { backgroundColor: themeColors.borderColor }]} />
+                        <View style={styles.infoGridItem}>
+                            <Text style={[styles.infoGridLabel, { color: themeColors.secondaryTextColor }]}>
+                                Véhicule
+                            </Text>
+                            <Text style={[styles.infoGridValue, { color: textColor }]} numberOfLines={2}>
+                                {ticket.bus.licencePlate}
+                            </Text>
+                        </View>
+                    </View>
                 </View>
 
-                {/* Section: Passagers */}
-                <View style={[styles.sectionCard, { backgroundColor: themeColors.cardBackgroundColor, borderColor: themeColors.borderColor }]}>
+                <View
+                    style={[
+                        styles.sectionCard,
+                        {
+                            backgroundColor: themeColors.cardBackgroundColor,
+                            borderColor: themeColors.borderColor,
+                        },
+                    ]}
+                >
                     <View style={styles.sectionHeader}>
-                        <Icon name="account-group-outline" size={20} color={themeColors.primaryBlue} />
+                        <View style={styles.sectionIconBlock}>
+                            <Icon name="account-group" size={22} color={themeColors.primaryBlue} />
+                        </View>
                         <Text style={[styles.sectionTitle, { color: textColor }]}>
                             {ticketDerivedValues.passengerCountText} ({ticket.passengers.length})
                         </Text>
                     </View>
                     {ticket.passengers.map((passenger, index) => (
                         <PassengerCard
-                            key={index}
+                            key={passenger.id || index}
                             passenger={{
                                 ...passenger,
-                                phone: passenger.phone ? {
-                                    type: 'MOBILE',
-                                    countryCode: passenger.phone.countryCode,
-                                    digits: passenger.phone.digits,
-                                } : {
-                                    type: 'MOBILE',
-                                    countryCode: '',
-                                    digits: '',
-                                },
+                                phone: passenger.phone
+                                    ? {
+                                          type: 'MOBILE',
+                                          countryCode: passenger.phone.countryCode,
+                                          digits: passenger.phone.digits,
+                                      }
+                                    : {
+                                          type: 'MOBILE',
+                                          countryCode: '',
+                                          digits: '',
+                                      },
                             }}
                             textColor={textColor}
                             secondaryTextColor={themeColors.secondaryTextColor}
@@ -588,103 +632,81 @@ const TicketDetails = () => {
                     ))}
                 </View>
 
-                {/* Section: Détails du paiement */}
-                <View style={[styles.sectionCard, { backgroundColor: themeColors.cardBackgroundColor, borderColor: themeColors.borderColor }]}>
-                    <View style={[styles.sectionHeader, { marginBottom: 20 }]}>
-                        <Icon name="wallet-outline" size={20} color={themeColors.primaryBlue} />
-                        <Text style={[styles.sectionTitle, { color: textColor }]}>Détails du paiement</Text>
+                <View
+                    style={[
+                        styles.sectionCard,
+                        {
+                            backgroundColor: themeColors.cardBackgroundColor,
+                            borderColor: themeColors.borderColor,
+                        },
+                    ]}
+                >
+                    <View style={styles.sectionHeader}>
+                        <View style={styles.sectionIconBlock}>
+                            <Icon name="wallet" size={22} color={themeColors.primaryBlue} />
+                        </View>
+                        <Text style={[styles.sectionTitle, { color: textColor }]}>Paiement</Text>
                     </View>
+
                     <DetailRow
                         label="Prix du ticket"
                         value={formatPriceWithCurrency(ticket.passengers[0]?.price || '0')}
                         textColor={textColor}
                         secondaryTextColor={themeColors.secondaryTextColor}
-                        valueWidth="45%"
-                    />
-                    <View style={[styles.separator, { backgroundColor: themeColors.borderColor }]} />
-                    <DetailRow
-                        label="Total payé"
-                        value={formatPriceWithCurrency(ticket.totalAmount)}
-                        textColor={textColor}
-                        secondaryTextColor={themeColors.secondaryTextColor}
-                        isTotal
-                        totalValueColor={themeColors.primaryBlue}
                     />
                     <DetailRow
-                        label="Méthode de paiement"
+                        label="Méthode"
                         value={ticketDerivedValues.formattedPaymentMethod.replaceAll('_', ' ')}
                         textColor={textColor}
                         secondaryTextColor={themeColors.secondaryTextColor}
                     />
                     <DetailRow
-                        label="Date de réservation"
+                        label="Réservé le"
                         value={formatFullDateWithTime(ticket.createdAt)}
                         textColor={textColor}
                         secondaryTextColor={themeColors.secondaryTextColor}
-                        valueWidth="45%"
                     />
+
+                    <View
+                        style={[
+                            styles.totalBox,
+                            {
+                                backgroundColor: themeColors.passengerCardBackground,
+                                borderColor: themeColors.borderColor,
+                            },
+                        ]}
+                    >
+                        <Text style={[styles.totalBoxLabel, { color: textColor }]}>Total payé</Text>
+                        <Text style={[styles.totalBoxValue, { color: themeColors.primaryBlue }]}>
+                            {formatPriceWithCurrency(ticket.totalAmount)}
+                        </Text>
+                    </View>
                 </View>
 
-                {/* Section: Actions */}
-                <Pressable
-                    style={[styles.actionButton, { borderColor: themeColors.primaryBlue, borderWidth: 1 }]}
-                    onPress={handleDownloadTicket}
-                    disabled={isGeneratingPDF}
-                >
-                    {isGeneratingPDF ? (
-                        <ActivityIndicator size="small" color={themeColors.primaryBlue} />
-                    ) : (
-                        <>
-                            <Icon name="download" size={20} color={themeColors.primaryBlue} />
-                            <Text style={[styles.actionButtonText, { color: themeColors.primaryBlue }]}>
-                                Télécharger le reçu
-                            </Text>
-                        </>
+                <View style={styles.actions}>
+                    <AppButton
+                        title="Télécharger le reçu"
+                        onPress={handleDownloadTicket}
+                        loading={isGeneratingPDF}
+                        variant="secondary"
+                        icon={<Icon name="download" size={20} color={themeColors.primaryBlue} />}
+                    />
+                    {canCancelReservation && (
+                        <AppButton
+                            title="Annuler la réservation"
+                            onPress={handleCancelReservation}
+                            variant="danger"
+                            icon={<Icon name="cancel" size={20} color="#FFFFFF" />}
+                        />
                     )}
-                </Pressable>
-                {canCancelReservation && (
-                    <Pressable
-                        style={[styles.actionButton, { backgroundColor: '#DC3545', marginTop: 12 }]}
-                        onPress={handleCancelReservation}
-                    >
-                        <Icon name="cancel" size={20} color={'#FFFFFF'} />
-                        <Text style={[styles.actionButtonText, { color: '#FFFFFF' }]}>
-                            Annuler la réservation
-                        </Text>
-                    </Pressable>
-                )}
-
-                {canGiveFeedback && (
-                    <Pressable
-                        style={[styles.actionButton, { backgroundColor: themeColors.primaryBlue, marginTop: 12 }]}
-                        onPress={handleGiveFeedback}
-                    >
-                        <Icon name="star-outline" size={20} color={'#FFFFFF'} />
-                        <Text style={[styles.actionButtonText, { color: '#FFFFFF' }]}>
-                            Donner mon avis
-                        </Text>
-                    </Pressable>
-                )}
-                {/* Bouton sauvegarder dans Photos/Galerie */}
-                {/* <Pressable
-                    style={[styles.actionButton, { backgroundColor: primaryBlue, borderColor: primaryBlue, marginTop: 20 }]}
-                    onPress={handleSaveToPhotos}
-                >
-                    <Icon name={Platform.OS === 'ios' ? 'image-outline' : 'download'} size={20} color="#FFFFFF" />
-                    <Text style={[styles.actionButtonText, { color: '#FFFFFF' }]}>
-                        {Platform.OS === 'ios' ? 'Sauvegarder dans Photos' : 'Sauvegarder dans la galerie'}
-                    </Text>
-                </Pressable> */}
-                {/* <Pressable
-                        style={[styles.actionButton, { borderColor: primaryBlue, marginTop: 12 }]}
-                        onPress={handleViewQRCode}
-                    >
-                        <Icon name="qrcode" size={20} color={primaryBlue} />
-                        <Text style={[styles.actionButtonText, { color: primaryBlue }]}>
-                            Voir le code QR
-                        </Text>
-                    </Pressable> */}
-                {/* </View> */}
+                    {canGiveFeedback && (
+                        <AppButton
+                            title="Donner mon avis"
+                            onPress={handleGiveFeedback}
+                            icon={<Icon name="star" size={20} color="#FFFFFF" />}
+                        />
+                    )}
+                </View>
             </ScrollView>
         </View>
     );
@@ -702,7 +724,7 @@ const styles = StyleSheet.create({
     retryButton: {
         paddingHorizontal: 20,
         paddingVertical: 12,
-        borderRadius: 8,
+        borderRadius: 10,
         backgroundColor: '#1776BA',
     },
     retryButtonText: {
@@ -713,87 +735,168 @@ const styles = StyleSheet.create({
     header: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 16,
+        paddingHorizontal: 8,
         paddingBottom: 12,
-        borderBottomWidth: 1,
+        borderBottomWidth: StyleSheet.hairlineWidth,
     },
-    backButton: {
-        padding: 8,
+    headerTitle: {
+        flex: 1,
+        fontSize: 17,
+        fontFamily: 'Ubuntu_Bold',
+        textAlign: 'center',
+    },
+    headerSpacer: {
+        width: 44,
+        height: 44,
     },
     scrollView: {
         flex: 1,
     },
     scrollContent: {
         padding: 16,
-        paddingBottom: 32,
+        gap: 14,
     },
-    blueHeader: {
-        padding: 20,
+    captureBlock: {
+        gap: 14,
+    },
+    heroCard: {
         borderRadius: 12,
-        marginBottom: 16,
-        position: 'relative',
+        padding: 18,
+        gap: 18,
     },
-    routeTitle: {
-        fontSize: 24,
+    heroTop: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 12,
+    },
+    heroRouteWrap: {
+        flex: 1,
+        minWidth: 0,
+        gap: 6,
+    },
+    heroRoute: {
+        fontSize: 22,
         fontFamily: 'Ubuntu_Bold',
         color: '#FFFFFF',
-        marginBottom: 8,
+        lineHeight: 28,
     },
-    referenceText: {
-        fontSize: 14,
+    heroReference: {
+        fontSize: 13,
         fontFamily: 'Ubuntu_Regular',
-        color: '#FFFFFF',
-        opacity: 0.9,
+        color: 'rgba(255,255,255,0.9)',
     },
     statusBadge: {
-        position: 'absolute',
-        top: 20,
-        right: 20,
-        paddingHorizontal: 12,
+        paddingHorizontal: 10,
         paddingVertical: 6,
         borderRadius: 8,
+        borderWidth: 1,
     },
     statusBadgeText: {
         fontSize: 12,
         fontFamily: 'Ubuntu_Bold',
         color: '#FFFFFF',
     },
+    heroMetaRow: {
+        flexDirection: 'row',
+        alignItems: 'stretch',
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: 'rgba(255,255,255,0.28)',
+        paddingTop: 14,
+    },
+    heroMetaItem: {
+        flex: 1,
+        gap: 4,
+    },
+    heroMetaDivider: {
+        width: StyleSheet.hairlineWidth,
+        backgroundColor: 'rgba(255,255,255,0.28)',
+        marginHorizontal: 10,
+    },
+    heroMetaLabel: {
+        fontSize: 11,
+        fontFamily: 'Ubuntu_Medium',
+        color: 'rgba(255,255,255,0.75)',
+        textTransform: 'uppercase',
+        letterSpacing: 0.3,
+    },
+    heroMetaValue: {
+        fontSize: 14,
+        fontFamily: 'Ubuntu_Bold',
+        color: '#FFFFFF',
+    },
     sectionCard: {
         borderRadius: 12,
         padding: 16,
-        marginBottom: 16,
         borderWidth: 1,
+        gap: 4,
     },
     sectionHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 16,
-        gap: 8,
+        marginBottom: 14,
+        gap: 10,
     },
-    sectionTitle: {
-        fontSize: 18,
-        fontFamily: 'Ubuntu_Bold',
-    },
-    separator: {
-        height: 1,
-        marginVertical: 12,
-    },
-    stationsContainer: {
-        marginTop: 8,
-    },
-    actionButton: {
-        flexDirection: 'row',
+    sectionIconBlock: {
+        width: 40,
+        height: 40,
+        borderRadius: 10,
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        borderRadius: 8,
-        // borderWidth: 1,
-        gap: 8,
     },
-    actionButtonText: {
-        fontSize: 14,
+    sectionTitle: {
+        flex: 1,
+        fontSize: 17,
+        fontFamily: 'Ubuntu_Bold',
+    },
+    stationsContainer: {
+        marginBottom: 4,
+    },
+    infoGrid: {
+        flexDirection: 'row',
+        borderTopWidth: 1,
+        paddingTop: 14,
+        marginTop: 4,
+    },
+    infoGridItem: {
+        flex: 1,
+        gap: 4,
+    },
+    infoGridDivider: {
+        width: StyleSheet.hairlineWidth,
+        marginHorizontal: 12,
+    },
+    infoGridLabel: {
+        fontSize: 12,
         fontFamily: 'Ubuntu_Medium',
+        textTransform: 'uppercase',
+        letterSpacing: 0.3,
+    },
+    infoGridValue: {
+        fontSize: 15,
+        fontFamily: 'Ubuntu_Bold',
+    },
+    totalBox: {
+        marginTop: 4,
+        borderRadius: 10,
+        borderWidth: 1,
+        paddingHorizontal: 14,
+        paddingVertical: 14,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+    },
+    totalBoxLabel: {
+        fontSize: 15,
+        fontFamily: 'Ubuntu_Bold',
+    },
+    totalBoxValue: {
+        fontSize: 20,
+        fontFamily: 'Ubuntu_Bold',
+    },
+    actions: {
+        gap: 12,
+        marginTop: 2,
     },
 });
 

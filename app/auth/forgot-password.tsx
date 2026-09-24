@@ -1,12 +1,31 @@
 //@ts-nocheck
-import { forgotPasswordApi, resetPasswordApi, sendResetCodeApi, verifyResetCodeApi } from '@/api/auth_register';
+import {
+    forgotPasswordApi,
+    resetPasswordApi,
+    sendResetCodeApi,
+    verifyResetCodeApi,
+} from '@/api/auth_register';
 import { AuthFormField } from '@/components/auth/AuthFormField';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Image, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+    Animated,
+    Image,
+    Keyboard,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
+} from 'react-native';
+import { showAlert } from '@/utils/alert';
+import { AppButton } from '@/components/ui/AppButton';
 
 /**
  * Composant Stepper pour afficher la progression
@@ -209,7 +228,7 @@ export default function ForgotPasswordScreen() {
      */
     const handleSearchAccount = async () => {
         if (accountIdentifier.trim() === '') {
-            Alert.alert('Attention !', 'Veuillez renseigner votre E-mail, Username ou Téléphone');
+            showAlert('Attention !', 'Veuillez renseigner votre E-mail, Username ou Téléphone');
             return;
         }
 
@@ -224,10 +243,10 @@ export default function ForgotPasswordScreen() {
                     setAccountData(response.data);
                     setCurrentStep(2);
                 } else {
-                    Alert.alert('Attention !', 'Aucun compte trouvé avec ces informations.');
+                    showAlert('Attention !', 'Aucun compte trouvé avec ces informations.');
                 }
             } else {
-                Alert.alert('Attention !', 'Une erreur est survenue lors de la recherche. Veuillez réessayer.');
+                showAlert('Attention !', 'Une erreur est survenue lors de la recherche. Veuillez réessayer.');
             }
         } catch (error: any) {
             console.error('Erreur lors de la recherche de compte : ', error);
@@ -242,7 +261,7 @@ export default function ForgotPasswordScreen() {
                 errorMessage = error.message;
             }
 
-            Alert.alert('Attention !', errorMessage);
+            showAlert('Attention !', errorMessage);
         } finally {
             setIsLoading(false);
         }
@@ -253,7 +272,7 @@ export default function ForgotPasswordScreen() {
      */
     const handleSendCode = async () => {
         if (!selectedMethod) {
-            Alert.alert('Attention !', 'Veuillez sélectionner une méthode de réception du code');
+            showAlert('Attention !', 'Veuillez sélectionner une méthode de réception du code');
             return;
         }
 
@@ -271,7 +290,7 @@ export default function ForgotPasswordScreen() {
                 setResetToken(response.data.resetToken);
                 setCurrentStep(3);
             } else {
-                Alert.alert('Attention !', 'Une erreur est survenue lors de l\'envoi du code. Veuillez réessayer.');
+                showAlert('Attention !', 'Une erreur est survenue lors de l\'envoi du code. Veuillez réessayer.');
             }
         } catch (error: any) {
             console.error('Erreur lors de l\'envoi du code : ', error);
@@ -282,7 +301,7 @@ export default function ForgotPasswordScreen() {
                 errorMessage = error.response.data.message;
             }
 
-            Alert.alert('Attention !', errorMessage);
+            showAlert('Attention !', errorMessage);
         } finally {
             setIsLoading(false);
         }
@@ -293,7 +312,7 @@ export default function ForgotPasswordScreen() {
      */
     const handleVerifyCode = async () => {
         if (verificationCode.trim().length !== 6) {
-            Alert.alert('Attention !', 'Veuillez entrer un code à 6 chiffres');
+            showAlert('Attention !', 'Veuillez entrer un code à 6 chiffres');
             return;
         }
 
@@ -312,12 +331,12 @@ export default function ForgotPasswordScreen() {
                 }
                 setCurrentStep(4);
             } else {
-                // Alert.alert('Attention !', response.data?.message || 'Le code de vérification est incorrect. Veuillez réessayer.' + ' ' + response.data?.remainingAttempts + ' tentatives restantes.');
+                // showAlert('Attention !', response.data?.message || 'Le code de vérification est incorrect. Veuillez réessayer.' + ' ' + response.data?.remainingAttempts + ' tentatives restantes.');
                 if (response.data?.remainingAttempts === 0 && response.data?.verified === false) {
-                    Alert.alert('Attention !', 'Vous avez atteint le nombre maximum de tentatives. Veuillez réessayer svp.');
+                    showAlert('Attention !', 'Vous avez atteint le nombre maximum de tentatives. Veuillez réessayer svp.');
                     router.back();
                 } else {
-                    Alert.alert(
+                    showAlert(
                         'Attention !',
                         response.data?.message ? response.data?.message + '. ' + response.data?.remainingAttempts + ' tentatives restantes.'
                         :
@@ -335,7 +354,7 @@ export default function ForgotPasswordScreen() {
                 errorMessage = error.response.data.message;
             }
 
-            Alert.alert('Attention !', errorMessage);
+            showAlert('Attention !', errorMessage);
         } finally {
             setIsLoading(false);
         }
@@ -358,11 +377,11 @@ export default function ForgotPasswordScreen() {
 
             if (response && response.status === 200) {
                 setResetToken(response.data.resetToken);
-                Alert.alert('Succès !', 'Un nouveau code a été envoyé.');
+                showAlert('Succès !', 'Un nouveau code a été envoyé.');
             }
         } catch (error: any) {
             console.error('Erreur lors du renvoi du code : ', error);
-            Alert.alert('Attention !', 'Une erreur est survenue lors du renvoi du code.');
+            showAlert('Attention !', 'Une erreur est survenue lors du renvoi du code.');
         } finally {
             setIsLoading(false);
         }
@@ -373,17 +392,17 @@ export default function ForgotPasswordScreen() {
      */
     const handleResetPassword = async () => {
         if (newPassword.trim() === '') {
-            Alert.alert('Attention !', 'Veuillez entrer un nouveau mot de passe');
+            showAlert('Attention !', 'Veuillez entrer un nouveau mot de passe');
             return;
         }
 
         if (newPassword.trim().length < 6) {
-            Alert.alert('Attention !', 'Le mot de passe doit contenir au moins 6 caractères');
+            showAlert('Attention !', 'Le mot de passe doit contenir au moins 6 caractères');
             return;
         }
 
         if (newPassword !== confirmPassword) {
-            Alert.alert('Attention !', 'Les mots de passe ne correspondent pas');
+            showAlert('Attention !', 'Les mots de passe ne correspondent pas');
             return;
         }
 
@@ -399,7 +418,7 @@ export default function ForgotPasswordScreen() {
 
             if (response && response.status === 200 && response.data) {
                 if (response.data.success === true) {
-                    Alert.alert(
+                    showAlert(
                         'Succès !',
                         response.data.message || 'Votre mot de passe a été réinitialisé avec succès.',
                         [
@@ -410,13 +429,13 @@ export default function ForgotPasswordScreen() {
                         ]
                     );
                 } else {
-                    Alert.alert(
+                    showAlert(
                         'Attention !',
                         response.data.message || 'Une erreur est survenue lors de la réinitialisation. Veuillez réessayer.'
                     );
                 }
             } else {
-                Alert.alert('Attention !', 'Une erreur est survenue lors de la réinitialisation. Veuillez réessayer.');
+                showAlert('Attention !', 'Une erreur est survenue lors de la réinitialisation. Veuillez réessayer.');
             }
         } catch (error: any) {
             console.error('Erreur lors de la réinitialisation : ', error);
@@ -427,7 +446,7 @@ export default function ForgotPasswordScreen() {
                 errorMessage = error.response.data.message;
             }
 
-            Alert.alert('Attention !', errorMessage);
+            showAlert('Attention !', errorMessage);
         } finally {
             setIsLoading(false);
         }
@@ -539,17 +558,12 @@ export default function ForgotPasswordScreen() {
                 </View>
             </View>
 
-            <Pressable
-                style={styles.primaryButton}
+            <AppButton
+                title="Rechercher"
                 onPress={handleSearchAccount}
+                loading={isLoading}
                 disabled={isLoading}
-            >
-                {isLoading ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                    <Text style={styles.primaryButtonText}>Rechercher</Text>
-                )}
-            </Pressable>
+            />
         </>
     );
 
@@ -718,20 +732,19 @@ export default function ForgotPasswordScreen() {
                     <Pressable style={styles.cancelButton} onPress={handleCancel}>
                         <Text style={[styles.cancelButtonText, { color: '#1776BA' }]}>Annuler</Text>
                     </Pressable>
-                    <Pressable
-                        style={[styles.primaryButton, styles.continueButton]}
+                    <AppButton
+                        title="Continuer"
                         onPress={handleSendCode}
+                        loading={isLoading}
                         disabled={isLoading || !selectedMethod}
-                    >
-                        {isLoading ? (
-                            <ActivityIndicator size="small" color="#FFFFFF" />
-                        ) : (
-                            <>
-                                <Text style={styles.primaryButtonText}>Continuer</Text>
-                                <Ionicons name="arrow-forward" size={20} color="#FFFFFF" style={{ marginLeft: 8 }} />
-                            </>
-                        )}
-                    </Pressable>
+                        fullWidth={false}
+                        icon={
+                            !isLoading ? (
+                                <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
+                            ) : undefined
+                        }
+                        style={styles.continueButton}
+                    />
                 </View>
             </>
         );
@@ -785,20 +798,19 @@ export default function ForgotPasswordScreen() {
                 <Pressable style={styles.cancelButton} onPress={handleCancel}>
                     <Text style={[styles.cancelButtonText, { color: '#1776BA' }]}>Annuler</Text>
                 </Pressable>
-                <Pressable
-                    style={[styles.primaryButton, styles.verifyButton]}
+                <AppButton
+                    title="Vérifier"
                     onPress={handleVerifyCode}
+                    loading={isLoading}
                     disabled={isLoading || verificationCode.length !== 6}
-                >
-                    {isLoading ? (
-                        <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                        <>
-                            <Ionicons name="checkmark" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-                            <Text style={styles.primaryButtonText}>Vérifier</Text>
-                        </>
-                    )}
-                </Pressable>
+                    fullWidth={false}
+                    icon={
+                        !isLoading ? (
+                            <Ionicons name="checkmark" size={20} color="#FFFFFF" />
+                        ) : undefined
+                    }
+                    style={styles.verifyButton}
+                />
             </View>
         </>
     );
@@ -879,20 +891,19 @@ export default function ForgotPasswordScreen() {
                 <Pressable style={styles.cancelButton} onPress={handleCancel}>
                     <Text style={[styles.cancelButtonText, { color: '#1776BA' }]}>Annuler</Text>
                 </Pressable>
-                <Pressable
-                    style={[styles.primaryButton, styles.resetButton]}
+                <AppButton
+                    title="Réinitialiser"
                     onPress={handleResetPassword}
+                    loading={isLoading}
                     disabled={isLoading}
-                >
-                    {isLoading ? (
-                        <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                        <>
-                            <Ionicons name="checkmark" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-                            <Text style={styles.primaryButtonText}>Réinitialiser</Text>
-                        </>
-                    )}
-                </Pressable>
+                    fullWidth={false}
+                    icon={
+                        !isLoading ? (
+                            <Ionicons name="checkmark" size={20} color="#FFFFFF" />
+                        ) : undefined
+                    }
+                    style={styles.resetButton}
+                />
             </View>
         </>
     );
@@ -1048,20 +1059,6 @@ const styles = StyleSheet.create({
         padding: 16,
         marginBottom: 20,
         borderWidth: 1,
-    },
-    primaryButton: {
-        backgroundColor: '#1776BA',
-        borderRadius: 16,
-        paddingVertical: 16,
-        paddingHorizontal: 24,
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexDirection: 'row',
-    },
-    primaryButtonText: {
-        fontSize: 16,
-        fontFamily: 'Ubuntu_Bold',
-        color: '#FFFFFF',
     },
     continueButton: {
         flex: 1,

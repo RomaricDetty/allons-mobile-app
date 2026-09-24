@@ -5,8 +5,6 @@ import { getAuthToken } from '@/utils/storage';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
     KeyboardAvoidingView,
     Platform,
     Pressable,
@@ -18,6 +16,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { showAlert } from '@/utils/alert';
+import { AppButton } from '@/components/ui/AppButton';
+import { BackButton } from '@/components/ui/BackButton';
 
 /** Étiquettes rapides : libellé affiché + valeur API */
 const QUICK_TAGS: { label: string; tag: FeedbackTag }[] = [
@@ -67,16 +68,16 @@ export default function FeedbackPassengerScreen() {
 
     const handleSubmit = useCallback(async () => {
         if (rating === 0) {
-            Alert.alert('Champ requis', 'Veuillez attribuer une note globale.');
+            showAlert('Champ requis', 'Veuillez attribuer une note globale.');
             return;
         }
         if (!bookingId) {
-            Alert.alert('Erreur', 'Identifiant de réservation manquant.');
+            showAlert('Erreur', 'Identifiant de réservation manquant.');
             return;
         }
         const token = await getAuthToken();
         if (!token?.trim()) {
-            Alert.alert('Erreur', 'Veuillez vous reconnecter pour envoyer votre avis.');
+            showAlert('Erreur', 'Veuillez vous reconnecter pour envoyer votre avis.');
             return;
         }
 
@@ -98,14 +99,14 @@ export default function FeedbackPassengerScreen() {
                 },
                 token
             );
-            Alert.alert('Merci !', 'Votre avis a bien été enregistré.', [
+            showAlert('Merci !', 'Votre avis a bien été enregistré.', [
                 { text: 'OK', onPress: () => router.back() },
             ]);
         } catch (err: unknown) {
             const message =
                 (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
                 'Impossible d\'envoyer votre avis. Réessayez plus tard.';
-            Alert.alert('Erreur', message);
+            showAlert('Erreur', message);
         } finally {
             setIsSubmitting(false);
         }
@@ -124,9 +125,7 @@ export default function FeedbackPassengerScreen() {
                     },
                 ]}
             >
-                <Pressable onPress={handleCancel} style={styles.backButton} hitSlop={12}>
-                    <Icon name="arrow-left" size={25} color={colors.icon} />
-                </Pressable>
+                <BackButton onPress={handleCancel} color={colors.icon} />
                 <View style={styles.headerContent}>
                     <Text style={[styles.headerTitle, { color: colors.text }]}>
                         Donnez votre avis
@@ -163,7 +162,7 @@ export default function FeedbackPassengerScreen() {
                                     hitSlop={8}
                                 >
                                     <Icon
-                                        name={value <= rating ? 'star' : 'star-outline'}
+                                        name="star"
                                         size={36}
                                         color={value <= rating ? '#FFB800' : colors.border}
                                     />
@@ -249,26 +248,23 @@ export default function FeedbackPassengerScreen() {
 
                     {/* Actions */}
                     <View style={styles.actions}>
-                        <Pressable
+                        <AppButton
+                            title="Annuler"
                             onPress={handleCancel}
+                            variant="ghost"
+                            disabled={isSubmitting}
+                            fullWidth={false}
                             style={[styles.button, styles.buttonSecondary, { borderColor: colors.border }]}
-                            disabled={isSubmitting}
-                        >
-                            <Text style={[styles.buttonSecondaryText, { color: colors.text }]}>
-                                Annuler
-                            </Text>
-                        </Pressable>
-                        <Pressable
+                            textStyle={{ color: colors.text }}
+                        />
+                        <AppButton
+                            title="Envoyer"
                             onPress={handleSubmit}
-                            style={[styles.button, styles.buttonPrimary, { backgroundColor: colors.activeTabColor, opacity: isSubmitting ? 0.7 : 1 }]}
+                            loading={isSubmitting}
                             disabled={isSubmitting}
-                        >
-                            {isSubmitting ? (
-                                <ActivityIndicator size="small" color="#FFFFFF" />
-                            ) : (
-                                <Text style={styles.buttonPrimaryText}>Envoyer</Text>
-                            )}
-                        </Pressable>
+                            fullWidth={false}
+                            style={[styles.button, styles.buttonPrimary, { backgroundColor: colors.activeTabColor }]}
+                        />
                     </View>
                 </ScrollView>
             </KeyboardAvoidingView>
@@ -286,11 +282,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingBottom: 16,
         borderBottomWidth: 1,
-    },
-    backButton: {
-        padding: 8,
-        marginRight: 8,
-        marginTop: 4,
     },
     headerContent: {
         flex: 1,
@@ -381,14 +372,5 @@ const styles = StyleSheet.create({
     buttonSecondary: {
         borderWidth: 1,
     },
-    buttonSecondaryText: {
-        fontSize: 15,
-        fontFamily: 'Ubuntu_Medium',
-    },
     buttonPrimary: {},
-    buttonPrimaryText: {
-        fontSize: 15,
-        fontFamily: 'Ubuntu_Medium',
-        color: '#FFFFFF',
-    },
 });

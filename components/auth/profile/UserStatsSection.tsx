@@ -1,8 +1,13 @@
-import { useAppColors } from '@/hooks/use-app-colors';
+import {
+    useAppColors } from '@/hooks/use-app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { User } from '@/interfaces';
-import React, { useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React,
+    { useMemo } from 'react';
+import { StyleSheet,
+    Text,
+    View,
+} from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 interface UserStatsSectionProps {
@@ -162,8 +167,8 @@ export const UserStatsSection: React.FC<UserStatsSectionProps> = ({ user }) => {
         <View style={styles.statsSection}>
             {/* Voyages effectués */}
             <View style={[styles.statCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
-                <View style={[styles.iconContainer, { backgroundColor: colors.tripsIconContainerBackground }]}>
-                    <MaterialCommunityIcons name="check-circle" size={24} color={colors.activeTabColor} />
+                <View style={styles.iconContainer}>
+                    <MaterialCommunityIcons name="check-circle" size={22} color={colors.activeTabColor} />
                 </View>
                 <View style={styles.statsContent}>
                     <Text style={[styles.statsLabel, { color: colors.secondaryText }]}>Voyages effectués</Text>
@@ -178,20 +183,13 @@ export const UserStatsSection: React.FC<UserStatsSectionProps> = ({ user }) => {
                 style={[
                     styles.statCard,
                     {
-                        backgroundColor: colors.clientTypeCardBackground,
+                        backgroundColor: colors.cardBackground,
                         borderColor: colors.border,
                     },
                 ]}
             >
-                <View
-                    style={[
-                        styles.iconContainer,
-                        {
-                            backgroundColor: tierTheme.iconBackground,
-                        },
-                    ]}
-                >
-                    <MaterialCommunityIcons name="wallet" size={24} color={tierTheme.accent} />
+                <View style={styles.iconContainer}>
+                    <MaterialCommunityIcons name="card-account-details" size={22} color={tierTheme.accent} />
                 </View>
                 <View style={styles.statsContent}>
                     <Text style={[styles.statsLabel, { color: colors.secondaryText }]}>Type de client</Text>
@@ -202,13 +200,13 @@ export const UserStatsSection: React.FC<UserStatsSectionProps> = ({ user }) => {
             </View>
 
             {/* AllOn Coin gagnés */}
-            <View style={[styles.statCard, { backgroundColor: colors.coinsCardBackground, borderColor: colors.border }]}>
-                <View style={[styles.iconContainer, { backgroundColor: 'rgba(255, 167, 38, 0.15)' }]}>
-                    <MaterialCommunityIcons name="star" size={24} color="#FFA726" />
+            <View style={[styles.statCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
+                <View style={styles.iconContainer}>
+                    <MaterialCommunityIcons name="star" size={22} color={colors.activeTabColor} />
                 </View>
                 <View style={styles.statsContent}>
                     <Text style={[styles.statsLabel, { color: colors.secondaryText }]}>AllOn Coin gagnés</Text>
-                    <Text style={[styles.statsValue, { color: '#FFA726' }]}>
+                    <Text style={[styles.statsValue, { color: colors.text }]}>
                         {customerProfile?.totalCoinsEarned ?? '0.00'}
                     </Text>
                 </View>
@@ -223,20 +221,17 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     statCard: {
-        borderRadius: 16,
-        padding: 18,
+        borderRadius: 12,
+        padding: 16,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 16,
+        gap: 14,
         borderWidth: 1,
     },
-    // tierCard: {
-    //     borderLeftWidth: 2,
-    // },
     iconContainer: {
-        width: 56,
-        height: 56,
-        borderRadius: 28,
+        width: 40,
+        height: 40,
+        borderRadius: 10,
         justifyContent: 'center',
         alignItems: 'center',
     },

@@ -11,7 +11,6 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     Modal,
     Pressable,
     ScrollView,
@@ -22,6 +21,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { showAlert } from '@/utils/alert';
+import { AppButton } from '@/components/ui/AppButton';
+import { BackButton } from '@/components/ui/BackButton';
 
 /**
  * Convertit une heure au format HH:MM en minutes pour faciliter la comparaison
@@ -439,7 +441,7 @@ const TripList = () => {
 
         // Si c'est un aller-retour, rechercher les voyages retour
         if (!searchParams?.departureCity || !searchParams?.arrivalCity || !searchParams?.returnDate) {
-            Alert.alert('Attention !', 'Informations de recherche manquantes pour le retour');
+            showAlert('Attention !', 'Informations de recherche manquantes pour le retour');
             return;
         }
 
@@ -464,12 +466,12 @@ const TripList = () => {
                     searchParams: searchParams
                 });
             } else {
-                Alert.alert('Information !', 'Aucun voyage retour disponible pour la date sélectionnée.');
+                showAlert('Information !', 'Aucun voyage retour disponible pour la date sélectionnée.');
             }
         } catch (error: any) {
             setLoadingReturnTrips(false);
             console.error('Erreur dans la récupération des voyages retour : ', error);
-            Alert.alert('Attention !', 'Une erreur est survenue lors de la recherche des voyages retour');
+            showAlert('Attention !', 'Une erreur est survenue lors de la recherche des voyages retour');
         }
     }, [searchParams, navigation, formatDateToYYYYMMDD]);
 
@@ -540,12 +542,7 @@ const TripList = () => {
             <View style={[styles.container, { backgroundColor: scrollBackgroundColor }]}>
                 {/* Header avec bouton retour */}
                 <View style={[styles.header, dynamicStyles.header]}>
-                    <Pressable
-                        onPress={handleGoBack}
-                        style={styles.backButton}
-                    >
-                        <Icon name="arrow-left" size={25} color={iconColor} />
-                    </Pressable>
+                    <BackButton onPress={handleGoBack} color={iconColor} />
 
                     {/* Bouton Filtres */}
                     <Pressable
@@ -898,12 +895,10 @@ const TripList = () => {
 
                             {/* Bouton Fermer */}
                             <View style={[styles.modalCloseButtonContainer, { paddingBottom: insets.bottom + 10 }]}>
-                                <Pressable
-                                    style={[styles.modalCloseButton, { backgroundColor: "#1776BA" }]}
+                                <AppButton
+                                    title="Fermer"
                                     onPress={handleCloseFilters}
-                                >
-                                    <Text style={[styles.modalCloseButtonText, { color: '#FFFFFF' }]}>Fermer</Text>
-                                </Pressable>
+                                />
                             </View>
                         </View>
                     </Pressable>
@@ -962,9 +957,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingBottom: 12,
         borderBottomWidth: 1,
-    },
-    backButton: {
-        padding: 8,
     },
     filterButton: {
         flexDirection: 'row',
@@ -1193,20 +1185,14 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-end',
     },
     modalContent: {
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
+        borderTopLeftRadius: 12,
+        borderTopRightRadius: 12,
         width: '100%',
         maxHeight: '90%',
         minHeight: 300,
         flexDirection: 'column',
-        shadowColor: '#000',
-        shadowOffset: {
-            width: 0,
-            height: -2,
-        },
-        shadowOpacity: 0.25,
-        shadowRadius: 10,
-        elevation: 10,
+        borderTopWidth: 1,
+        borderTopColor: '#E0E0E0',
     },
     modalScrollView: {
         maxHeight: 500,

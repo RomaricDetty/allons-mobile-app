@@ -13,7 +13,6 @@ import { router } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     KeyboardAvoidingView,
     Modal,
     Platform,
@@ -25,6 +24,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { showAlert } from '@/utils/alert';
+import { AppButton } from '@/components/ui/AppButton';
+import { ScreenHeader } from '@/components/ui/ScreenHeader';
 
 /**
  * Type pour les pays
@@ -33,7 +35,6 @@ interface Country {
     id: string;
     name: string;
 }
-
 
 /**
  * Écran de modification des informations du profil utilisateur
@@ -134,12 +135,12 @@ export default function EditProfileScreen() {
             if (response.status === 200) {
                 return response.data;
             } else {
-                Alert.alert('Erreur', 'Une erreur est survenue lors de la récupération des informations');
+                showAlert('Erreur', 'Une erreur est survenue lors de la récupération des informations');
                 return null;
             }
         } catch (error) {
             console.error('Erreur lors de la récupération des informations:', error);
-            Alert.alert('Erreur', 'Une erreur est survenue lors de la récupération des informations');
+            showAlert('Erreur', 'Une erreur est survenue lors de la récupération des informations');
             return null;
         }
     };
@@ -153,7 +154,7 @@ export default function EditProfileScreen() {
         }
         catch (error) {
             console.error('Erreur lors de la récupération de la liste des pays:', error);
-            Alert.alert('Erreur', 'Une erreur est survenue lors de la récupération de la liste des pays');
+            showAlert('Erreur', 'Une erreur est survenue lors de la récupération de la liste des pays');
             return null;
         }
     }, []);
@@ -397,23 +398,23 @@ export default function EditProfileScreen() {
      */
     const validateForm = (): boolean => {
         if (!formData.firstName.trim()) {
-            Alert.alert('Erreur', 'Le prénom est requis');
+            showAlert('Erreur', 'Le prénom est requis');
             return false;
         }
         if (!formData.lastName.trim()) {
-            Alert.alert('Erreur', 'Le nom est requis');
+            showAlert('Erreur', 'Le nom est requis');
             return false;
         }
         if (!formData.email.trim()) {
-            Alert.alert('Erreur', 'L\'email est requis');
+            showAlert('Erreur', 'L\'email est requis');
             return false;
         }
         if (!formData.dateOfBirth.trim()) {
-            Alert.alert('Erreur', 'La date de naissance est requise');
+            showAlert('Erreur', 'La date de naissance est requise');
             return false;
         }
         if (!formData.phone.trim()) {
-            Alert.alert('Erreur', 'Le téléphone est requis');
+            showAlert('Erreur', 'Le téléphone est requis');
             return false;
         }
         return true;
@@ -434,12 +435,12 @@ export default function EditProfileScreen() {
 
             // Vérifier que le token et l'ID utilisateur sont disponibles
             if (!token || token.trim() === '') {
-                Alert.alert('Erreur', 'Token d\'authentification manquant. Veuillez vous reconnecter.');
+                showAlert('Erreur', 'Token d\'authentification manquant. Veuillez vous reconnecter.');
                 return;
             }
 
             if (!userId || userId.trim() === '') {
-                Alert.alert('Erreur', 'ID utilisateur manquant. Veuillez vous reconnecter.');
+                showAlert('Erreur', 'ID utilisateur manquant. Veuillez vous reconnecter.');
                 return;
             }
 
@@ -478,7 +479,7 @@ export default function EditProfileScreen() {
 
             const response = await updateUserInfo(userId, updatedUser as any, token);
             if (response.status === 200) {
-                Alert.alert('Succès', 'Les informations ont été mises à jour avec succès', [
+                showAlert('Succès', 'Les informations ont été mises à jour avec succès', [
                     {
                         text: 'OK',
                         onPress: () => router.back(),
@@ -489,7 +490,7 @@ export default function EditProfileScreen() {
             }
         } catch (error) {
             console.error('Erreur lors de la sauvegarde:', error);
-            Alert.alert('Erreur', 'Une erreur est survenue lors de la mise à jour');
+            showAlert('Erreur', 'Une erreur est survenue lors de la mise à jour');
         } finally {
             setIsSaving(false);
         }
@@ -528,21 +529,15 @@ export default function EditProfileScreen() {
 
     return (
         <View style={[styles.container, { backgroundColor: scrollBackgroundColor }]}>
-            {/* Header */}
-            <View style={[
-                styles.header,
-                {
-                    paddingTop: insets.top,
-                    backgroundColor: headerBackgroundColor,
-                    borderBottomColor: headerBorderColor
-                }
-            ]}>
-                <Pressable style={styles.backButton} onPress={() => router.back()}>
-                    <MaterialCommunityIcons name="arrow-left" size={25} color={iconColor} />
-                </Pressable>
-                <Text style={[styles.headerTitle, { color: textColor }]}>Modifier mes informations</Text>
-                <View style={styles.headerSpacer} />
-            </View>
+            <ScreenHeader
+                title="Modifier mes informations"
+                onBack={() => router.back()}
+                iconColor={iconColor}
+                textColor={textColor}
+                backgroundColor={headerBackgroundColor}
+                borderColor={headerBorderColor}
+                paddingTop={insets.top}
+            />
 
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -832,20 +827,14 @@ export default function EditProfileScreen() {
                     </View>
 
                     {/* Bouton de sauvegarde */}
-                    <Pressable
-                        style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
+                    <AppButton
+                        title="Enregistrer"
                         onPress={handleSave}
+                        loading={isSaving}
                         disabled={isSaving}
-                    >
-                        {isSaving ? (
-                            <ActivityIndicator size="small" color="#FFFFFF" />
-                        ) : (
-                            <>
-                                <MaterialCommunityIcons name="check" size={20} color="#FFFFFF" />
-                                <Text style={styles.saveButtonText}>Enregistrer</Text>
-                            </>
-                        )}
-                    </Pressable>
+                        icon={<MaterialCommunityIcons name="check" size={20} color="#FFFFFF" />}
+                        style={styles.saveButton}
+                    />
                 </ScrollView>
             </KeyboardAvoidingView>
 
@@ -925,26 +914,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingBottom: 12,
-        borderBottomWidth: 1,
-    },
-    backButton: {
-        padding: 8,
-    },
-    headerTitle: {
-        fontSize: 18,
-        fontFamily: 'Ubuntu_Bold',
-        flex: 1,
-        textAlign: 'center',
-    },
-    headerSpacer: {
-        width: 40,
-    },
     keyboardView: {
         flex: 1,
     },
@@ -1003,24 +972,8 @@ const styles = StyleSheet.create({
         fontFamily: 'Ubuntu_Regular',
     },
     saveButton: {
-        backgroundColor: '#1776BA',
-        borderRadius: 8,
-        paddingVertical: 14,
-        paddingHorizontal: 16,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
         marginTop: 16,
         marginBottom: 16,
-    },
-    saveButtonDisabled: {
-        opacity: 0.6,
-    },
-    saveButtonText: {
-        fontSize: 16,
-        fontFamily: 'Ubuntu_Bold',
-        color: '#FFFFFF',
     },
     datePickerOverlay: {
         flex: 1,

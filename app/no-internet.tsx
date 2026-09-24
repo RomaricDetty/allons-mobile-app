@@ -2,10 +2,11 @@
 import { useConnectivity } from '@/contexts/ConnectivityContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
+import { AppButton } from '@/components/ui/AppButton';
 import NetInfo from '@react-native-community/netinfo';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
@@ -99,25 +100,14 @@ export default function NoInternetScreen() {
                 </Text>
 
                 {/* Bouton de vérification manuelle */}
-                <TouchableOpacity
-                    style={[styles.checkButton, isChecking && styles.checkButtonDisabled]}
+                <AppButton
+                    title="Réessayer"
                     onPress={handleCheckConnection}
-                    disabled={isChecking}
-                    activeOpacity={0.7}
-                >
-                    {isChecking ? (
-                        <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                        <MaterialCommunityIcons
-                            name="refresh"
-                            size={20}
-                            color="#FFFFFF"
-                        />
-                    )}
-                    <Text style={styles.checkButtonText}>
-                        {isChecking ? 'Vérification...' : 'Réessayer'}
-                    </Text>
-                </TouchableOpacity>
+                    loading={isChecking}
+                    icon={<MaterialCommunityIcons name="refresh" size={20} color="#FFFFFF" />}
+                    style={styles.checkButton}
+                    fullWidth={false}
+                />
             </View>
         </View>
     );
@@ -151,23 +141,8 @@ const styles = StyleSheet.create({
         lineHeight: 22,
     },
     checkButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#1776BA',
-        paddingHorizontal: 24,
-        paddingVertical: 12,
-        borderRadius: 8,
-        gap: 8,
-        minWidth: 140,
-    },
-    checkButtonDisabled: {
-        opacity: 0.6,
-    },
-    checkButtonText: {
-        fontSize: 16,
-        fontFamily: 'Ubuntu_Medium',
-        color: '#FFFFFF',
+        minWidth: 160,
+        alignSelf: 'center',
     },
 });
 

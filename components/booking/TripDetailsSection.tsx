@@ -51,7 +51,7 @@ export const TripDetailsSection = memo<TripDetailsSectionProps>(({
     return (
         <View style={[styles.sectionCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
             <View style={[styles.sectionHeader, { marginBottom: 20 }]}>
-                <Icon name="map-outline" size={20} color={primaryBlue} />
+                <Icon name="map" size={20} color={primaryBlue} />
                 <Text style={[styles.sectionTitle, { color: textColor }]}>{title}</Text>
             </View>
             <View style={styles.detailRow}>

@@ -9,18 +9,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
     KeyboardAvoidingView,
     Platform,
-    Pressable,
     ScrollView,
     StyleSheet,
     Text,
     View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { showAlert } from '@/utils/alert';
+import { AppButton } from '@/components/ui/AppButton';
+import { ScreenHeader } from '@/components/ui/ScreenHeader';
 
 /** Mappe la méthode UI vers PaymentMethod + PaymentProvider (enums backend) */
 function mapToPayMethodAndProvider(uiMethod: string | null): { method: string; provider?: string } {
@@ -134,17 +133,17 @@ export default function BusRentalPaymentScreen() {
 
     const handleConfirmAndPay = useCallback(async () => {
         if (!selectedPaymentMethod) {
-            Alert.alert('Attention', 'Veuillez choisir une méthode de paiement');
+            showAlert('Attention', 'Veuillez choisir une méthode de paiement');
             return;
         }
         const referenceId = requestItem?.id;
         if (!referenceId) {
-            Alert.alert('Erreur', 'Demande de location introuvable');
+            showAlert('Erreur', 'Demande de location introuvable');
             return;
         }
         const amountNum = Number(requestItem?.quotedAmount ?? requestItem?.quoteAmount ?? requestItem?.amount ?? requestItem?.totalAmount ?? 0);
         if (!amountNum || amountNum <= 0) {
-            Alert.alert('Erreur', 'Montant invalide');
+            showAlert('Erreur', 'Montant invalide');
             return;
         }
         const { method, provider } = mapToPayMethodAndProvider(selectedPaymentMethod);
@@ -171,18 +170,18 @@ export default function BusRentalPaymentScreen() {
         try {
             const token = await AsyncStorage.getItem('token');
             if (!token) {
-                Alert.alert('Erreur', 'Session expirée. Veuillez vous reconnecter.');
+                showAlert('Erreur', 'Session expirée. Veuillez vous reconnecter.');
                 return;
             }
             const response = await payBusRentalRequest(payData, token);
             if (response.status >= 200 && response.status < 300) {
-                Alert.alert('Paiement effectué', 'Votre paiement a bien été enregistré.', [{ text: 'OK', onPress: () => router.back() }]);
+                showAlert('Paiement effectué', 'Votre paiement a bien été enregistré.', [{ text: 'OK', onPress: () => router.back() }]);
             } else {
-                Alert.alert('Erreur', response?.data?.message ?? 'Le paiement a échoué.');
+                showAlert('Erreur', response?.data?.message ?? 'Le paiement a échoué.');
             }
         } catch (error: any) {
             const message = error?.response?.data?.message ?? error?.message ?? 'Une erreur est survenue lors du paiement';
-            Alert.alert('Erreur', message);
+            showAlert('Erreur', message);
         } finally {
             setIsSubmitting(false);
         }
@@ -199,15 +198,15 @@ export default function BusRentalPaymentScreen() {
 
     return (
         <View style={[styles.container, { backgroundColor: colors.scrollBackground }]}>
-            <View style={[styles.header, { paddingTop: insets.top, backgroundColor: colors.cardBackground, borderBottomColor: colors.border }]}>
-                <Pressable style={styles.backButton} onPress={() => router.back()}>
-                    <MaterialCommunityIcons name="arrow-left" size={25} color={colors.icon} />
-                </Pressable>
-                <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
-                    Location de bus – {departureName} → {arrivalName}
-                </Text>
-                <View style={styles.headerSpacer} />
-            </View>
+            <ScreenHeader
+                title={`Location de bus – ${departureName} → ${arrivalName}`}
+                onBack={() => router.back()}
+                iconColor={colors.icon}
+                textColor={colors.text}
+                backgroundColor={colors.cardBackground}
+                borderColor={colors.border}
+                paddingTop={insets.top}
+            />
 
             <KeyboardAvoidingView
                 style={styles.keyboardView}
@@ -248,20 +247,22 @@ export default function BusRentalPaymentScreen() {
                 </ScrollView>
 
                 <View style={[styles.footer, { paddingBottom: insets.bottom + 8, backgroundColor: colors.cardBackground, borderTopColor: colors.border }]}>
-                    <Pressable style={[styles.cancelButton, { borderColor: colors.border }]} onPress={handleCancel}>
-                        <Text style={[styles.cancelButtonText, { color: colors.text }]}>Annuler</Text>
-                    </Pressable>
-                    <Pressable
-                        style={[styles.confirmButton, { backgroundColor: colors.activeTabColor, opacity: isSubmitting ? 0.7 : 1 }]}
+                    <AppButton
+                        title="Annuler"
+                        onPress={handleCancel}
+                        variant="ghost"
+                        fullWidth={false}
+                        style={[styles.cancelButton, { borderColor: colors.border }]}
+                        textStyle={{ color: colors.text }}
+                    />
+                    <AppButton
+                        title="Confirmer et payer"
                         onPress={handleConfirmAndPay}
+                        loading={isSubmitting}
                         disabled={isSubmitting}
-                    >
-                        {isSubmitting ? (
-                            <ActivityIndicator size="small" color="#FFFFFF" />
-                        ) : (
-                            <Text style={styles.confirmButtonText}>Confirmer et payer</Text>
-                        )}
-                    </Pressable>
+                        fullWidth={false}
+                        style={[styles.confirmButton, { backgroundColor: colors.activeTabColor }]}
+                    />
                 </View>
             </KeyboardAvoidingView>
 
@@ -279,17 +280,6 @@ export default function BusRentalPaymentScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingBottom: 12,
-        borderBottomWidth: 1,
-    },
-    backButton: { padding: 8 },
-    headerTitle: { fontSize: 18, fontFamily: 'Ubuntu_Bold', flex: 1, textAlign: 'center' },
-    headerSpacer: { width: 40 },
     keyboardView: { flex: 1 },
     scrollView: { flex: 1 },
     scrollContent: { padding: 16 },
@@ -319,17 +309,8 @@ const styles = StyleSheet.create({
     },
     cancelButton: {
         flex: 1,
-        paddingVertical: 14,
-        borderRadius: 8,
-        borderWidth: 1,
-        alignItems: 'center',
     },
-    cancelButtonText: { fontSize: 16, fontFamily: 'Ubuntu_Bold' },
     confirmButton: {
         flex: 1,
-        paddingVertical: 14,
-        borderRadius: 8,
-        alignItems: 'center',
     },
-    confirmButtonText: { fontSize: 16, fontFamily: 'Ubuntu_Bold', color: '#FFFFFF' },
 });

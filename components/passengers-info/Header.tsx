@@ -1,6 +1,7 @@
 import React, { memo } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { BackButton } from '@/components/ui/BackButton';
 import { Trip } from '@/types';
 
 interface HeaderProps {
@@ -38,13 +39,11 @@ export const Header = memo<HeaderProps>(({
         isKeyboardVisible && styles.headerReduced,
         { paddingTop, backgroundColor, borderBottomColor: borderColor }
     ]}>
-        <Pressable
+        <BackButton
             onPress={onBack}
-            style={styles.backButton}
-            android_ripple={{ color: 'rgba(0, 0, 0, 0.1)', borderless: true, radius: 25 }}
-        >
-            <Icon name="arrow-left" size={isKeyboardVisible ? 20 : 25} color={iconColor} />
-        </Pressable>
+            color={iconColor}
+            compact={isKeyboardVisible}
+        />
 
         <View style={styles.routeBadge}>
             <Text style={[
@@ -74,15 +73,12 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 16,
+        paddingHorizontal: 8,
         paddingBottom: 12,
         borderBottomWidth: 1,
     },
     headerReduced: {
         paddingBottom: 8,
-    },
-    backButton: {
-        padding: 8,
     },
     routeBadge: {
         flex: 1,

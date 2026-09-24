@@ -1,7 +1,7 @@
 import { RebookingCodeResponse, verifyRebookingCode as verifyRebookingCodeAPI } from '@/api/rebooking';
 import { getAuthToken } from '@/utils/storage';
 import { useCallback, useState } from 'react';
-import { Alert } from 'react-native';
+import { showAlert } from '@/utils/alert';
 
 /**
  * Hook pour gérer le code de rebooking
@@ -44,7 +44,7 @@ export const useRebookingCode = () => {
                     setIsCodeValid(false);
                     setDiscount(0);
                     setRebookingTokenData(null);
-                    Alert.alert(
+                    showAlert(
                         'Crédit épuisé',
                         'Ce code de rebooking n\'a plus de crédit disponible.'
                     );
@@ -65,7 +65,7 @@ export const useRebookingCode = () => {
                     errorMessage = 'Ce code de rebooking a été annulé.';
                 }
                 
-                Alert.alert('Code invalide', errorMessage);
+                showAlert('Code invalide', errorMessage);
             }
         } catch (error: any) {
             console.error('Erreur vérification code rebooking:', error);
@@ -77,22 +77,22 @@ export const useRebookingCode = () => {
                 const status = error.response.status;
                 
                 if (status === 404) {
-                    Alert.alert(
+                    showAlert(
                         'Code introuvable',
                         'Ce code de rebooking n\'existe pas. Vérifiez que vous l\'avez correctement saisi.'
                     );
                 } else if (status === 400) {
-                    Alert.alert(
+                    showAlert(
                         'Code invalide',
                         error.response.data?.message || 'Le format du code est invalide.'
                     );
                 } else if (status === 401) {
-                    Alert.alert(
+                    showAlert(
                         'Authentification requise',
                         'Vous devez être connecté pour utiliser un code de rebooking.'
                     );
                 } else {
-                    Alert.alert(
+                    showAlert(
                         'Erreur',
                         error.response.data?.message || 'Impossible de vérifier le code. Veuillez réessayer.'
                     );
@@ -105,12 +105,12 @@ export const useRebookingCode = () => {
                     if (isValid) {
                         setDiscount(5000);
                         setIsCodeValid(true);
-                        Alert.alert('Mode Démo', 'Code accepté (mode développement) - Crédit: 5000 FCFA');
+                        showAlert('Mode Démo', 'Code accepté (mode développement) - Crédit: 5000 FCFA');
                     } else {
-                        Alert.alert('Erreur', 'Code invalide (minimum 6 caractères en mode démo)');
+                        showAlert('Erreur', 'Code invalide (minimum 6 caractères en mode démo)');
                     }
                 } else {
-                    Alert.alert(
+                    showAlert(
                         'Erreur de connexion',
                         'Impossible de vérifier le code. Vérifiez votre connexion internet.'
                     );

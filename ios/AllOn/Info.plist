@@ -28,6 +28,7 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>allonappmobile</string>
+				<string>allon</string>
 				<string>com.allon.app</string>
 			</array>
 		</dict>

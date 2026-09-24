@@ -6,16 +6,18 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     Dimensions,
     Pressable,
     ScrollView,
     StyleSheet,
     Text,
-    View
+    View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { showAlert } from '@/utils/alert';
+import { AppButton } from '@/components/ui/AppButton';
+import { BackButton } from '@/components/ui/BackButton';
 
 /**
  * Interface pour un siège
@@ -79,7 +81,7 @@ const SeatSelection = () => {
      */
     const fetchSeats = async () => {
         if (!currentTrip?.id) {
-            Alert.alert('Erreur', 'Aucun trajet sélectionné');
+            showAlert('Erreur', 'Aucun trajet sélectionné');
             navigation.goBack();
             return;
         }
@@ -145,7 +147,7 @@ const SeatSelection = () => {
             }
         } catch (error: any) {
             console.error('Erreur:', error);
-            Alert.alert('Erreur', 'Une erreur est survenue');
+            showAlert('Erreur', 'Une erreur est survenue');
             navigation.goBack();
         } finally {
             setIsLoading(false);
@@ -188,7 +190,7 @@ const SeatSelection = () => {
         const targetPassengerIndex = passengerIndices.find(idx => !passengersWithSeats.includes(idx));
 
         if (targetPassengerIndex === undefined) {
-            Alert.alert(
+            showAlert(
                 'Attention',
                 'Tous les passagers ont déjà un siège. Désélectionnez d\'abord un siège.'
             );
@@ -212,7 +214,7 @@ const SeatSelection = () => {
      */
     const handleConfirm = () => {
         if (selectedSeats.size < totalPassengers) {
-            Alert.alert(
+            showAlert(
                 'Attention',
                 `Sélectionnez un siège pour tous les passagers (${selectedSeats.size}/${totalPassengers})`
             );
@@ -355,9 +357,7 @@ const SeatSelection = () => {
                     borderBottomColor: headerBorderColor
                 }
             ]}>
-                <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Icon name="arrow-left" size={25} color={iconColor} />
-                </Pressable>
+                <BackButton onPress={() => navigation.goBack()} color={iconColor} />
 
                 <View style={styles.headerTitleContainer}>
                     <Text style={[styles.headerTitle, { color: textColor }]}>
@@ -598,16 +598,14 @@ const SeatSelection = () => {
                             borderTopColor: headerBorderColor
                         }
                     ]}>
-                        <Pressable
-                            style={[styles.confirmButton, { backgroundColor: primaryBlue }]}
+                        <AppButton
+                            title={
+                                isRoundTrip && !isReturnLeg
+                                    ? 'Continuer vers le retour'
+                                    : 'Confirmer la sélection'
+                            }
                             onPress={handleConfirm}
-                        >
-                            <Text style={styles.confirmButtonText}>
-                                {isRoundTrip && !isReturnLeg 
-                                    ? 'Continuer vers le retour' 
-                                    : 'Confirmer la sélection'}
-                            </Text>
-                        </Pressable>
+                        />
                     </View>
                 </>
             )}
@@ -626,9 +624,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingBottom: 12,
         borderBottomWidth: 1,
-    },
-    backButton: {
-        padding: 8,
     },
     headerTitleContainer: {
         flex: 1,
@@ -857,25 +852,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingTop: 12,
         borderTopWidth: 1,
-        shadowColor: '#000',
-        shadowOffset: {
-            width: 0,
-            height: -2,
-        },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 5,
-    },
-    confirmButton: {
-        borderRadius: 8,
-        paddingVertical: 14,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    confirmButtonText: {
-        fontSize: 16,
-        fontFamily: 'Ubuntu_Bold',
-        color: '#FFFFFF',
     },
 });
 

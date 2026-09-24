@@ -6,15 +6,23 @@ import {
     PassengerSelection,
     RefundOptionsSection,
     WarningBox,
-} from '@/components/cancellation';
+    } from '@/components/cancellation';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { useCancellation } from '@/hooks/useCancellation';
-import { router, useLocalSearchParams } from 'expo-router';
-import React, { useMemo } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { router,
+    useLocalSearchParams } from 'expo-router';
+import React,
+    { useMemo } from 'react';
+import {
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-
+import { AppButton } from '@/components/ui/AppButton';
 
 /**
  * Écran d'annulation de réservation optimisé
@@ -127,17 +135,13 @@ export default function CancelReservationScreen() {
                 />
 
                 <View style={styles.actionButtons}>
-                    <Pressable
-                        style={[styles.confirmButton, { opacity: isSubmitting ? 0.7 : 1 }]}
+                    <AppButton
+                        title="Confirmer l'annulation"
                         onPress={handleConfirmCancellation}
+                        loading={isSubmitting}
                         disabled={isSubmitting}
-                    >
-                        {isSubmitting ? (
-                            <ActivityIndicator size="small" color="#FFFFFF" />
-                        ) : (
-                            <Text style={styles.confirmButtonText}>Confirmer l'annulation</Text>
-                        )}
-                    </Pressable>
+                        variant="danger"
+                    />
                 </View>
             </ScrollView>
 
@@ -170,12 +174,4 @@ const styles = StyleSheet.create({
     scrollView: { flex: 1 },
     scrollContent: { padding: 20 },
     actionButtons: { marginTop: 12 },
-    confirmButton: {
-        backgroundColor: '#DC3545',
-        borderRadius: 12,
-        paddingVertical: 16,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    confirmButtonText: { fontSize: 16, fontFamily: 'Ubuntu_Bold', color: '#FFFFFF' },
 });

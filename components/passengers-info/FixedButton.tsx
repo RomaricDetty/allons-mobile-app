@@ -1,5 +1,6 @@
+import { AppButton } from '@/components/ui/AppButton';
 import React, { memo } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 interface FixedButtonProps {
     onPress: () => void;
@@ -7,6 +8,7 @@ interface FixedButtonProps {
     backgroundColor: string;
     borderColor: string;
     paddingBottom: number;
+    title?: string;
 }
 
 /**
@@ -17,26 +19,22 @@ export const FixedButton = memo<FixedButtonProps>(({
     loading,
     backgroundColor,
     borderColor,
-    paddingBottom
+    paddingBottom,
+    title = 'Confirmer et payer',
 }) => (
-    <View style={
-        [
+    <View
+        style={[
             styles.container,
-            { paddingBottom: paddingBottom + 8, backgroundColor, borderTopColor: borderColor }
-        ]
-    }>
-        <Pressable
-            style={[styles.button, styles.buttonWidth]}
+            { paddingBottom: paddingBottom + 8, backgroundColor, borderTopColor: borderColor },
+        ]}
+    >
+        <AppButton
+            title={title}
             onPress={onPress}
-            disabled={loading}
-            android_ripple={{ color: 'rgba(255, 255, 255, 0.3)' }}
-        >
-            {loading ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-                <Text style={styles.buttonText}>Confirmer et payer</Text>
-            )}
-        </Pressable>
+            loading={loading}
+            style={styles.buttonWidth}
+            fullWidth={false}
+        />
     </View>
 ));
 
@@ -51,27 +49,9 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingTop: 15,
         borderTopWidth: 1,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 5,
-    },
-    button: {
-        backgroundColor: '#1776BA',
-        borderRadius: 8,
-        paddingVertical: 14,
-        alignItems: 'center',
-        justifyContent: 'center',
-        overflow: 'hidden',
     },
     buttonWidth: {
-        width: '60%',
+        width: '100%',
         alignSelf: 'center',
-    },
-    buttonText: {
-        fontSize: 16,
-        fontFamily: 'Ubuntu_Bold',
-        color: '#FFFFFF',
     },
 });

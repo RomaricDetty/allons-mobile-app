@@ -3,7 +3,7 @@ import { Booking, User } from '@/interfaces';
 import { getAuthToken } from '@/utils/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useState } from 'react';
-import { Alert } from 'react-native';
+import { showAlert } from '@/utils/alert';
 
 /**
  * Hook personnalisé pour gérer les données du profil utilisateur
@@ -24,12 +24,12 @@ export const useProfileData = () => {
             const userId = await AsyncStorage.getItem('user_id');
 
             if (!token || token.trim() === '') {
-                Alert.alert('Erreur', 'Token d\'authentification manquant. Veuillez vous reconnecter.');
+                showAlert('Erreur', 'Token d\'authentification manquant. Veuillez vous reconnecter.');
                 return null;
             }
 
             if (!userId || userId.trim() === '') {
-                Alert.alert('Erreur', 'ID utilisateur manquant. Veuillez vous reconnecter.');
+                showAlert('Erreur', 'ID utilisateur manquant. Veuillez vous reconnecter.');
                 return null;
             }
 
@@ -38,12 +38,12 @@ export const useProfileData = () => {
             if (response.status === 200) {
                 return response.data;
             } else {
-                Alert.alert('Erreur', 'Une erreur est survenue lors de la récupération des informations de l\'utilisateur');
+                showAlert('Erreur', 'Une erreur est survenue lors de la récupération des informations de l\'utilisateur');
                 return null;
             }
         } catch (error: any) {
             console.error('Erreur lors de la récupération des informations utilisateur:', error);
-            Alert.alert('Erreur', error?.response?.data?.message || 'Une erreur est survenue lors de la récupération des informations de l\'utilisateur');
+            showAlert('Erreur', error?.response?.data?.message || 'Une erreur est survenue lors de la récupération des informations de l\'utilisateur');
             return null;
         }
     }, []);
@@ -57,12 +57,12 @@ export const useProfileData = () => {
             const userId = await AsyncStorage.getItem('user_id');
 
             if (!token || token.trim() === '') {
-                Alert.alert('Erreur', 'Token d\'authentification manquant. Veuillez vous reconnecter.');
+                showAlert('Erreur', 'Token d\'authentification manquant. Veuillez vous reconnecter.');
                 return;
             }
 
             if (!userId || userId.trim() === '') {
-                Alert.alert('Erreur', 'ID utilisateur manquant. Veuillez vous reconnecter.');
+                showAlert('Erreur', 'ID utilisateur manquant. Veuillez vous reconnecter.');
                 return;
             }
 
@@ -72,11 +72,11 @@ export const useProfileData = () => {
                 setBookingList(response.data.items);
                 // console.log('bookingList[0] in getBookingList ===>, ', JSON.stringify(response.data.items[0], null, 2));
             } else {
-                Alert.alert('Erreur', 'Une erreur est survenue lors de la récupération de la liste des réservations');
+                showAlert('Erreur', 'Une erreur est survenue lors de la récupération de la liste des réservations');
             }
         } catch (error: any) {
             console.error('Erreur lors de la récupération de la liste des réservations:', error);
-            Alert.alert('Erreur', error?.response?.data?.message || 'Une erreur est survenue lors de la récupération de la liste des réservations');
+            showAlert('Erreur', error?.response?.data?.message || 'Une erreur est survenue lors de la récupération de la liste des réservations');
         }
     }, []);
 

@@ -51,7 +51,7 @@ export const PassengerCard: React.FC<PassengerCardProps> = ({
         ? 'close-circle' 
         : isSelected 
             ? 'checkbox-marked' 
-            : 'checkbox-blank-outline';
+            : 'checkbox-blank';
     
     const iconColor = isCancelled 
         ? '#F44336' 

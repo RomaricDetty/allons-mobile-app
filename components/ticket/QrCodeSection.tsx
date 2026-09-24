@@ -1,11 +1,9 @@
+import { AppButton } from '@/components/ui/AppButton';
 import React from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-/**
- * Interface pour les props du composant QrCodeSection
- */
 interface QrCodeSectionProps {
     qrCode: string;
     isLoadingQrCode: boolean;
@@ -13,12 +11,14 @@ interface QrCodeSectionProps {
     primaryBlue: string;
     textColor: string;
     secondaryTextColor: string;
+    frameBackground: string;
+    borderColor: string;
     onRetry: () => void;
     onViewQRCode: () => void;
 }
 
 /**
- * Composant pour afficher la section QR Code
+ * Section QR du billet : cadre dédié + accès agrandi
  */
 export const QrCodeSection: React.FC<QrCodeSectionProps> = ({
     qrCode,
@@ -27,88 +27,107 @@ export const QrCodeSection: React.FC<QrCodeSectionProps> = ({
     primaryBlue,
     textColor,
     secondaryTextColor,
+    frameBackground,
+    borderColor,
     onRetry,
     onViewQRCode,
 }) => {
     return (
-        <View style={styles.qrCodeContainer}>
-            {isLoadingQrCode ? (
-                <ActivityIndicator size="large" color={primaryBlue} />
-            ) : error || !qrCode || qrCode.trim() === '' ? (
-                <View style={styles.qrCodeErrorContainer}>
-                    <Icon name="alert-circle-outline" size={40} color={secondaryTextColor} />
-                    <Text style={[styles.qrCodeErrorText, { color: secondaryTextColor }]}>
-                        Impossible de charger le QR Code
-                    </Text>
-                    <TouchableOpacity
-                        onPress={onRetry}
-                        style={[styles.retryButton, { borderColor: primaryBlue }]}
-                    >
-                        <Text style={[styles.retryButtonText, { color: primaryBlue }]}>
-                            Réessayer
+        <View style={styles.wrapper}>
+            <View
+                style={[
+                    styles.frame,
+                    {
+                        backgroundColor: frameBackground,
+                        borderColor,
+                    },
+                ]}
+            >
+                {isLoadingQrCode ? (
+                    <ActivityIndicator size="large" color={primaryBlue} />
+                ) : error || !qrCode || qrCode.trim() === '' ? (
+                    <View style={styles.errorBox}>
+                        <View style={styles.iconBlock}>
+                            <Icon name="qrcode-remove" size={22} color={secondaryTextColor} />
+                        </View>
+                        <Text style={[styles.errorText, { color: secondaryTextColor }]}>
+                            Impossible de charger le QR Code
                         </Text>
-                    </TouchableOpacity>
-                </View>
-            ) : (
-                <>
+                        <AppButton
+                            title="Réessayer"
+                            onPress={onRetry}
+                            variant="secondary"
+                            fullWidth={false}
+                            style={styles.retryButton}
+                        />
+                    </View>
+                ) : (
                     <QRCode
                         value={qrCode}
-                        size={150}
+                        size={168}
                         color={primaryBlue}
                         backgroundColor="transparent"
                     />
-                    <TouchableOpacity
+                )}
+            </View>
+
+            {qrCode && !error && !isLoadingQrCode ? (
+                <>
+                    <Text style={[styles.hint, { color: secondaryTextColor }]}>
+                        Présentez ce code à l’embarquement
+                    </Text>
+                    <AppButton
+                        title="Agrandir le QR code"
                         onPress={onViewQRCode}
-                        activeOpacity={1}
-                        style={styles.qrCodeOverlay}
+                        variant="secondary"
+                        icon={<Icon name="fullscreen" size={20} color={primaryBlue} />}
                     />
                 </>
-            )}
+            ) : null}
         </View>
     );
 };
 
 const styles = StyleSheet.create({
-    qrCodeContainer: {
-        width: 150,
-        height: 150,
+    wrapper: {
+        gap: 14,
+        alignItems: 'stretch',
+    },
+    frame: {
         alignSelf: 'center',
-        position: 'relative',
-        justifyContent: 'center',
+        width: 200,
+        height: 200,
+        borderRadius: 12,
+        borderWidth: 1,
         alignItems: 'center',
-    },
-    qrCodeOverlay: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        width: 150,
-        height: 150,
-    },
-    qrCodeErrorContainer: {
-        width: 150,
-        height: 150,
         justifyContent: 'center',
-        alignItems: 'center',
-        padding: 10,
+        padding: 16,
     },
-    qrCodeErrorText: {
-        fontSize: 12,
+    hint: {
+        fontSize: 13,
         fontFamily: 'Ubuntu_Regular',
         textAlign: 'center',
-        marginTop: 8,
-        marginBottom: 12,
+        lineHeight: 18,
+    },
+    errorBox: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 10,
+        paddingHorizontal: 8,
+    },
+    iconBlock: {
+        width: 40,
+        height: 40,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    errorText: {
+        fontSize: 13,
+        fontFamily: 'Ubuntu_Regular',
+        textAlign: 'center',
     },
     retryButton: {
-        paddingVertical: 6,
-        paddingHorizontal: 12,
-        borderRadius: 6,
-        borderWidth: 1,
-    },
-    retryButtonText: {
-        fontSize: 12,
-        fontFamily: 'Ubuntu_Medium',
+        minWidth: 120,
     },
 });
-

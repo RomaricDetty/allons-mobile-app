@@ -13,7 +13,7 @@ interface BookingFiltersProps {
 }
 
 /**
- * Composant de filtres pour les réservations (recherche + statut)
+ * Filtres réservations : recherche + statut
  */
 export const BookingFilters: React.FC<BookingFiltersProps> = ({
     searchQuery,
@@ -25,40 +25,60 @@ export const BookingFilters: React.FC<BookingFiltersProps> = ({
 
     const selectedStatusLabel = useMemo(() => {
         return selectedStatus
-            ? STATUS_OPTIONS.find(opt => opt.value === selectedStatus)?.label
+            ? STATUS_OPTIONS.find((opt) => opt.value === selectedStatus)?.label
             : 'Tous les statuts';
     }, [selectedStatus]);
 
     return (
-        <View style={[styles.container, { backgroundColor: colors.headerBackground }]}>
-            <TextInput
+        <View style={styles.container}>
+            <View
                 style={[
-                    styles.searchInput,
+                    styles.searchField,
                     {
                         backgroundColor: colors.inputBackground,
                         borderColor: colors.border,
-                        color: colors.text
-                    }
+                    },
                 ]}
-                placeholder="Rechercher par ville, référence ou compagnie"
-                placeholderTextColor={colors.placeholder}
-                value={searchQuery}
-                onChangeText={onSearchChange}
-            />
+            >
+                <View style={styles.iconBlock}>
+                    <MaterialCommunityIcons name="magnify" size={20} color={colors.activeTabColor} />
+                </View>
+                <TextInput
+                    style={[styles.searchInput, { color: colors.text }]}
+                    placeholder="Ville, référence ou compagnie"
+                    placeholderTextColor={colors.placeholder}
+                    value={searchQuery}
+                    onChangeText={onSearchChange}
+                    returnKeyType="search"
+                    clearButtonMode="while-editing"
+                />
+            </View>
+
             <Pressable
                 style={[
                     styles.statusFilter,
                     {
-                        backgroundColor: colors.inputBackground,
-                        borderColor: colors.border
-                    }
+                        backgroundColor: colors.cardBackground,
+                        borderColor: selectedStatus ? colors.activeTabColor : colors.border,
+                    },
                 ]}
                 onPress={onStatusPress}
+                android_ripple={{ color: 'rgba(23, 118, 186, 0.08)' }}
             >
-                <Text style={[
-                    styles.statusFilterText,
-                    { color: selectedStatus ? colors.text : colors.placeholder }
-                ]}>
+                <View style={styles.iconBlock}>
+                    <MaterialCommunityIcons
+                        name="filter-variant"
+                        size={20}
+                        color={selectedStatus ? colors.activeTabColor : colors.icon}
+                    />
+                </View>
+                <Text
+                    style={[
+                        styles.statusFilterText,
+                        { color: selectedStatus ? colors.text : colors.placeholder },
+                    ]}
+                    numberOfLines={1}
+                >
                     {selectedStatusLabel}
                 </Text>
                 <MaterialCommunityIcons name="chevron-down" size={20} color={colors.secondaryText} />
@@ -69,28 +89,45 @@ export const BookingFilters: React.FC<BookingFiltersProps> = ({
 
 const styles = StyleSheet.create({
     container: {
-        padding: 16,
-        gap: 12,
+        paddingHorizontal: 16,
+        paddingTop: 14,
+        paddingBottom: 8,
+        gap: 10,
+    },
+    searchField: {
+        borderRadius: 10,
+        borderWidth: 1,
+        minHeight: 48,
+        paddingHorizontal: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    iconBlock: {
+        width: 32,
+        height: 32,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     searchInput: {
-        borderRadius: 8,
-        paddingHorizontal: 16,
-        paddingVertical: 12,
+        flex: 1,
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        borderWidth: 1,
+        paddingVertical: 10,
     },
     statusFilter: {
-        borderRadius: 8,
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
+        borderRadius: 10,
         borderWidth: 1,
+        minHeight: 48,
+        paddingHorizontal: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
     },
     statusFilterText: {
+        flex: 1,
         fontSize: 14,
-        fontFamily: 'Ubuntu_Regular',
+        fontFamily: 'Ubuntu_Medium',
     },
 });

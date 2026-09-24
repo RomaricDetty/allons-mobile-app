@@ -11,7 +11,6 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     Animated,
     Dimensions,
     PanResponder,
@@ -24,6 +23,8 @@ import {
 } from 'react-native';
 import MapView, { Circle, Marker, Polyline, PROVIDER_DEFAULT } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { showAlert } from '@/utils/alert';
+import { BackButton } from '@/components/ui/BackButton';
 
 interface OSMBusTrackerProps {
     tripId: string;
@@ -128,9 +129,9 @@ export default function OSMBusTracker({ tripId, bookingDetails }: OSMBusTrackerP
         panel: colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF',
         listItem: colorScheme === 'dark' ? '#2C2C2E' : '#F8F8F8',
         iconCircle: colorScheme === 'dark' ? '#2C2C2E' : '#F8F8F8',
-        accent: '#6A5ACD',
-        accentLight: 'rgba(106, 90, 205, 0.1)',
-        accentMedium: 'rgba(106, 90, 205, 0.3)',
+        accent: '#1776BA',
+        accentLight: 'rgba(23, 118, 186, 0.1)',
+        accentMedium: 'rgba(23, 118, 186, 0.3)',
     }), [colorScheme]);
 
     /**
@@ -235,7 +236,7 @@ export default function OSMBusTracker({ tripId, bookingDetails }: OSMBusTrackerP
             const { status } = await Location.requestForegroundPermissionsAsync();
             
             if (status !== 'granted') {
-                Alert.alert(
+                showAlert(
                     'Permission refusée',
                     "L'accès à la localisation est nécessaire pour afficher votre position"
                 );
@@ -570,7 +571,7 @@ export default function OSMBusTracker({ tripId, bookingDetails }: OSMBusTrackerP
             case 'approaching':
                 return 'navigate-circle';
             default:
-                return 'ellipse-outline';
+                return 'ellipse';
         }
     }, []);
 
@@ -748,13 +749,13 @@ export default function OSMBusTracker({ tripId, bookingDetails }: OSMBusTrackerP
 
             {/* En-tête de navigation */}
             <View style={[styles.header, { backgroundColor: themeColors.header, paddingTop: insets.top }]}>
-                <TouchableOpacity
-                    style={styles.headerButton}
+                <BackButton
                     onPress={() => router.back()}
-                    activeOpacity={0.7}
-                >
-                    <Ionicons name="arrow-back" size={24} color={themeColors.text} />
-                </TouchableOpacity>
+                    color={themeColors.text}
+                    backgroundColor={themeColors.panel}
+                    bordered
+                    borderColor={themeColors.border ?? 'rgba(0,0,0,0.12)'}
+                />
                 <Text style={[styles.headerTitle, { color: themeColors.text }]}>Suivi en direct</Text>
                 <View style={styles.headerRight}>
                     {/* Indicateur de connexion */}
@@ -959,18 +960,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingBottom: 16,
         paddingHorizontal: 20,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 4,
-    },
-    headerButton: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        justifyContent: 'center',
-        alignItems: 'center',
+        borderBottomWidth: 1,
+        borderBottomColor: '#E0E0E0',
     },
     headerTitle: {
         fontSize: 18,
@@ -989,41 +980,31 @@ const styles = StyleSheet.create({
         borderColor: '#fff',
     },
     busMarker: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 3,
-        borderColor: 'white',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.3,
-        shadowRadius: 4,
-        elevation: 6,
-    },
-    stopMarker: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+        width: 40,
+        height: 40,
+        borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 2,
         borderColor: 'white',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.2,
-        shadowRadius: 2,
-        elevation: 3,
+    },
+    stopMarker: {
+        width: 28,
+        height: 28,
+        borderRadius: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: 'white',
     },
     nearestStopMarker: {
-        borderColor: '#4CAF50',
-        borderWidth: 3,
-        transform: [{ scale: 1.15 }],
+        borderColor: '#2D7A4F',
+        borderWidth: 2,
+        transform: [{ scale: 1.1 }],
     },
     selectedStopMarker: {
-        borderColor: '#FF9800',
-        borderWidth: 3,
+        borderColor: '#1776BA',
+        borderWidth: 2,
     },
     stopMarkerNumber: {
         color: 'white',
@@ -1032,39 +1013,31 @@ const styles = StyleSheet.create({
         fontFamily: 'Ubuntu_Bold',
     },
     userMarker: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: 'rgba(106, 90, 205, 0.2)',
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        backgroundColor: 'rgba(23, 118, 186, 0.2)',
         justifyContent: 'center',
         alignItems: 'center',
     },
     userMarkerInner: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+        width: 28,
+        height: 28,
+        borderRadius: 8,
         justifyContent: 'center',
         alignItems: 'center',
-        borderWidth: 3,
+        borderWidth: 2,
         borderColor: 'white',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.3,
-        shadowRadius: 3,
-        elevation: 5,
     },
     infoPanel: {
         position: 'absolute',
         bottom: 0,
         left: 0,
         right: 0,
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-        elevation: 8,
+        borderTopLeftRadius: 12,
+        borderTopRightRadius: 12,
+        borderTopWidth: 1,
+        borderTopColor: '#E0E0E0',
         overflow: 'hidden',
     },
     panelHandle: {
@@ -1079,7 +1052,7 @@ const styles = StyleSheet.create({
     destinationCard: {
         marginHorizontal: 20,
         marginBottom: 12,
-        borderRadius: 16,
+        borderRadius: 12,
         padding: 16,
     },
     destinationCardContent: {
@@ -1140,15 +1113,12 @@ const styles = StyleSheet.create({
         gap: 12,
     },
     floatingButton: {
-        width: 56,
-        height: 56,
-        borderRadius: 28,
+        width: 44,
+        height: 44,
+        borderRadius: 10,
         justifyContent: 'center',
         alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 4,
-        elevation: 5,
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
     },
 });

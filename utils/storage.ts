@@ -64,6 +64,7 @@ export const clearAuthData = async (): Promise<void> => {
             'expires_at',
             'token_type',
             'user_id',
+            'user_profile',
         ]);
     } catch (error) {
         console.error('Erreur lors de la suppression des données d\'authentification:', error);

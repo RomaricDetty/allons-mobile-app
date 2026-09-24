@@ -4,23 +4,45 @@ import { useThemeColor } from '@/hooks/use-theme-color';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Dimensions, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+    ActivityIndicator,
+    Animated,
+    Dimensions,
+    Keyboard,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { authRegister } from '../../api/auth_register';
 import { isValidEmail, isValidPhone } from '../../constants/functions';
-import { COUNTRY_CODES, FormErrors, RegisterData, SignUpFormData, SignUpScreenProps } from '../../interfaces';
+import {
+    COUNTRY_CODES,
+    FormErrors,
+    RegisterData,
+    SignUpFormData,
+    SignUpScreenProps,
+} from '../../interfaces';
 import { Civility, PhoneType } from '../../types';
 import { SelectField } from '../passengers/SelectField';
 import { SelectionBottomSheet } from '../passengers/SelectionBottomSheet';
 import { AuthFormField } from './AuthFormField';
 import { Checkbox } from './Checkbox';
 import { PasswordField } from './PasswordField';
+import { showAlert } from '@/utils/alert';
+import { useAuth } from '@/contexts/AuthContext';
+import { AppButton } from '@/components/ui/AppButton';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
-
 export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) => {
+    const { setSessionUser } = useAuth();
     const insets = useSafeAreaInsets();
     const colorScheme = useColorScheme() ?? 'light';
 
@@ -464,15 +486,20 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
                         }
 
                         await AsyncStorage.setItem('user_id', user.id);
+                        await setSessionUser({
+                            ...user,
+                            firstName: user.firstName || formData.firstName,
+                            lastName: user.lastName || formData.lastName,
+                        });
                     } catch (storageError) {
                         console.error('Erreur lors du stockage des données:', storageError);
-                        Alert.alert('Erreur', 'Impossible de sauvegarder les informations de connexion. Veuillez réessayer.');
+                        showAlert('Erreur', 'Impossible de sauvegarder les informations de connexion. Veuillez réessayer.');
                         setIsLoading(false);
                         return;
                     }
 
                     // Affiche le message de succès
-                    Alert.alert(
+                    showAlert(
                         'Succès !',
                         'Votre inscription a été effectuée avec succès.',
                         [
@@ -503,7 +530,7 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
                 } else {
                     // Gestion des autres codes de statut
                     const errorMessage = response?.data?.message || 'Une erreur est survenue lors de l\'inscription';
-                    Alert.alert('Attention !', errorMessage);
+                    showAlert('Attention !', errorMessage);
                     setIsLoading(false);
                     return;
                 }
@@ -535,14 +562,13 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
                     errorMessage = apiError;
                 }
                 console.log('Erreur API : ', apiError);
-                Alert.alert('Attention !', errorMessage);
+                showAlert('Attention !', errorMessage);
             }
 
             setIsLoading(false);
             return;
         }
     };
-
 
     /**
      * Ouvre le bottom sheet pour la civilité
@@ -587,7 +613,6 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
     };
 
     const selectedCivility = civilityOptions.find(opt => opt.value === formData.civility);
-
 
     return (
         <>
@@ -959,9 +984,11 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
                             </View>
                         </View>
 
-                        <Pressable style={styles.primaryButton} onPress={handleSignUp}>
-                            <Text style={styles.primaryButtonText}>Inscription</Text>
-                        </Pressable>
+                        <AppButton
+                            title="Inscription"
+                            onPress={handleSignUp}
+                            style={{ marginBottom: 16 }}
+                        />
 
                         {/* <View style={styles.separator}>
                         <View style={[styles.separatorLine, { backgroundColor: separatorLineColor }]} />
@@ -1158,25 +1185,6 @@ const styles = StyleSheet.create({
         marginTop: 8,
         marginBottom: 8,
         paddingHorizontal: 4,
-    },
-    primaryButton: {
-        // backgroundColor: '#1776BA',
-        // borderRadius: 8,
-        // paddingVertical: 14,
-        // alignItems: 'center',
-        // justifyContent: 'center',
-        // marginBottom: 24,
-        backgroundColor: '#1776BA',
-        borderRadius: 16,
-        paddingVertical: 16,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 16,
-    },
-    primaryButtonText: {
-        fontSize: 16,
-        fontFamily: 'Ubuntu_Bold',
-        color: '#FFFFFF',
     },
     separator: {
         flexDirection: 'row',

@@ -1,8 +1,13 @@
 // @ts-nocheck
 import { getFeesAndTaxesQuote } from '@/api/booking';
-import { FixedButton, Header, ProgressBar, SeatSelectionButton, SelectedSeatsDisplay } from '@/components/passengers-info';
+import {
+    FixedButton,
+    Header,
+    ProgressBar,
+    SeatSelectionButton,
+    SelectedSeatsDisplay,
+} from '@/components/passengers-info';
 import { EmergencyContactBlock } from '@/components/passengers/EmergencyContactBlock';
-import { ErrorModal } from '@/components/passengers/ErrorModal';
 import { PassengersInfoBlock } from '@/components/passengers/PassengersInfoBlock';
 import { PaymentMethodBlock } from '@/components/passengers/PaymentMethodBlock';
 import { NoPaymentRequiredBlock, RebookingCodeBlock } from '@/components/passengers/RebookingCodeBlock';
@@ -17,12 +22,20 @@ import { usePaymentManagement } from '@/hooks/usePaymentManagement';
 import { useRebookingCode } from '@/hooks/useRebookingCode';
 import { useSeatsManagement } from '@/hooks/useSeatsManagement';
 import { SearchParams, Trip } from '@/types';
+import { showErrors } from '@/utils/alert';
 import { getAuthToken } from '@/utils/storage';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+    ActivityIndicator,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
 
 /**
  * Écran de saisie des informations passagers et paiement
@@ -58,8 +71,6 @@ const PassengersInfo = () => {
     const numberOfPersons = useMemo(() => searchParams?.numberOfPersons || 1, [searchParams?.numberOfPersons]);
     const isRoundTrip = useMemo(() => !!returnTrip, [returnTrip]);
 
-    const [showErrorModal, setShowErrorModal] = useState(false);
-    const [validationErrors, setValidationErrors] = useState<string[]>([]);
     const [feesTotal, setFeesTotal] = useState<number>(Number((route.params as any)?.feesAndTaxes?.feesTotal || 0));
     const [taxesTotal, setTaxesTotal] = useState<number>(Number((route.params as any)?.feesAndTaxes?.taxesTotal || 0));
     const [apiTotalAmount, setApiTotalAmount] = useState<number>(Number((route.params as any)?.feesAndTaxes?.totalAmount || 0));
@@ -179,7 +190,7 @@ const PassengersInfo = () => {
                     channel: 'MOBILE_APP',
                     paymentMethod: method,
                     paymentChannel: 'MOBILE_APP',
-                    // ...(provider ? { provider } : {}),
+                    ...(provider ? { provider } : {}),
                     passengers: buildFeesPassengersPayload(),
                     outboundDepartureId: trip.id,
                     ...(isRoundTrip && returnTrip?.id ? { returnDepartureId: returnTrip.id } : {}),
@@ -235,8 +246,7 @@ const PassengersInfo = () => {
         const errors = validateForm(selectedPaymentMethod, cardName, cardNumber, expirationDate, cardCvv, paymentNumber, pricing.totalAmount);
 
         if (errors) {
-            setValidationErrors(errors);
-            setShowErrorModal(true);
+            showErrors('Attention !', errors);
             return;
         }
 
@@ -438,13 +448,6 @@ const PassengersInfo = () => {
                 currentValue={currentSelectionValue}
                 onSelect={handleSelection}
                 onClose={closeSelectionBottomSheet}
-            />
-
-            <ErrorModal
-                visible={showErrorModal}
-                title="Attention !"
-                errors={validationErrors}
-                onClose={() => setShowErrorModal(false)}
             />
         </KeyboardAvoidingView>
     );

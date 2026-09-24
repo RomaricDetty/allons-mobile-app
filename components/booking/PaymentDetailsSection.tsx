@@ -58,7 +58,7 @@ export const PaymentDetailsSection = memo<PaymentDetailsSectionProps>(({
     return (
         <View style={[styles.sectionCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
             <View style={[styles.sectionHeader, { marginBottom: 20 }]}>
-                <Icon name="wallet-outline" size={20} color={primaryBlue} />
+                <Icon name="wallet" size={20} color={primaryBlue} />
                 <Text style={[styles.sectionTitle, { color: textColor }]}>Détails du paiement</Text>
             </View>
             

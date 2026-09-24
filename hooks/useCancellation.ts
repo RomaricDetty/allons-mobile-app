@@ -1,6 +1,6 @@
 import { cancelFullBooking, cancelPartialBooking, RefundOption } from '@/api/cancellation';
 import { useState, useMemo, useCallback } from 'react';
-import { Alert } from 'react-native';
+import { showAlert } from '@/utils/alert';
 
 interface Passenger {
     id?: string;
@@ -90,14 +90,14 @@ export const useCancellation = (ticketDetails: TicketDetails | null) => {
         );
         
         if (passenger && isPassengerCancelled(passenger)) {
-            Alert.alert('Passager déjà annulé', 'Ce passager ne peut pas être sélectionné.');
+            showAlert('Passager déjà annulé', 'Ce passager ne peut pas être sélectionné.');
             return;
         }
 
         setSelectedPassengers((prev) => {
             if (prev.includes(passengerId)) {
                 if (prev.length === 1) {
-                    Alert.alert('Attention', 'Vous devez sélectionner au moins un passager');
+                    showAlert('Attention', 'Vous devez sélectionner au moins un passager');
                     return prev;
                 }
                 return prev.filter(id => id !== passengerId);
@@ -118,12 +118,12 @@ export const useCancellation = (ticketDetails: TicketDetails | null) => {
      */
     const handleConfirmCancellation = useCallback(async () => {
         if (!cancellationReason.trim()) {
-            Alert.alert('Attention !', 'Veuillez indiquer la raison de l\'annulation');
+            showAlert('Attention !', 'Veuillez indiquer la raison de l\'annulation');
             return;
         }
 
         if (selectedPassengers.length === 0) {
-            Alert.alert('Attention !', 'Veuillez sélectionner au moins un passager');
+            showAlert('Attention !', 'Veuillez sélectionner au moins un passager');
             return;
         }
 
@@ -132,7 +132,7 @@ export const useCancellation = (ticketDetails: TicketDetails | null) => {
             ? `Annuler ${selectedPassengers.length} passager(s) sur ${activePassengersCount} ?`
             : 'Annuler toute la réservation ?';
 
-        Alert.alert('Confirmation', confirmMessage, [
+        showAlert('Confirmation', confirmMessage, [
             { text: 'Non', style: 'cancel' },
             {
                 text: 'Oui, annuler',
@@ -159,7 +159,7 @@ export const useCancellation = (ticketDetails: TicketDetails | null) => {
                         const errorMessage = error instanceof Error 
                             ? error.message 
                             : 'Une erreur est survenue';
-                        Alert.alert('Erreur', errorMessage);
+                        showAlert('Erreur', errorMessage);
                     } finally {
                         setIsSubmitting(false);
                     }

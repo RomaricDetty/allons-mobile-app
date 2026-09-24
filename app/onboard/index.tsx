@@ -1,10 +1,23 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { router } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-    Animated, Dimensions, Image,
-    ImageBackground, Platform, Pressable,
-    StyleSheet, Text, View, ViewToken
+    router } from 'expo-router';
+import React,
+    { useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState } from 'react';
+import {
+    Animated,
+    Dimensions,
+    Image,
+    ImageBackground,
+    Platform,
+    Pressable,
+    StyleSheet,
+    Text,
+    View,
+    ViewToken,
 } from 'react-native';
 
 /**
@@ -440,7 +453,7 @@ const styles = StyleSheet.create({
         height: 45,
         alignItems: 'center',
         justifyContent: 'center',
-        borderRadius: 100,
+        borderRadius: 10,
     },
     startButtonText: {
         color: '#ffffff',

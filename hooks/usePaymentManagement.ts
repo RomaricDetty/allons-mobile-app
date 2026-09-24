@@ -1,12 +1,26 @@
-import { createBooking, createBookingPayment, createRebookingBooking, RebookingPassengerPayload } from '@/api/booking';
+import {
+    createBooking,
+    createBookingPayment,
+    createRebookingBooking,
+    RebookingPassengerPayload,
+} from '@/api/booking';
+import { PAYMENT_RETURN_URL_PREFIX } from '@/constants/payment';
 import { mapUiPaymentMethod } from '@/constants/paymentMethods';
+import { PayBookingRequest } from '@/interfaces/payment';
+import { savePendingPayment } from '@/utils/pendingPayment';
+import { classifyPaymentReturnUrl } from '@/utils/paymentPolling';
+import { toInternationalPhone } from '@/utils/phoneFormat';
 import { getAuthToken, getUserId } from '@/utils/storage';
 import { CommonActions } from '@react-navigation/native';
+import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert } from 'react-native';
+import { showAlert } from '@/utils/alert';
+
+WebBrowser.maybeCompleteAuthSession();
 
 /**
- * Hook pour gérer le paiement
+ * Hook pour gérer le paiement Mobile Money (checkout PSP + deep link).
  */
 export const usePaymentManagement = (defaultCountryCode: string = '+225') => {
     const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string | null>(null);
@@ -17,7 +31,6 @@ export const usePaymentManagement = (defaultCountryCode: string = '+225') => {
     const [paymentNumber, setPaymentNumber] = useState('');
     const [paymentCountryCode, setPaymentCountryCode] = useState(defaultCountryCode);
 
-    // Reset des champs lors du changement de méthode
     useEffect(() => {
         setCardName('');
         setCardNumber('');
@@ -26,14 +39,10 @@ export const usePaymentManagement = (defaultCountryCode: string = '+225') => {
         setPaymentNumber('');
     }, [selectedPaymentMethod]);
 
-    // Mettre à jour le code pays du paiement quand le code par défaut change
     useEffect(() => {
         setPaymentCountryCode(defaultCountryCode);
     }, [defaultCountryCode]);
 
-    /**
-     * Construit le tableau passagers au format rebooking (phone en objet, leg, price).
-     */
     const buildRebookingPassengers = useCallback((
         passengers: any[],
         trip: any,
@@ -79,9 +88,86 @@ export const usePaymentManagement = (defaultCountryCode: string = '+225') => {
         return list;
     }, []);
 
-    /**
-     * Traite la réservation et le paiement (flux classique ou rebooking selon rebookingCode).
-     */
+    const navigateToConfirmation = useCallback((
+        navigation: any,
+        payload: {
+            bookingResponse: any;
+            paymentResponse: any;
+            trip: any;
+            returnTrip: any;
+            passengers: any[];
+            searchParams: any;
+            rebookingCode?: string;
+        }
+    ) => {
+        navigation.dispatch(
+            CommonActions.reset({
+                index: 0,
+                routes: [{
+                    name: 'trip/booking-confirmation' as any,
+                    params: payload,
+                }]
+            })
+        );
+    }, []);
+
+    const navigatePaymentResult = useCallback((
+        navigation: any,
+        bookingId: string,
+        kind: 'success' | 'error'
+    ) => {
+        navigation.dispatch(
+            CommonActions.reset({
+                index: 0,
+                routes: [{
+                    name: kind === 'success' ? 'payment/success' as any : 'payment/error' as any,
+                    params: kind === 'success'
+                        ? { bookingId }
+                        : { bookingId, reason: 'failed' },
+                }],
+            })
+        );
+    }, []);
+
+    const openCheckoutAndAwaitReturn = useCallback(async (
+        redirectUrl: string,
+        bookingId: string,
+        navigation: any
+    ) => {
+        let settled = false;
+
+        const settleFromUrl = (url: string) => {
+            const kind = classifyPaymentReturnUrl(url);
+            if (kind === 'unknown' || settled) return false;
+            settled = true;
+            WebBrowser.dismissBrowser().catch(() => undefined);
+            navigatePaymentResult(navigation, bookingId, kind);
+            return true;
+        };
+
+        const linkingSub = Linking.addEventListener('url', ({ url }) => {
+            settleFromUrl(url);
+        });
+
+        try {
+            const result = await WebBrowser.openAuthSessionAsync(
+                redirectUrl,
+                PAYMENT_RETURN_URL_PREFIX
+            );
+
+            if (!settled && result.type === 'success' && result.url) {
+                settleFromUrl(result.url);
+            }
+
+            if (!settled) {
+                // Fermeture manuelle : confirmation via polling sur l'écran succès.
+                navigatePaymentResult(navigation, bookingId, 'success');
+            }
+        } finally {
+            linkingSub.remove();
+        }
+    }, [navigatePaymentResult]);
+
     const processBookingAndPayment = useCallback(async (
         trip: any,
         returnTrip: any,
@@ -96,11 +182,11 @@ export const usePaymentManagement = (defaultCountryCode: string = '+225') => {
         try {
             const userId = await getUserId() || null;
             const token = await getAuthToken() || null;
+            const { method: paymentMethod, provider } = mapUiPaymentMethod(selectedPaymentMethod);
 
             let bookingResponse: any;
 
             if (rebookingCode?.trim()) {
-                console.log("rebookingCode ==>, ", rebookingCode)
                 const rebookingPassengers = buildRebookingPassengers(passengers, trip, returnTrip, isRoundTrip, userId);
                 const rebookingPayload = {
                     tokenCode: rebookingCode.trim(),
@@ -111,9 +197,7 @@ export const usePaymentManagement = (defaultCountryCode: string = '+225') => {
                     returnDepartureTripId: isRoundTrip && returnTrip ? returnTrip.departureTripId : null,
                 };
                 bookingResponse = await createRebookingBooking(rebookingPayload, token || '');
-                console.log("bookingResponse ==>, ", bookingResponse.data)
             } else {
-                console.log("rebookingCode non trouvé ==>, ", rebookingCode)
                 const tripType = isRoundTrip ? 'ROUND_TRIP' : 'ONE_WAY';
                 const contact = {
                     firstName: emergencyContact.firstName.trim() || '',
@@ -161,9 +245,10 @@ export const usePaymentManagement = (defaultCountryCode: string = '+225') => {
                     ...(isRoundTrip && returnTrip ? { returnDepartureId: returnTrip.id } : {}),
                     type: tripType,
                     channel: 'MOBILE_APP',
-                    paymentMethod: 'MOBILE_MONEY',
+                    paymentMethod,
                     paymentChannel: 'MOBILE_APP',
-                    paymentProvider: mapUiPaymentMethod(selectedPaymentMethod).provider,
+                    paymentProvider: provider,
+                    currency: trip.currency || 'XOF',
                     contact,
                     passengers: passengersData,
                     totalAmount: pricing.totalAmount
@@ -181,83 +266,117 @@ export const usePaymentManagement = (defaultCountryCode: string = '+225') => {
             const noPaymentRequired = pricing.totalAmount === 0;
 
             if (noPaymentRequired) {
-                const paymentResponse = {
-                    data: {
-                        status: 'PAID',
-                        amount: 0,
-                        currency: trip.currency || 'XOF',
-                        bookingId,
-                        method: 'REBOOKING',
-                        provider: 'REBOOKING'
+                navigateToConfirmation(navigation, {
+                    bookingResponse,
+                    paymentResponse: {
+                        data: {
+                            status: 'PAID',
+                            amount: 0,
+                            currency: trip.currency || 'XOF',
+                            bookingId,
+                            method: 'REBOOKING',
+                            provider: 'REBOOKING'
+                        },
+                        status: 200
                     },
-                    status: 200
-                };
-                navigation.dispatch(
-                    CommonActions.reset({
-                        index: 0,
-                        routes: [{
-                            name: 'trip/booking-confirmation' as any,
-                            params: {
-                                bookingResponse,
-                                paymentResponse,
-                                trip,
-                                returnTrip,
-                                passengers,
-                                searchParams,
-                                rebookingCode
-                            }
-                        }]
-                    })
-                );
+                    trip,
+                    returnTrip,
+                    passengers,
+                    searchParams,
+                    rebookingCode
+                });
                 return;
             }
 
-            const { method: paymentMethod, provider } = mapUiPaymentMethod(selectedPaymentMethod);
-            const phoneNumber = passengers[0]?.phone?.trim() || emergencyContact.phone.trim();
-            const paymentData = {
+            if (paymentMethod === 'MOBILE_MONEY' && !provider) {
+                throw new Error('Sélectionnez un wallet Mobile Money (Wave, Orange ou MTN).');
+            }
+
+            const rawPhone = paymentNumber.trim() || passengers[0]?.phone?.trim() || emergencyContact.phone.trim();
+            const phoneNumber = toInternationalPhone(
+                paymentCountryCode || passengers[0]?.countryCode || '+225',
+                rawPhone
+            );
+
+            const paymentData: PayBookingRequest = {
                 bookingId,
                 method: paymentMethod,
-                provider,
+                provider: provider || undefined,
                 amount: pricing.totalAmount,
                 channel: 'MOBILE_APP',
                 currency: trip.currency || 'XOF',
                 rawPayload: {
-                    cardNumber: selectedPaymentMethod === 'credit-card' ? cardNumber.replace(/\s/g, '') : null,
-                    cardName: selectedPaymentMethod === 'credit-card' ? cardName.trim() : null,
-                    expiryDate: selectedPaymentMethod === 'credit-card' ? expirationDate.trim() : null,
-                    cvv: selectedPaymentMethod === 'credit-card' ? cardCvv : null,
-                    phoneNumber: selectedPaymentMethod !== 'credit-card' ? (paymentNumber.trim() || phoneNumber) : null
-                }
+                    PaymentInfo: {
+                        phoneNumber,
+                    },
+                },
             };
+
             const paymentResponse = await createBookingPayment(paymentData, token || '');
 
-            if (paymentResponse.status === 200 || paymentResponse.status === 201) {
-                navigation.dispatch(
-                    CommonActions.reset({
-                        index: 0,
-                        routes: [{
-                            name: 'trip/booking-confirmation' as any,
-                            params: {
-                                bookingResponse,
-                                paymentResponse,
-                                trip,
-                                returnTrip,
-                                passengers,
-                                searchParams,
-                                rebookingCode
-                            }
-                        }]
-                    })
-                );
-            } else {
+            if (paymentResponse.status !== 200 && paymentResponse.status !== 201) {
                 throw new Error('Erreur paiement');
             }
+
+            const payData = paymentResponse.data;
+            const paymentStatus = (payData.paymentStatus || payData.status || '').toUpperCase();
+            const redirectUrl = payData.redirectUrl;
+
+            if (
+                !redirectUrl &&
+                (paymentStatus === 'SUCCEEDED' || paymentStatus === 'PAID')
+            ) {
+                navigateToConfirmation(navigation, {
+                    bookingResponse,
+                    paymentResponse,
+                    trip,
+                    returnTrip,
+                    passengers,
+                    searchParams,
+                    rebookingCode,
+                });
+                return;
+            }
+
+            if (!redirectUrl) {
+                throw new Error('Pas d\'URL de checkout. Réessayez ou changez de wallet.');
+            }
+
+            await savePendingPayment({
+                bookingId,
+                paymentId: payData.paymentId,
+                expiresAt: payData.expiresAt,
+                bookingResponse: bookingResponse.data,
+                paymentInitResponse: payData,
+                trip,
+                returnTrip,
+                passengers,
+                searchParams,
+                rebookingCode,
+                emergencyContact,
+                feesAndTaxes: {
+                    feesTotal: pricing.feesTotal,
+                    taxesTotal: pricing.taxesTotal,
+                    totalAmount: pricing.totalAmount,
+                },
+                createdAt: new Date().toISOString(),
+                phase: 'checkout',
+            });
+
+            await openCheckoutAndAwaitReturn(redirectUrl, bookingId, navigation);
         } catch (error: any) {
             console.error('Erreur réservation:', error);
-            Alert.alert('Erreur', error?.response?.data?.message || error?.message || 'Erreur lors de la réservation');
+            showAlert('Erreur', error?.response?.data?.message || error?.message || 'Erreur lors de la réservation');
             throw error;
         }
-    }, [selectedPaymentMethod, cardName, cardNumber, expirationDate, cardCvv, paymentNumber, buildRebookingPassengers]);
+    }, [
+        selectedPaymentMethod,
+        paymentNumber,
+        paymentCountryCode,
+        buildRebookingPassengers,
+        navigateToConfirmation,
+        openCheckoutAndAwaitReturn,
+    ]);
 
     return {
         selectedPaymentMethod,

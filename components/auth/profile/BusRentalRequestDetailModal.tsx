@@ -7,10 +7,19 @@ import * as FileSystemLegacy from 'expo-file-system/legacy';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import React from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+    ActivityIndicator,
+    Modal,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { BusRentalRequestItem } from './BusRentalRequestCard';
+import { showAlert } from '@/utils/alert';
 
 const TRIP_TYPE_LABELS: Record<string, string> = {
     ONE_WAY: 'Aller simple',
@@ -170,11 +179,11 @@ export function BusRentalRequestDetailModal({
                     dialogTitle: 'Télécharger le reçu',
                 });
             } else {
-                Alert.alert('Succès', `Le reçu a été sauvegardé dans vos documents.\n\nFichier: ${finalFileName}`);
+                showAlert('Succès', `Le reçu a été sauvegardé dans vos documents.\n\nFichier: ${finalFileName}`);
             }
         } catch (error) {
             console.error('Erreur lors de la génération du reçu de location:', error);
-            Alert.alert('Erreur', 'Une erreur est survenue lors de la génération du reçu. Veuillez réessayer.');
+            showAlert('Erreur', 'Une erreur est survenue lors de la génération du reçu. Veuillez réessayer.');
         } finally {
             setIsGeneratingReceipt(false);
         }

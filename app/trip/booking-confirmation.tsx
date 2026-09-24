@@ -17,17 +17,18 @@ import * as Sharing from 'expo-sharing';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     BackHandler,
     Pressable,
     ScrollView,
     StyleSheet,
     Text,
-    View
+    View,
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { showAlert } from '@/utils/alert';
+import { AppButton } from '@/components/ui/AppButton';
 
 /**
  * Écran de confirmation de réservation (Étape 3 sur 3)
@@ -81,7 +82,6 @@ const BookingConfirmation = () => {
             passengers,
         });
     }, [bookingResponse, paymentResponse, trip, returnTrip, passengers]);
-
 
     /**
      * Empêche le retour en arrière depuis cet écran
@@ -138,7 +138,6 @@ const BookingConfirmation = () => {
         };
         return methodMap[method] || method;
     }, []);
-
 
     /**
      * Formate la date au format YYMMDDHHmmss pour le nom de fichier
@@ -200,7 +199,7 @@ const BookingConfirmation = () => {
                     dialogTitle: 'Télécharger le reçu',
                 });
             } else {
-                Alert.alert(
+                showAlert(
                     'Succès',
                     `Le reçu a été sauvegardé dans vos documents.\n\nFichier: ${finalFileName}`,
                     [{ text: 'OK' }]
@@ -208,7 +207,7 @@ const BookingConfirmation = () => {
             }
         } catch (error) {
             console.error('Erreur lors de la génération du PDF:', error);
-            Alert.alert(
+            showAlert(
                 'Erreur',
                 'Une erreur est survenue lors de la génération du PDF. Veuillez réessayer.'
             );
@@ -293,13 +292,13 @@ const BookingConfirmation = () => {
 
             {/* Indicateurs de progression */}
             <View style={[styles.progressIndicators, { backgroundColor: headerBackgroundColor }]}>
-                <View style={[styles.progressDot, { backgroundColor: '#4CAF50' }]}>
+                <View style={[styles.progressDot, { backgroundColor: colors.success }]}>
                     <Icon name="check" size={12} color="#FFFFFF" />
                 </View>
-                <View style={[styles.progressDot, { backgroundColor: '#4CAF50' }]}>
+                <View style={[styles.progressDot, { backgroundColor: colors.success }]}>
                     <Icon name="check" size={12} color="#FFFFFF" />
                 </View>
-                <View style={[styles.progressDot, { backgroundColor: '#4CAF50' }]}>
+                <View style={[styles.progressDot, { backgroundColor: colors.success }]}>
                     <Icon name="check" size={12} color="#FFFFFF" />
                 </View>
             </View>
@@ -311,8 +310,8 @@ const BookingConfirmation = () => {
             >
                 {/* Message de succès */}
                 <View style={[styles.successCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
-                    <Icon name="check-circle" size={48} color="#4CAF50" />
-                    <Text style={[styles.successTitle, { color: textColor }]}>Réservation confirmée !</Text>
+                    <Icon name="check" size={24} color={colors.success} />
+                    <Text style={[styles.successTitle, { color: textColor }]}>Réservation confirmée</Text>
                     <Text style={[styles.successMessage, { color: secondaryTextColor }]}>
                         Votre réservation a été créée avec succès. Vous pouvez télécharger votre reçu ci-dessous.
                     </Text>
@@ -403,7 +402,7 @@ const BookingConfirmation = () => {
                         {/* Passagers - Voyage aller */}
                         <View style={[styles.sectionCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
                             <View style={styles.sectionHeader}>
-                                <Icon name="account-group-outline" size={20} color={primaryBlue} />
+                                <Icon name="account-group" size={20} color={primaryBlue} />
                                 <Text style={[styles.sectionTitle, { color: textColor }]}>
                                     Passagers - Voyage aller ({bookingData.passengers.length})
                                 </Text>
@@ -425,7 +424,7 @@ const BookingConfirmation = () => {
                         {/* Passagers - Voyage retour */}
                         <View style={[styles.sectionCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
                             <View style={styles.sectionHeader}>
-                                <Icon name="account-group-outline" size={20} color={primaryBlue} />
+                                <Icon name="account-group" size={20} color={primaryBlue} />
                                 <Text style={[styles.sectionTitle, { color: textColor }]}>
                                     Passagers - Voyage retour ({bookingData.passengers.length})
                                 </Text>
@@ -448,7 +447,7 @@ const BookingConfirmation = () => {
                     /* Passagers - Voyage simple */
                     <View style={[styles.sectionCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
                         <View style={styles.sectionHeader}>
-                            <Icon name="account-group-outline" size={20} color={primaryBlue} />
+                            <Icon name="account-group" size={20} color={primaryBlue} />
                             <Text style={[styles.sectionTitle, { color: textColor }]}>
                                 {bookingData.passengers.length > 1 ? 'Passagers' : 'Passager'} ({bookingData.passengers.length})
                             </Text>
@@ -509,15 +508,12 @@ const BookingConfirmation = () => {
                 </Pressable>
 
                 {/* Bouton pour retourner à l'accueil */}
-                <Pressable
-                    style={[styles.homeButtonBottom, { backgroundColor: primaryBlue }]}
+                <AppButton
+                    title="Retour à l'accueil"
                     onPress={handleNavigateToHome}
-                >
-                    <Icon name="home" size={20} color="#FFFFFF" />
-                    <Text style={styles.homeButtonText}>
-                        Retour à l'accueil
-                    </Text>
-                </Pressable>
+                    icon={<Icon name="home" size={20} color="#FFFFFF" />}
+                    style={{ backgroundColor: primaryBlue, marginTop: 16 }}
+                />
             </ScrollView>
         </View>
     );
@@ -534,9 +530,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingBottom: 12,
         borderBottomWidth: 1,
-    },
-    backButton: {
-        padding: 8,
     },
     homeButton: {
         padding: 8,
@@ -599,22 +592,22 @@ const styles = StyleSheet.create({
         paddingBottom: 32,
     },
     successCard: {
-        borderRadius: 12,
-        padding: 20,
+        borderRadius: 10,
+        padding: 16,
         marginBottom: 16,
         borderWidth: 1,
-        alignItems: 'center',
+        alignItems: 'flex-start',
+        gap: 6,
     },
     successTitle: {
-        fontSize: 20,
+        fontSize: 18,
         fontFamily: 'Ubuntu_Bold',
-        marginTop: 12,
-        marginBottom: 8,
+        marginTop: 4,
     },
     successMessage: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        textAlign: 'center',
+        textAlign: 'left',
         lineHeight: 20,
     },
     blueHeader: {
@@ -682,21 +675,6 @@ const styles = StyleSheet.create({
     actionButtonText: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Medium',
-    },
-    homeButtonBottom: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 14,
-        paddingHorizontal: 16,
-        borderRadius: 8,
-        marginTop: 16,
-        gap: 8,
-    },
-    homeButtonText: {
-        fontSize: 16,
-        fontFamily: 'Ubuntu_Bold',
-        color: '#FFFFFF',
     },
 });
 

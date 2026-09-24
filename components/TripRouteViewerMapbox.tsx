@@ -12,23 +12,17 @@ import { geocodingService } from "@/services/geocodingService";
 import { routingService } from "@/services/routingService";
 import { PassengerLocation } from "@/types/tracking";
 import { Ionicons } from "@expo/vector-icons";
-import Mapbox, {
+import { BackButton } from "@/components/ui/BackButton";
+import Mapbox,
+    {
     Camera,
     MapView,
-} from "@rnmapbox/maps";
+    } from "@rnmapbox/maps";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
-import {
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
-    type ElementRef,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ElementRef } from "react";
 import {
     ActivityIndicator,
-    Alert,
     Animated,
     InteractionManager,
     PanResponder,
@@ -38,8 +32,9 @@ import {
     TouchableOpacity,
     useWindowDimensions,
     View,
-} from "react-native";
+} from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { showAlert } from '@/utils/alert';
 
 // Initialisation de Mapbox avec le token
 // Import des images
@@ -51,11 +46,11 @@ const userLocationPinImage = require("@/assets/images/user-location-pin.png");
 // Constantes de couleurs
 const COLORS = {
     ACCENT: "#1776BA",
-    ACCENT_LIGHT: "rgba(106, 90, 205, 0.1)",
-    START_MARKER: "#4CAF50",
-    END_MARKER: "#F44336",
-    ROUTE_BLUE: "#2196F3",
-    ERROR: "#F44336",
+    ACCENT_LIGHT: "rgba(23, 118, 186, 0.1)",
+    START_MARKER: "#2D7A4F",
+    END_MARKER: "#C44747",
+    ROUTE_BLUE: "#1776BA",
+    ERROR: "#C44747",
     WHITE: "#fff",
     DARK_CARD: "#1C1C1E",
     DARK_BORDER: "#3A3A3C",
@@ -530,7 +525,7 @@ export default function TripRouteViewerMapbox({
 
             const { status } = await Location.requestForegroundPermissionsAsync();
             if (status !== "granted") {
-                Alert.alert(
+                showAlert(
                     "Permission refusée",
                     "L'accès à la localisation est nécessaire pour afficher votre position",
                 );
@@ -892,7 +887,7 @@ export default function TripRouteViewerMapbox({
             try {
                 const { status } = await Location.requestForegroundPermissionsAsync();
                 if (status !== "granted") {
-                    Alert.alert(
+                    showAlert(
                         "Permission refusée",
                         "L'accès à la localisation est nécessaire pour afficher votre position",
                     );
@@ -985,7 +980,7 @@ export default function TripRouteViewerMapbox({
      * Affiche les infos de la gare de départ et centre la carte sur le drapeau.
      */
     const handleStartPointPress = useCallback(() => {
-        Alert.alert("Point de départ", startStationMessage);
+        showAlert("Point de départ", startStationMessage);
         centerOnStartPoint();
     }, [startStationMessage, centerOnStartPoint]);
 
@@ -993,7 +988,7 @@ export default function TripRouteViewerMapbox({
      * Affiche les infos de la gare d'arrivée et centre la carte sur le drapeau.
      */
     const handleEndPointPress = useCallback(() => {
-        Alert.alert("Point d'arrivée", endStationMessage);
+        showAlert("Point d'arrivée", endStationMessage);
         centerOnEndPoint();
     }, [endStationMessage, centerOnEndPoint]);
 
@@ -1184,11 +1179,6 @@ export default function TripRouteViewerMapbox({
         [insets.top],
     );
 
-    const headerButtonStyle = useMemo(
-        () => [styles.headerButton, { backgroundColor: backgroundColor }],
-        [backgroundColor],
-    );
-
     const panelHeightInterpolation = useMemo(
         () =>
             panelHeightAnim.interpolate({
@@ -1376,15 +1366,12 @@ export default function TripRouteViewerMapbox({
 
             {/* En-tête de navigation */}
             <View style={headerStyle}>
-                <TouchableOpacity
-                    style={headerButtonStyle}
+                <BackButton
                     onPress={handleBackPress}
-                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                    accessibilityRole="button"
-                    accessibilityLabel="Retour"
-                >
-                    <Ionicons name="arrow-back" size={20} color={textColor} />
-                </TouchableOpacity>
+                    color={textColor}
+                    backgroundColor={backgroundColor}
+                    bordered
+                />
             </View>
 
             <RecenterRouteButton
@@ -1485,13 +1472,6 @@ const styles = StyleSheet.create({
         alignItems: "center",
         paddingBottom: 16,
         paddingHorizontal: 20,
-    },
-    headerButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        justifyContent: "center",
-        alignItems: "center",
     },
     headerTitle: {
         fontSize: 18,

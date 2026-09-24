@@ -3,7 +3,7 @@ import { refreshTokenApi } from '@/api/auth_register';
 import { ProfileScreen } from '@/components/auth/ProfileScreen';
 import { SignInScreen } from '@/components/auth/SignInScreen';
 import { SignUpScreen } from '@/components/auth/SignUpScreen';
-import { clearAuthData } from '@/utils/storage';
+import { useAuth } from '@/contexts/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -15,9 +15,9 @@ type AuthScreen = 'signup' | 'signin';
  * Écran de profil principal qui gère l'affichage des écrans d'authentification et de profil
  */
 export default function TabTwoScreen() {
+    const { isAuthenticated, signOut } = useAuth();
     const [isSignedIn, setIsSignedIn] = useState(false);
     const [currentScreen, setCurrentScreen] = useState<AuthScreen>('signin');
-    // const [user, setUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     /**
@@ -26,6 +26,13 @@ export default function TabTwoScreen() {
     useEffect(() => {
         checkUserSession();
     }, []);
+
+    // Garde l'onglet profil aligné sur la session globale (login / logout)
+    useEffect(() => {
+        if (isAuthenticated) {
+            setIsSignedIn(true);
+        }
+    }, [isAuthenticated]);
 
     /**
      * Vérifie la session utilisateur au chargement de l'écran
@@ -75,7 +82,7 @@ export default function TabTwoScreen() {
                 } catch (refreshError: any) {
                     console.error('Erreur lors du rafraîchissement du token:', refreshError);
                     // Si le refresh token est invalide, nettoyer les données
-                    await clearAuthData();
+                    await signOut();
                     setIsSignedIn(false);
                     setCurrentScreen('signin');
                     return;
@@ -104,7 +111,7 @@ export default function TabTwoScreen() {
                     
                     if (expiresAtDate < currentDate) {
                         // Le token a expiré, nettoyer les données
-                        await clearAuthData();
+                        await signOut();
                         setIsSignedIn(false);
                         setCurrentScreen('signin');
                         return;
@@ -112,7 +119,7 @@ export default function TabTwoScreen() {
                 } catch (dateError) {
                     console.error('Erreur lors de la vérification de la date d\'expiration:', dateError);
                     // Si la date est invalide, considérer le token comme expiré
-                    await clearAuthData();
+                    await signOut();
                     setIsSignedIn(false);
                     setCurrentScreen('signin');
                     return;
@@ -124,7 +131,7 @@ export default function TabTwoScreen() {
                 setIsSignedIn(true);
             } else {
                 // Pas de token valide, nettoyer les données
-                await clearAuthData();
+                await signOut();
                 setIsSignedIn(false);
                 setCurrentScreen('signin');
             }
@@ -132,7 +139,7 @@ export default function TabTwoScreen() {
             console.error('Erreur lors de la vérification de la session:', error);
             // En cas d'erreur, nettoyer les données et déconnecter
             try {
-                await clearAuthData();
+                await signOut();
             } catch (cleanupError) {
                 console.error('Erreur lors du nettoyage:', cleanupError);
             }

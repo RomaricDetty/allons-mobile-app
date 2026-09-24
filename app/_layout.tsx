@@ -8,9 +8,13 @@ import 'react-native-reanimated';
 
 import { ConnectivityGuard } from '@/components/ConnectivityGuard';
 import CustomSplashScreen from '@/components/custom-splashscreen';
+import { AuthProvider } from '@/contexts/AuthContext';
 import { ConnectivityProvider } from '@/contexts/ConnectivityContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { usePendingPaymentRecovery } from '@/hooks/usePendingPaymentRecovery';
+import { usePaymentNotificationResponse } from '@/hooks/usePaymentNotificationResponse';
+import { ensureLocalNotificationPermissions } from '@/utils/paymentNotifications';
 import { useEffect, useState } from 'react';
 
 export const unstable_settings = {
@@ -123,9 +127,11 @@ export default function RootLayout() {
 
     return (
         <ThemeProvider>
-            <ConnectivityProvider>
-                <RootContent />
-            </ConnectivityProvider>
+            <AuthProvider>
+                <ConnectivityProvider>
+                    <RootContent />
+                </ConnectivityProvider>
+            </AuthProvider>
         </ThemeProvider>
     );
 }
@@ -135,6 +141,13 @@ export default function RootLayout() {
  */
 function RootContent() {
     const colorScheme = useColorScheme();
+    usePendingPaymentRecovery(true);
+    usePaymentNotificationResponse();
+
+    useEffect(() => {
+        ensureLocalNotificationPermissions().catch(() => undefined);
+    }, []);
+
     return (
         <NavigationThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
             <ConnectivityGuard>
@@ -150,6 +163,9 @@ function RootContent() {
                     <Stack.Screen name="trip/passengers-info" options={{ headerShown: false }} />
                     <Stack.Screen name="trip/seat-selection" options={{ headerShown: false }} />
                     <Stack.Screen name="trip/booking-confirmation" options={{ headerShown: false }} />
+                    <Stack.Screen name="payment/success" options={{ headerShown: false }} />
+                    <Stack.Screen name="payment/error" options={{ headerShown: false }} />
+                    <Stack.Screen name="notification/payment-status" options={{ headerShown: false }} />
                     <Stack.Screen name="profile/edit" options={{ headerShown: false }} />
                     <Stack.Screen name="trip/ticket-details" options={{ headerShown: false }} />
                     <Stack.Screen name="trip/ticket-qr" options={{ headerShown: false }} />

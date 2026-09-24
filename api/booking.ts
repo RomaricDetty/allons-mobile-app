@@ -1,3 +1,4 @@
+import { BookingPaymentStatusResponse, PayBookingRequest, PayBookingResponse } from "@/interfaces/payment";
 import axios, { AxiosResponse } from "axios";
 import { baseUrl } from "./config";
 
@@ -19,7 +20,6 @@ export const getBookingDetails = async (bookingId: string, token: string): Promi
         },
     });
 }
-
 
 /**
  * Create a new booking
@@ -53,7 +53,7 @@ export interface FeesAndTaxesPassengerPayload {
 export interface FeesAndTaxesRequestPayload {
     companyId: string;
     channel: 'MOBILE_APP';
-    paymentMethod?: 'MOBILE_MONEY' | 'CREDIT_CARD';
+    paymentMethod?: 'MOBILE_MONEY' | 'ALLON_COIN' | 'CREDIT_CARD';
     provider?: 'WAVE' | 'ORANGE_MONEY' | 'MTN_MONEY' | null;
     paymentChannel?: 'MOBILE_APP';
     passengers: FeesAndTaxesPassengerPayload[];
@@ -143,23 +143,44 @@ export const createRebookingBooking = async (
 };
 
 /**
- * Crée un paiement pour une réservation
+ * Crée un paiement pour une réservation (MOBILE_MONEY → redirectUrl checkout).
  * @param bookingData - Les données de paiement
  * @param token - Le token d'authentification (optionnel)
- * @returns AxiosResponse<any>
  */
-export const createBookingPayment = async (bookingData: any, token?: string): Promise<AxiosResponse<any>> => {
-    const headers: any = {};
-    
-    // Ajouter le header Authorization uniquement si le token est fourni
+export const createBookingPayment = async (
+    bookingData: PayBookingRequest,
+    token?: string
+): Promise<AxiosResponse<PayBookingResponse>> => {
+    const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+    };
+
     if (token && token.trim() !== '') {
         headers.Authorization = `Bearer ${token}`;
     }
-    
+
     return await axios.post(`${baseUrl}/customers/bookings/pay`, bookingData, {
         headers,
     });
-}
+};
+
+/**
+ * Suit le statut du paiement d'une réservation (source de vérité après deep link).
+ * Public — JWT optionnel.
+ */
+export const getBookingPaymentStatus = async (
+    bookingId: string,
+    token?: string
+): Promise<AxiosResponse<BookingPaymentStatusResponse>> => {
+    const headers: Record<string, string> = {};
+    if (token && token.trim() !== '') {
+        headers.Authorization = `Bearer ${token}`;
+    }
+
+    return await axios.get(`${baseUrl}/customers/bookings/${bookingId}/payment-status`, {
+        headers,
+    });
+};
 
 /**
  * Recherche un ticket par référence (sans authentification)
@@ -169,7 +190,6 @@ export const createBookingPayment = async (bookingData: any, token?: string): Pr
 export const getBookingByReference = async (referenceCode: string): Promise<AxiosResponse<any>> => {
     return await axios.get(`${baseUrl}/bookings/reference/${referenceCode}`);
 }
-
 
 /**
  * Récupère le QR code d'une réservation

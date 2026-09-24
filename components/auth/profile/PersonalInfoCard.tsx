@@ -1,8 +1,17 @@
-import { CIVILITY_MAP } from '@/constants/profile';
+import {
+    CIVILITY_MAP } from '@/constants/profile';
 import { useAppColors } from '@/hooks/use-app-colors';
-import { COUNTRY_CODES, User } from '@/interfaces';
-import React, { useMemo } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { COUNTRY_CODES,
+    User } from '@/interfaces';
+import { formatUserAddress,
+    hasDisplayableAddress } from '@/utils/formatAddress';
+import React,
+    { useMemo } from 'react';
+import { Image,
+    StyleSheet,
+    Text,
+    View,
+} from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 interface PersonalInfoCardProps {
@@ -14,6 +23,11 @@ interface PersonalInfoCardProps {
  */
 export const PersonalInfoCard: React.FC<PersonalInfoCardProps> = ({ user }) => {
     const colors = useAppColors();
+
+    const formattedAddress = useMemo(
+        () => formatUserAddress(user?.address),
+        [user?.address]
+    );
 
     const fullName = useMemo(() => {
         if (!user) return 'Non renseigné';
@@ -48,7 +62,6 @@ export const PersonalInfoCard: React.FC<PersonalInfoCardProps> = ({ user }) => {
                     {
                         backgroundColor: colors.profileImagePlaceholderBackground,
                         borderColor: colors.border,
-                        borderWidth: 1,
                     }
                 ]}>
                     {user?.picture ? (
@@ -62,7 +75,7 @@ export const PersonalInfoCard: React.FC<PersonalInfoCardProps> = ({ user }) => {
                 <Text style={[styles.userName, { color: colors.text }]}>{fullName}</Text>
                 <Text style={[styles.userRole, { color: colors.secondaryText }]}>{formattedCivility}</Text>
                 {user?.company && (
-                    <View style={styles.companyBadge}>
+                    <View style={[styles.companyBadge, { borderColor: colors.border }]}>
                         <MaterialCommunityIcons name="office-building" size={14} color={colors.activeTabColor} />
                         <Text style={[styles.userCompany, { color: colors.activeTabColor }]}>{user?.company}</Text>
                     </View>
@@ -73,12 +86,12 @@ export const PersonalInfoCard: React.FC<PersonalInfoCardProps> = ({ user }) => {
             <View style={[styles.detailsSection, { borderTopColor: colors.border }]}>
                 <View style={[styles.detailRow, styles.detailRowSpacing]}>
                     <View style={styles.detailIconContainer}>
-                        <MaterialCommunityIcons name="email-outline" size={20} color={colors.activeTabColor} />
+                        <MaterialCommunityIcons name="email" size={20} color={colors.activeTabColor} />
                     </View>
                     <View style={styles.detailContent}>
-                        <Text style={[styles.detailLabel, { color: colors.text }]}>Email</Text>
+                        <Text style={[styles.detailLabel, { color: colors.secondaryText }]}>Email</Text>
                         <View style={styles.detailValueContainer}>
-                            <Text style={[styles.detailValue, { color: colors.secondaryText }]} numberOfLines={1}>
+                            <Text style={[styles.detailValue, { color: colors.text }]} numberOfLines={1}>
                                 {user?.email ?? 'Non renseigné'}
                             </Text>
                             {user?.isEmailVerified && (
@@ -89,22 +102,22 @@ export const PersonalInfoCard: React.FC<PersonalInfoCardProps> = ({ user }) => {
                 </View>
                 <View style={[styles.detailRow, styles.detailRowSpacing]}>
                     <View style={styles.detailIconContainer}>
-                        <MaterialCommunityIcons name="account-outline" size={20} color={colors.activeTabColor} />
+                        <MaterialCommunityIcons name="account" size={20} color={colors.activeTabColor} />
                     </View>
                     <View style={styles.detailContent}>
-                        <Text style={[styles.detailLabel, { color: colors.text }]}>Nom d'utilisateur</Text>
-                        <Text style={[styles.detailValue, { color: colors.secondaryText }]} numberOfLines={1}>
+                        <Text style={[styles.detailLabel, { color: colors.secondaryText }]}>Nom d'utilisateur</Text>
+                        <Text style={[styles.detailValue, { color: colors.text }]} numberOfLines={1}>
                             {user?.username ? `@${user.username}` : 'Non renseigné'}
                         </Text>
                     </View>
                 </View>
                 <View style={[styles.detailRow, styles.detailRowSpacing]}>
                     <View style={styles.detailIconContainer}>
-                        <MaterialCommunityIcons name="phone-outline" size={20} color={colors.activeTabColor} />
+                        <MaterialCommunityIcons name="phone" size={20} color={colors.activeTabColor} />
                     </View>
                     <View style={styles.detailContent}>
-                        <Text style={[styles.detailLabel, { color: colors.text }]}>Téléphone</Text>
-                        <Text style={[styles.detailValue, { color: colors.secondaryText }]}>
+                        <Text style={[styles.detailLabel, { color: colors.secondaryText }]}>Téléphone</Text>
+                        <Text style={[styles.detailValue, { color: colors.text }]}>
                             {getFlagFromCountryCode(user?.phones?.[0]?.countryCode ?? '')} {user?.phones?.[0]?.digits ?? 'Non renseigné'}
                         </Text>
                     </View>
@@ -112,27 +125,23 @@ export const PersonalInfoCard: React.FC<PersonalInfoCardProps> = ({ user }) => {
                 {user?.dateOfBirth && (
                     <View style={[styles.detailRow, styles.detailRowSpacing]}>
                         <View style={styles.detailIconContainer}>
-                            <MaterialCommunityIcons name="calendar-outline" size={20} color={colors.activeTabColor} />
+                            <MaterialCommunityIcons name="calendar-month" size={20} color={colors.activeTabColor} />
                         </View>
                         <View style={styles.detailContent}>
-                            <Text style={[styles.detailLabel, { color: colors.text }]}>Date de naissance</Text>
-                            <Text style={[styles.detailValue, { color: colors.secondaryText }]}>{formattedDateOfBirth}</Text>
+                            <Text style={[styles.detailLabel, { color: colors.secondaryText }]}>Date de naissance</Text>
+                            <Text style={[styles.detailValue, { color: colors.text }]}>{formattedDateOfBirth}</Text>
                         </View>
                     </View>
                 )}
-                {user?.address && (
+                {hasDisplayableAddress(user?.address) && (
                     <View style={[styles.detailRow, styles.detailRowSpacing]}>
                         <View style={styles.detailIconContainer}>
-                            <MaterialCommunityIcons name="map-marker-outline" size={20} color={colors.activeTabColor} />
+                            <MaterialCommunityIcons name="map-marker" size={20} color={colors.activeTabColor} />
                         </View>
                         <View style={styles.detailContent}>
-                            <Text style={[styles.detailLabel, { color: colors.text }]}>Adresse</Text>
-                            <Text style={[styles.detailValue, { color: colors.secondaryText, flexWrap: 'wrap' }]} numberOfLines={2}>
-                                {
-                                    user.address?.country
-                                        ? `${user.address.street}, ${user.address.city},  ${user.address.country ?? ''}`.trim()
-                                        : 'Non renseigné'
-                                }
+                            <Text style={[styles.detailLabel, { color: colors.secondaryText }]}>Adresse</Text>
+                            <Text style={[styles.detailValue, { color: colors.text, flexWrap: 'wrap' }]} numberOfLines={2}>
+                                {formattedAddress}
                             </Text>
                         </View>
                     </View>
@@ -143,10 +152,9 @@ export const PersonalInfoCard: React.FC<PersonalInfoCardProps> = ({ user }) => {
             {user?.contactUrgent && (
                 <View style={[styles.emergencySection, { borderTopColor: colors.border }]}>
                     <View style={styles.emergencyHeader}>
-                        {/* <MaterialCommunityIcons name="alert-circle-outline" size={18} color={colors.activeTabColor} /> */}
                         <Text style={[styles.sectionTitle, { color: colors.text }]}>Contact d'urgence</Text>
                     </View>
-                    <View style={[styles.emergencyInfo, { backgroundColor: colors.emergencyInfoBackground }]}>
+                    <View style={[styles.emergencyInfo, { backgroundColor: colors.emergencyInfoBackground, borderColor: colors.border }]}>
                         {user?.contactUrgent?.firstName && user?.contactUrgent?.lastName && (
                             <Text style={[styles.emergencyName, { color: colors.text }]}>
                                 {user?.contactUrgent?.firstName ?? 'Non renseigné'} {user?.contactUrgent?.lastName ?? 'Non renseigné'}
@@ -155,14 +163,14 @@ export const PersonalInfoCard: React.FC<PersonalInfoCardProps> = ({ user }) => {
                         {user?.contactUrgent?.phone?.digits && (
                             <View style={styles.emergencyDetails}>
                                 <View style={styles.emergencyDetailItem}>
-                                    <MaterialCommunityIcons name="phone" size={14} color={colors.secondaryText} />
-                                    <Text style={[styles.emergencyPhone, { color: colors.secondaryText }]}>
+                                    <MaterialCommunityIcons name="phone" size={18} color={colors.activeTabColor} />
+                                    <Text style={[styles.emergencyPhone, { color: colors.text }]}>
                                         {getFlagFromCountryCode(user?.contactUrgent?.phone?.countryCode ?? '')} {user?.contactUrgent?.phone?.digits ?? 'Non renseigné'}
                                     </Text>
                                 </View>
                                 <View style={styles.emergencyDetailItem}>
-                                    <MaterialCommunityIcons name="account-heart" size={14} color={colors.secondaryText} />
-                                    <Text style={[styles.emergencyRelation, { color: colors.secondaryText }]}>
+                                    <MaterialCommunityIcons name="heart" size={18} color={colors.activeTabColor} />
+                                    <Text style={[styles.emergencyRelation, { color: colors.text }]}>
                                         {user?.contactUrgent?.relationship
                                             ? user?.contactUrgent?.relationship.charAt(0).toUpperCase() + user?.contactUrgent?.relationship.slice(1).toLowerCase()
                                             : 'Non renseigné'}
@@ -179,7 +187,7 @@ export const PersonalInfoCard: React.FC<PersonalInfoCardProps> = ({ user }) => {
 
 const styles = StyleSheet.create({
     profileCard: {
-        borderRadius: 16,
+        borderRadius: 12,
         padding: 20,
         marginBottom: 20,
         borderWidth: 1,
@@ -206,7 +214,7 @@ const styles = StyleSheet.create({
         borderRadius: 48,
         overflow: 'hidden',
         marginBottom: 16,
-        borderWidth: 3,
+        borderWidth: 1,
     },
     profileImage: {
         width: '100%',
@@ -235,8 +243,8 @@ const styles = StyleSheet.create({
         gap: 6,
         paddingHorizontal: 12,
         paddingVertical: 6,
-        borderRadius: 16,
-        backgroundColor: 'rgba(23, 118, 186, 0.1)',
+        borderRadius: 10,
+        borderWidth: 1,
     },
     userCompany: {
         fontSize: 13,
@@ -258,8 +266,7 @@ const styles = StyleSheet.create({
     detailIconContainer: {
         width: 40,
         height: 40,
-        borderRadius: 20,
-        backgroundColor: 'rgba(23, 118, 186, 0.1)',
+        borderRadius: 10,
         justifyContent: 'center',
         alignItems: 'center',
         marginTop: 2,
@@ -305,6 +312,7 @@ const styles = StyleSheet.create({
     emergencyInfo: {
         borderRadius: 12,
         padding: 16,
+        borderWidth: 1,
     },
     emergencyName: {
         fontSize: 16,

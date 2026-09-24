@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Alert } from 'react-native';
 import { getDepartureAvailableSeats } from '@/api/departure';
 import { Trip } from '@/types';
+import { showAlert } from '@/utils/alert';
 
 interface Passenger {
     seatNumber: number | null;
@@ -127,7 +127,7 @@ export const useSeatsManagement = (
      */
     const openSeatSelection = useCallback((leg: 'OUTBOUND' | 'RETURN' = 'OUTBOUND') => {
         if (!passengers || passengers.length === 0) {
-            Alert.alert('Erreur', 'Aucun passager à assigner');
+            showAlert('Erreur', 'Aucun passager à assigner');
             return;
         }
 

@@ -58,7 +58,7 @@ function ControlButtonsInner({
                 accessibilityRole="button"
                 accessibilityLabel="Voir tout l'itinéraire"
             >
-                <Ionicons name="expand-outline" size={20} color={textColor} />
+                <Ionicons name="expand" size={20} color={textColor} />
             </TouchableOpacity>
         </View>
     );

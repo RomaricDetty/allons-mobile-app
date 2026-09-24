@@ -1,10 +1,12 @@
 import React from 'react';
-import { Modal, View, Text, Pressable, ScrollView, Alert, Clipboard, StyleSheet } from 'react-native';
+import { Modal, View, Text, Pressable, ScrollView, Clipboard, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAppColors } from '@/hooks/use-app-colors';
+import { AppButton } from '@/components/ui/AppButton';
 import { router } from 'expo-router';
 import { RefundOption } from '@/api/cancellation';
+import { showAlert } from '@/utils/alert';
 
 interface CancellationResult {
     refundableAmount: number;
@@ -44,7 +46,7 @@ export const CancellationSuccessModal: React.FC<CancellationSuccessModalProps> =
     const handleCopyCode = () => {
         if (result?.rebookingTokenCode) {
             Clipboard.setString(result.rebookingTokenCode);
-            Alert.alert('Code copié', 'Le code a été copié dans le presse-papier');
+            showAlert('Code copié', 'Le code a été copié dans le presse-papier');
         }
     };
 
@@ -127,7 +129,7 @@ export const CancellationSuccessModal: React.FC<CancellationSuccessModalProps> =
                 >
                     {/* Message de succès */}
                     <View style={styles.successBox}>
-                        <MaterialCommunityIcons name="check-circle" size={24} color="#4CAF50" />
+                        <MaterialCommunityIcons name="check" size={22} color="#2D7A4F" />
                         <View style={styles.successContent}>
                             <Text style={styles.successTitle}>Annulation confirmée</Text>
                             <Text style={styles.successText}>
@@ -155,7 +157,7 @@ export const CancellationSuccessModal: React.FC<CancellationSuccessModalProps> =
 
                             <View style={styles.rebookingCard}>
                                 <View style={styles.rebookingHeader}>
-                                    <MaterialCommunityIcons name="ticket-confirmation" size={48} color="#1976BA" />
+                                    <MaterialCommunityIcons name="ticket-confirmation" size={28} color="#1776BA" />
                                 </View>
                                 
                                 <Text style={styles.rebookingLabel}>Votre code de rebooking</Text>
@@ -200,20 +202,19 @@ export const CancellationSuccessModal: React.FC<CancellationSuccessModalProps> =
 
                                 {/* Boutons */}
                                 <View style={styles.actions}>
-                                    <Pressable style={styles.copyButton} onPress={handleCopyCode}>
-                                        <MaterialCommunityIcons name="content-copy" size={20} color="#1976BA" />
-                                        <Text style={styles.copyButtonText}>Copier le code</Text>
-                                    </Pressable>
-
-                                    <Pressable
-                                        style={styles.newBookingButton}
+                                    <AppButton
+                                        title="Copier le code"
+                                        onPress={handleCopyCode}
+                                        variant="secondary"
+                                        icon={<MaterialCommunityIcons name="content-copy" size={20} color="#1776BA" />}
+                                    />
+                                    <AppButton
+                                        title="Nouvelle réservation"
                                         onPress={() => {
                                             handleCloseModal();
                                             router.push('/(tabs)');
                                         }}
-                                    >
-                                        <Text style={styles.newBookingButtonText}>Nouvelle réservation</Text>
-                                    </Pressable>
+                                    />
                                 </View>
                             </View>
                         </>
@@ -236,7 +237,7 @@ export const CancellationSuccessModal: React.FC<CancellationSuccessModalProps> =
                                 </Text>
                             </View>
                             <View style={styles.infoBox}>
-                                <MaterialCommunityIcons name="information" size={20} color="#1976BA" />
+                                <MaterialCommunityIcons name="information" size={20} color="#1776BA" />
                                 <Text style={styles.infoText}>
                                     Le remboursement sera traité dans les prochains jours. Vous serez contacté.
                                 </Text>
@@ -266,60 +267,46 @@ const styles = StyleSheet.create({
     scrollContent: { padding: 20 },
     successBox: {
         flexDirection: 'row',
-        padding: 16,
-        borderRadius: 16,
-        backgroundColor: '#E8F5E9',
+        padding: 14,
+        borderRadius: 10,
+        backgroundColor: 'rgba(45, 122, 79, 0.1)',
         borderWidth: 1,
-        borderColor: '#4CAF50',
+        borderColor: '#E0E0E0',
         marginBottom: 20,
         gap: 12,
     },
     successContent: { flex: 1 },
-    successTitle: { fontSize: 16, fontFamily: 'Ubuntu_Bold', color: '#2E7D32', marginBottom: 4 },
-    successText: { fontSize: 14, fontFamily: 'Ubuntu_Regular', color: '#1B5E20' },
-    section: { borderRadius: 16, padding: 20, marginBottom: 20, borderWidth: 1 },
+    successTitle: { fontSize: 16, fontFamily: 'Ubuntu_Bold', color: '#2D7A4F', marginBottom: 4 },
+    successText: { fontSize: 14, fontFamily: 'Ubuntu_Regular', color: '#424242' },
+    section: { borderRadius: 12, padding: 16, marginBottom: 20, borderWidth: 1 },
     sectionTitle: { fontSize: 16, fontFamily: 'Ubuntu_Bold', marginBottom: 16 },
     detailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12 },
     detailLabel: { fontSize: 14, fontFamily: 'Ubuntu_Regular' },
     detailValue: { fontSize: 14, fontFamily: 'Ubuntu_Bold' },
     rebookingCard: {
-        backgroundColor: '#E3F2FD',
-        borderRadius: 16,
-        padding: 20,
+        backgroundColor: 'rgba(23, 118, 186, 0.08)',
+        borderRadius: 12,
+        padding: 16,
         marginBottom: 20,
         borderWidth: 1,
-        borderColor: '#1976BA',
+        borderColor: '#E0E0E0',
     },
-    rebookingHeader: { alignItems: 'center', marginBottom: 16 },
-    rebookingLabel: { fontSize: 18, fontFamily: 'Ubuntu_Bold', color: '#1565C0', textAlign: 'center', marginBottom: 8 },
-    rebookingSubtitle: { fontSize: 13, fontFamily: 'Ubuntu_Regular', color: '#424242', textAlign: 'center', marginBottom: 20 },
-    codeContainer: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#BBDEFB' },
-    codeTitle: { fontSize: 12, fontFamily: 'Ubuntu_Regular', color: '#757575', marginBottom: 8, textAlign: 'center' },
-    code: { fontSize: 24, fontFamily: 'Ubuntu_Bold', color: '#1976BA', textAlign: 'center', letterSpacing: 2 },
-    codeDetails: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#BBDEFB' },
+    rebookingHeader: { alignItems: 'flex-start', marginBottom: 12 },
+    rebookingLabel: { fontSize: 17, fontFamily: 'Ubuntu_Bold', color: '#1776BA', marginBottom: 6 },
+    rebookingSubtitle: { fontSize: 13, fontFamily: 'Ubuntu_Regular', color: '#666', marginBottom: 16 },
+    codeContainer: { backgroundColor: '#FFFFFF', borderRadius: 10, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#E0E0E0' },
+    codeTitle: { fontSize: 12, fontFamily: 'Ubuntu_Regular', color: '#757575', marginBottom: 8 },
+    code: { fontSize: 22, fontFamily: 'Ubuntu_Bold', color: '#1776BA', letterSpacing: 2 },
+    codeDetails: { backgroundColor: '#FFFFFF', borderRadius: 10, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#E0E0E0' },
     codeDetailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8 },
     codeDetailLabel: { fontSize: 14, fontFamily: 'Ubuntu_Regular', color: '#424242' },
     codeDetailValue: { fontSize: 14, fontFamily: 'Ubuntu_Bold', color: '#212121' },
-    instructions: { marginBottom: 20 },
-    instructionsTitle: { fontSize: 15, fontFamily: 'Ubuntu_Bold', color: '#1565C0', marginBottom: 12 },
+    instructions: { marginBottom: 16 },
+    instructionsTitle: { fontSize: 15, fontFamily: 'Ubuntu_Bold', color: '#1776BA', marginBottom: 12 },
     instructionItem: { flexDirection: 'row', marginBottom: 8, gap: 8 },
     instructionNumber: { fontSize: 14, fontFamily: 'Ubuntu_Bold', color: '#424242' },
     instructionText: { fontSize: 14, fontFamily: 'Ubuntu_Regular', color: '#424242', flex: 1 },
     actions: { gap: 12 },
-    copyButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-        backgroundColor: '#FFFFFF',
-        borderRadius: 12,
-        paddingVertical: 14,
-        borderWidth: 2,
-        borderColor: '#1976BA',
-    },
-    copyButtonText: { fontSize: 15, fontFamily: 'Ubuntu_Bold', color: '#1976BA' },
-    newBookingButton: { backgroundColor: '#1976BA', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
-    newBookingButtonText: { fontSize: 15, fontFamily: 'Ubuntu_Bold', color: '#FFFFFF' },
-    infoBox: { flexDirection: 'row', padding: 12, borderRadius: 12, backgroundColor: '#E3F2FD', gap: 12, marginTop: 16 },
-    infoText: { flex: 1, fontSize: 13, fontFamily: 'Ubuntu_Regular', color: '#1565C0', lineHeight: 20 },
+    infoBox: { flexDirection: 'row', padding: 12, borderRadius: 10, backgroundColor: 'rgba(23, 118, 186, 0.08)', gap: 12, marginTop: 16 },
+    infoText: { flex: 1, fontSize: 13, fontFamily: 'Ubuntu_Regular', color: '#1776BA', lineHeight: 20 },
 });

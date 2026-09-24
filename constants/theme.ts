@@ -1,6 +1,6 @@
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ * Couleurs utilisées dans l'application (light / dark).
+ * Marque : #1776BA — pas de pastels Material ni de violet hors-marque.
  */
 
 import { Platform } from 'react-native';
@@ -16,7 +16,6 @@ export const Colors = {
         icon: '#687076',
         tabIconDefault: '#687076',
         tabIconSelected: tintColorLight,
-        // Couleurs pour les cartes et conteneurs
         cardBackground: '#FFFFFF',
         border: '#E0E0E0',
         secondaryText: '#666',
@@ -31,14 +30,19 @@ export const Colors = {
         modalBorder: '#F0F0F0',
         emergencyInfoBackground: '#F5F5F5',
         profileImagePlaceholderBackground: '#E0E0E0',
-        tripsIconContainerBackground: '#E3F2FD',
-        clientTypeCardBackground: '#E8F5E9',
-        coinsCardBackground: '#FFF3E0',
+        tripsIconContainerBackground: 'rgba(23, 118, 186, 0.08)',
+        clientTypeCardBackground: '#F3F3F7',
+        coinsCardBackground: '#F3F3F7',
         actionButtonBackground: '#FFFFFF',
         progressBarBackground: '#E0E0E0',
         progressDotBackground: '#E0E0E0',
         separator: '#E0E0E0',
         secondaryButtonBackground: '#FFFFFF',
+        success: '#2D7A4F',
+        successMuted: 'rgba(45, 122, 79, 0.1)',
+        danger: '#C44747',
+        dangerMuted: 'rgba(196, 71, 71, 0.1)',
+        infoMuted: 'rgba(23, 118, 186, 0.08)',
     },
     dark: {
         text: '#ECEDEE',
@@ -47,7 +51,6 @@ export const Colors = {
         icon: '#9BA1A6',
         tabIconDefault: '#9BA1A6',
         tabIconSelected: tintColorDark,
-        // Couleurs pour les cartes et conteneurs
         cardBackground: '#1C1C1E',
         border: '#3A3A3C',
         secondaryText: '#9BA1A6',
@@ -70,6 +73,11 @@ export const Colors = {
         progressDotBackground: '#3A3A3C',
         separator: '#3A3A3C',
         secondaryButtonBackground: '#1C1C1E',
+        success: '#5CAD7A',
+        successMuted: 'rgba(45, 122, 79, 0.2)',
+        danger: '#E07070',
+        dangerMuted: 'rgba(196, 71, 71, 0.2)',
+        infoMuted: 'rgba(23, 118, 186, 0.2)',
     },
 };
 

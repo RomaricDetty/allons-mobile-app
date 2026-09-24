@@ -1,6 +1,7 @@
 // import TripRouteViewerMapbox from '@/components/TripRouteViewerMapbox';
 // @ts-nocheck
 import TripRouteViewerMapbox from '@/components/TripRouteViewerMapbox';
+import { AppButton } from '@/components/ui/AppButton';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { Booking } from '@/interfaces';
@@ -11,7 +12,6 @@ import {
     ActivityIndicator,
     StyleSheet,
     Text,
-    TouchableOpacity,
     View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -84,7 +84,7 @@ export default function RouteViewerScreen() {
             <SafeAreaView style={[styles.container, { backgroundColor }]} edges={['top', 'bottom']}>
                 <View style={styles.centerContainer}>
                     <View style={[styles.errorIconContainer, { backgroundColor: isDarkMode ? '#2C2C2E' : '#F5F5F5' }]}>
-                        <Ionicons name="alert-circle-outline" size={64} color="#F44336" />
+                        <Ionicons name="alert-circle" size={64} color="#F44336" />
                     </View>
                     <Text style={[styles.errorTitle, { color: textColor }]}>
                         Erreur
@@ -92,14 +92,11 @@ export default function RouteViewerScreen() {
                     <Text style={[styles.errorText, { color: secondaryTextColor }]}>
                         {parseError || 'Impossible de charger l\'itinéraire'}
                     </Text>
-                    <TouchableOpacity
-                        style={[styles.backButton, { backgroundColor: accentColor }]}
+                    <AppButton
+                        title="Retour"
                         onPress={() => router.back()}
-                        activeOpacity={0.7}
-                    >
-                        <Ionicons name="arrow-back" size={20} color="#fff" />
-                        <Text style={styles.backButtonText}>Retour</Text>
-                    </TouchableOpacity>
+                        style={styles.backButton}
+                    />
                 </View>
             </SafeAreaView>
         );
@@ -147,18 +144,7 @@ const styles = StyleSheet.create({
         lineHeight: 24,
     },
     backButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 24,
-        paddingVertical: 14,
-        borderRadius: 12,
-        gap: 8,
-        minWidth: 140,
-        justifyContent: 'center',
-    },
-    backButtonText: {
-        color: '#fff',
-        fontSize: 16,
-        fontFamily: 'Ubuntu_Medium',
+        minWidth: 160,
+        alignSelf: 'center',
     },
 });

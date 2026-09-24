@@ -1,44 +1,42 @@
 // @ts-nocheck
 import { formatPrice } from '@/constants/functions';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useAppColors } from '@/hooks/use-app-colors';
 import { DepartureCardProps } from '@/types';
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
+const PRIMARY_COLOR = '#1776BA';
 
 /**
- * Composant de carte de départ
- * Affiche une carte verticale avec image, prix et nom du trajet
+ * Carte de départ (carousel / listes)
  */
-export function DepartureCard({ item, width, height, onPress }: DepartureCardProps) {
+export function DepartureCard({ item, width, onPress }: DepartureCardProps) {
+    const colors = useAppColors();
     const route = `${item.stationFrom.cityName} → ${item.stationTo.cityName}`;
     const price = formatPrice(item.basePrice).replace(' F CFA', ' F');
-    const colorScheme = useColorScheme() ?? 'dark';
-    // Largeur de la carte basée sur la largeur de l'écran
-    const cardWidth = (width - 100) / 2.2; // Environ 2.2 cartes visibles avec espacement
-    const imageBackgroundColor = colorScheme === 'dark' ? '#1776BA' : '#2C2C2E';
+    const cardWidth = (width - 100) / 2.2;
+
     return (
         <Pressable
             key={item.id}
-            style={[styles.cardContainer, { width: cardWidth }]}
+            style={[
+                styles.cardContainer,
+                {
+                    width: cardWidth,
+                    backgroundColor: colors.cardBackground,
+                    borderColor: colors.border,
+                },
+            ]}
             onPress={() => onPress?.(item)}
         >
-            {/* Zone d'image avec fond gris clair */}
-            <View style={[styles.imageContainer, { backgroundColor: '#dfe7f4' }]}>
-                <MaterialCommunityIcons
-                    name="bus"
-                    size={60}
-                    color={'#1776BA'}
-                />
+            <View style={[styles.imageContainer, { backgroundColor: colors.infoMuted }]}>
+                <MaterialCommunityIcons name="bus" size={36} color={PRIMARY_COLOR} />
             </View>
-            
-            {/* Zone de contenu avec prix et nom */}
+
             <View style={styles.contentContainer}>
-                {/* Prix en gras */}
-                <Text style={styles.priceText}>{price}</Text>
-                {/* Nom de la route */}
-                <Text style={styles.routeText} numberOfLines={2}>
+                <Text style={[styles.priceText, { color: colors.text }]}>{price}</Text>
+                <Text style={[styles.routeText, { color: colors.secondaryText }]} numberOfLines={2}>
                     {route}
                 </Text>
             </View>
@@ -48,32 +46,27 @@ export function DepartureCard({ item, width, height, onPress }: DepartureCardPro
 
 const styles = StyleSheet.create({
     cardContainer: {
-        borderRadius: 15,
-        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
         overflow: 'hidden',
         borderWidth: 1,
-        borderColor: '#bfcfe8',
     },
     imageContainer: {
         width: '100%',
-        height: 80,
+        height: 72,
         justifyContent: 'center',
         alignItems: 'center',
     },
     contentContainer: {
-        padding: 10,
-        backgroundColor: '#FFFFFF',
+        padding: 12,
     },
     priceText: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Bold',
-        color: '#11181C',
-        marginBottom: 6,
+        marginBottom: 4,
     },
     routeText: {
         fontSize: 12,
         fontFamily: 'Ubuntu_Regular',
-        color: '#11181C',
         lineHeight: 18,
     },
 });

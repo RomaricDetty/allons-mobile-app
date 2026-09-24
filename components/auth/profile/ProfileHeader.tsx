@@ -10,24 +10,33 @@ interface ProfileHeaderProps {
 }
 
 /**
- * Composant d'en-tête du profil avec titre et bouton de déconnexion
+ * En-tête du profil : titre + déconnexion
  */
 export const ProfileHeader: React.FC<ProfileHeaderProps> = ({ onLogout }) => {
     const insets = useSafeAreaInsets();
     const colors = useAppColors();
 
     return (
-        <View style={[
-            styles.header,
-            {
-                paddingTop: insets.top,
-                backgroundColor: colors.headerBackground,
-                borderBottomColor: colors.headerBorder
-            }
-        ]}>
+        <View
+            style={[
+                styles.header,
+                {
+                    paddingTop: insets.top,
+                    backgroundColor: colors.headerBackground,
+                    borderBottomColor: colors.headerBorder,
+                },
+            ]}
+        >
             <Text style={[styles.headerTitle, { color: colors.text }]}>Mon profil</Text>
-            <Pressable style={styles.headerButton} onPress={onLogout}>
-                <MaterialCommunityIcons name="logout" size={24} color={colors.icon} />
+            <Pressable
+                style={styles.headerButton}
+                onPress={onLogout}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Se déconnecter"
+                android_ripple={{ color: 'rgba(0,0,0,0.08)', borderless: true, radius: 22 }}
+            >
+                <MaterialCommunityIcons name="logout-variant" size={22} color={colors.icon} />
             </Pressable>
         </View>
     );
@@ -38,15 +47,19 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 24,
+        paddingHorizontal: 16,
         paddingBottom: 12,
-        borderBottomWidth: 1,
+        borderBottomWidth: StyleSheet.hairlineWidth,
     },
     headerButton: {
-        padding: 8,
+        width: 44,
+        height: 44,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     headerTitle: {
-        fontSize: 18,
+        fontSize: 20,
         fontFamily: 'Ubuntu_Bold',
     },
 });

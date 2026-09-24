@@ -10,14 +10,20 @@ interface TabNavigationProps {
     onTabPress: (tab: 'info' | 'tickets' | 'locations') => void;
 }
 
-/** Largeur fixe par onglet pour un rendu identique sur tous les devices */
 const TAB_WIDTH = 140;
 const PADDING_H = 16;
-const TAB_INDEX: Record<'info' | 'tickets' | 'locations', number> = { info: 0, tickets: 1, locations: 2 };
+const TAB_INDEX: Record<'info' | 'tickets' | 'locations', number> = {
+    info: 0,
+    tickets: 1,
+    locations: 2,
+};
 
-/**
- * Calcule l'offset de scroll pour centrer l'onglet à l'écran
- */
+const TABS = [
+    { key: 'info' as const, label: 'Informations', icon: 'account' },
+    { key: 'tickets' as const, label: 'Réservations', icon: 'ticket-confirmation' },
+    { key: 'locations' as const, label: 'Locations bus', icon: 'bus' },
+];
+
 const getScrollOffsetForTab = (tab: 'info' | 'tickets' | 'locations') => {
     const screenWidth = Dimensions.get('window').width;
     const contentWidth = 2 * PADDING_H + 3 * TAB_WIDTH;
@@ -29,30 +35,39 @@ const getScrollOffsetForTab = (tab: 'info' | 'tickets' | 'locations') => {
 };
 
 /**
- * Composant de navigation par onglets scrollable (sans indicateur)
+ * Navigation par onglets du profil
  */
 export const TabNavigation: React.FC<TabNavigationProps> = ({ activeTab, onTabPress }) => {
     const colors = useAppColors();
     const scrollViewRef = useRef<ScrollView>(null);
 
-    /** Scroll la barre d'onglets pour que l'onglet actif soit bien visible (centré) */
     const scrollToTab = useCallback((tab: 'info' | 'tickets' | 'locations') => {
-        const x = getScrollOffsetForTab(tab);
-        scrollViewRef.current?.scrollTo({ x, animated: true });
+        scrollViewRef.current?.scrollTo({ x: getScrollOffsetForTab(tab), animated: true });
     }, []);
 
     useEffect(() => {
         scrollToTab(activeTab);
     }, [activeTab, scrollToTab]);
 
-    const handleTabPress = useCallback((tab: 'info' | 'tickets' | 'locations') => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        onTabPress(tab);
-        scrollToTab(tab);
-    }, [onTabPress, scrollToTab]);
+    const handleTabPress = useCallback(
+        (tab: 'info' | 'tickets' | 'locations') => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            onTabPress(tab);
+            scrollToTab(tab);
+        },
+        [onTabPress, scrollToTab],
+    );
 
     return (
-        <View style={[styles.tabsContainer, { backgroundColor: colors.headerBackground, borderBottomColor: colors.headerBorder }]}>
+        <View
+            style={[
+                styles.tabsContainer,
+                {
+                    backgroundColor: colors.headerBackground,
+                    borderBottomColor: colors.headerBorder,
+                },
+            ]}
+        >
             <ScrollView
                 ref={scrollViewRef}
                 horizontal
@@ -60,48 +75,45 @@ export const TabNavigation: React.FC<TabNavigationProps> = ({ activeTab, onTabPr
                 contentContainerStyle={[styles.tabsScrollContent, { paddingHorizontal: PADDING_H }]}
                 style={styles.tabsScrollView}
             >
-                <Pressable style={[styles.tab, { width: TAB_WIDTH }]} onPress={() => handleTabPress('info')}>
-                    <MaterialCommunityIcons
-                        name="account-outline"
-                        size={20}
-                        color={activeTab === 'info' ? colors.activeTabColor : colors.inactiveIcon}
-                    />
-                    <Text style={[
-                        styles.tabText,
-                        { color: activeTab === 'info' ? colors.activeTabColor : colors.inactiveTabText },
-                        activeTab === 'info' && styles.tabTextActive
-                    ]}>
-                        Informations
-                    </Text>
-                </Pressable>
-                <Pressable style={[styles.tab, { width: TAB_WIDTH }]} onPress={() => handleTabPress('tickets')}>
-                    <MaterialCommunityIcons
-                        name="ticket-outline"
-                        size={20}
-                        color={activeTab === 'tickets' ? colors.activeTabColor : colors.inactiveIcon}
-                    />
-                    <Text style={[
-                        styles.tabText,
-                        { color: activeTab === 'tickets' ? colors.activeTabColor : colors.inactiveTabText },
-                        activeTab === 'tickets' && styles.tabTextActive
-                    ]}>
-                        Réservations
-                    </Text>
-                </Pressable>
-                <Pressable style={[styles.tab, { width: TAB_WIDTH }]} onPress={() => handleTabPress('locations')}>
-                    <MaterialCommunityIcons
-                        name="bus-stop"
-                        size={20}
-                        color={activeTab === 'locations' ? colors.activeTabColor : colors.inactiveIcon}
-                    />
-                    <Text style={[
-                        styles.tabText,
-                        { color: activeTab === 'locations' ? colors.activeTabColor : colors.inactiveTabText },
-                        activeTab === 'locations' && styles.tabTextActive
-                    ]}>
-                        Locations bus
-                    </Text>
-                </Pressable>
+                {TABS.map((tab) => {
+                    const active = activeTab === tab.key;
+                    return (
+                        <Pressable
+                            key={tab.key}
+                            style={[styles.tab, { width: TAB_WIDTH }]}
+                            onPress={() => handleTabPress(tab.key)}
+                        >
+                            <View
+                                style={[
+                                    styles.tabInner,
+                                    active && {
+                                        backgroundColor: colors.infoMuted,
+                                        borderColor: colors.activeTabColor,
+                                    },
+                                    !active && { borderColor: 'transparent' },
+                                ]}
+                            >
+                                <MaterialCommunityIcons
+                                    name={tab.icon}
+                                    size={18}
+                                    color={active ? colors.activeTabColor : colors.inactiveIcon}
+                                />
+                                <Text
+                                    style={[
+                                        styles.tabText,
+                                        {
+                                            color: active ? colors.activeTabColor : colors.inactiveTabText,
+                                            fontFamily: active ? 'Ubuntu_Bold' : 'Ubuntu_Regular',
+                                        },
+                                    ]}
+                                    numberOfLines={1}
+                                >
+                                    {tab.label}
+                                </Text>
+                            </View>
+                        </Pressable>
+                    );
+                })}
             </ScrollView>
         </View>
     );
@@ -109,27 +121,33 @@ export const TabNavigation: React.FC<TabNavigationProps> = ({ activeTab, onTabPr
 
 const styles = StyleSheet.create({
     tabsContainer: {
-        position: 'relative',
-        borderBottomWidth: 1,
+        borderBottomWidth: StyleSheet.hairlineWidth,
     },
     tabsScrollView: {
         flexGrow: 0,
     },
     tabsScrollContent: {
         flexDirection: 'row',
+        paddingVertical: 10,
+        gap: 8,
     },
     tab: {
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    tabInner: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 15,
         gap: 6,
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        borderRadius: 10,
+        borderWidth: 1,
+        minHeight: 40,
+        width: '100%',
     },
     tabText: {
-        fontSize: 14,
-        fontFamily: 'Ubuntu_Regular',
-    },
-    tabTextActive: {
-        fontFamily: 'Ubuntu_Bold',
+        fontSize: 13,
     },
 });

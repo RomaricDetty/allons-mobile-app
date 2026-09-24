@@ -7,7 +7,6 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     Dimensions,
-    Pressable,
     ScrollView,
     StyleSheet,
     Text,
@@ -18,6 +17,7 @@ import QRCode from 'react-native-qrcode-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // @ts-ignore - react-native-vector-icons n'a pas de types TypeScript
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { ScreenHeader } from '@/components/ui/ScreenHeader';
 
 /**
  * Paramètres de route pour l'écran TicketQR
@@ -177,29 +177,15 @@ const TicketQR = () => {
 
     return (
         <View style={[styles.container, { backgroundColor: colors.headerBackground }]}>
-            {/* Header avec bouton retour */}
-            <View
-                style={[
-                    styles.header,
-                    {
-                        paddingTop: insets.top + 10,
-                        backgroundColor: colors.headerBackground,
-                        borderBottomColor: colors.headerBorder,
-                    },
-                ]}
-            >
-                <Pressable
-                    onPress={handleGoBack}
-                    style={styles.backButton}
-                    accessibilityLabel="Retour"
-                    accessibilityRole="button"
-                >
-                    <Icon name="arrow-left" size={25} color={iconColor} />
-                </Pressable>
-                <Text style={[styles.headerTitle, { color: textColor, alignSelf: 'center' }]}>
-                    Code QR de vérification
-                </Text>
-            </View>
+            <ScreenHeader
+                title="Code QR de vérification"
+                onBack={handleGoBack}
+                iconColor={iconColor}
+                textColor={textColor}
+                backgroundColor={colors.headerBackground}
+                borderColor={colors.headerBorder}
+                paddingTop={insets.top + 10}
+            />
 
             <ScrollView
                 style={styles.scrollView}
@@ -257,22 +243,6 @@ const TicketQR = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-    },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingBottom: 12,
-        borderBottomWidth: 1,
-    },
-    backButton: {
-        padding: 8,
-    },
-    headerTitle: {
-        fontSize: 16,
-        fontFamily: 'Ubuntu_Bold',
-        flex: 1,
-        textAlign: 'center',
     },
     scrollView: {
         flex: 1,

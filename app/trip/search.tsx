@@ -2,8 +2,10 @@
 import { getCities } from "@/api/city";
 import { getAvailableDepartures } from "@/api/departure";
 import { BottomSheet } from "@/components/bottom-sheet";
+import { AppButton } from '@/components/ui/AppButton';
+import { ScreenHeader } from '@/components/ui/ScreenHeader';
+import { useAppColors } from '@/hooks/use-app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useThemeColor } from '@/hooks/use-theme-color';
 import { City, PopularTrip } from "@/types";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -11,17 +13,19 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     Modal,
     Platform,
     Pressable,
     ScrollView,
     StyleSheet,
     Text,
-    View
-} from "react-native";
+    View,
+} from 'react-native';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+import { showAlert } from '@/utils/alert';
+
+const BRAND_BLUE = '#1776BA';
 
 /**
  * =================================================================
@@ -89,71 +93,121 @@ const formatDateForDisplay = (date: Date | null): string => {
  */
 interface SearchFieldProps {
     icon: string;
+    label: string;
     placeholder: string;
     value: string;
     onPress: () => void;
     backgroundColor: string;
+    borderColor: string;
     textColor: string;
+    labelColor: string;
     placeholderColor: string;
     iconColor: string;
+    compact?: boolean;
 }
 
 const SearchField = memo<SearchFieldProps>(({
     icon,
+    label,
     placeholder,
     value,
     onPress,
     backgroundColor,
+    borderColor,
     textColor,
+    labelColor,
     placeholderColor,
-    iconColor
+    iconColor,
+    compact = false,
 }) => (
     <Pressable
-        style={[styles.field, { backgroundColor }]}
+        style={[
+            styles.field,
+            compact && styles.fieldCompact,
+            { backgroundColor, borderColor },
+        ]}
         onPress={onPress}
-        android_ripple={{ color: 'rgba(0, 0, 0, 0.1)' }}
+        android_ripple={{ color: 'rgba(0, 0, 0, 0.06)' }}
     >
-        <Icon name={icon} size={20} color={iconColor} />
-        <Text 
-            style={[
-                styles.fieldText,
-                { color: value ? textColor : placeholderColor }
-            ]}
-            numberOfLines={1}
-        >
-            {value || placeholder}
-        </Text>
-        <Icon name="chevron-down" size={20} color={iconColor} />
+        <View style={styles.fieldIconBlock}>
+            <Icon name={icon} size={20} color={iconColor} />
+        </View>
+        <View style={styles.fieldContent}>
+            <Text style={[styles.fieldLabel, { color: labelColor }]} numberOfLines={1}>
+                {label}
+            </Text>
+            <Text
+                style={[
+                    styles.fieldText,
+                    { color: value ? textColor : placeholderColor },
+                ]}
+                numberOfLines={1}
+            >
+                {value || placeholder}
+            </Text>
+        </View>
+        <Icon name="chevron-down" size={18} color={placeholderColor} />
     </Pressable>
 ));
 
 SearchField.displayName = 'SearchField';
 
 /**
- * En-tête avec bouton retour
+ * Sélecteur aller simple / aller-retour
  */
-interface HeaderProps {
-    onBack: () => void;
-    iconColor: string;
-    paddingTop: number;
+interface TripTypeToggleProps {
+    value: string;
+    onChange: (id: string) => void;
+    backgroundColor: string;
+    borderColor: string;
+    textColor: string;
+    secondaryText: string;
 }
 
-const Header = memo<HeaderProps>(({ onBack, iconColor, paddingTop }) => (
-    <View style={[styles.header, { paddingTop }]}>
-        <Pressable
-            onPress={onBack}
-            style={styles.backButton}
-            android_ripple={{ color: 'rgba(0, 0, 0, 0.1)', borderless: true, radius: 25 }}
-        >
-            <Icon name="arrow-left" size={25} color={iconColor} />
-        </Pressable>
+const TripTypeToggle = memo<TripTypeToggleProps>(({
+    value,
+    onChange,
+    backgroundColor,
+    borderColor,
+    textColor,
+    secondaryText,
+}) => (
+    <View style={[styles.tripTypeRow, { backgroundColor, borderColor }]}>
+        {TYPE_DEPARTURE_OPTIONS.map((option) => {
+            const selected = value === option.id;
+            return (
+                <Pressable
+                    key={option.id}
+                    style={[
+                        styles.tripTypeChip,
+                        selected && styles.tripTypeChipSelected,
+                    ]}
+                    onPress={() => onChange(option.id)}
+                    android_ripple={{ color: 'rgba(23, 118, 186, 0.12)' }}
+                >
+                    <Icon
+                        name={option.id === 'ROUND_TRIP' ? 'swap-horizontal' : 'arrow-right'}
+                        size={16}
+                        color={selected ? '#FFFFFF' : secondaryText}
+                    />
+                    <Text
+                        style={[
+                            styles.tripTypeChipText,
+                            { color: selected ? '#FFFFFF' : textColor },
+                        ]}
+                    >
+                        {option.label}
+                    </Text>
+                </Pressable>
+            );
+        })}
     </View>
 ));
 
-Header.displayName = 'Header';
+TripTypeToggle.displayName = 'TripTypeToggle';
 
 /**
- * Bouton de recherche
+ * Bouton de recherche pleine largeur
  */
 interface SearchButtonProps {
     loading: boolean;
@@ -161,22 +215,13 @@ interface SearchButtonProps {
 }
 
 const SearchButton = memo<SearchButtonProps>(({ loading, onPress }) => (
-    <View style={styles.searchButtonContainer}>
-        {loading ? (
-            <View style={[styles.searchButton, styles.searchButtonLoading]}>
-                <ActivityIndicator size="small" color="#FFFFFF" />
-            </View>
-        ) : (
-            <Pressable
-                disabled={loading}
-                style={styles.searchButton}
-                onPress={onPress}
-                android_ripple={{ color: 'rgba(255, 255, 255, 0.3)', borderless: true }}
-            >
-                <MaterialIcons name="search" size={30} color="#FFFFFF" />
-            </Pressable>
-        )}
-    </View>
+    <AppButton
+        title="Rechercher"
+        onPress={onPress}
+        loading={loading}
+        icon={<MaterialIcons name="search" size={22} color="#FFFFFF" />}
+        style={styles.searchButton}
+    />
 ));
 
 SearchButton.displayName = 'SearchButton';
@@ -338,7 +383,7 @@ const SelectionItem = memo<SelectionItemProps>(({
         android_ripple={{ color: 'rgba(0, 0, 0, 0.1)' }}
     >
         <Icon
-            name={isSelected ? "check-circle" : "circle-outline"}
+            name={isSelected ? "check-circle" : "circle"}
             size={24}
             color={isSelected ? tintColor : iconColor}
         />
@@ -365,27 +410,26 @@ const TripSearch = () => {
     const route = useRoute();
     const { popularTrip } = (route.params as { popularTrip?: PopularTrip }) || {};
     const colorScheme = useColorScheme() ?? 'light';
-    
-    // Hooks de couleurs AVANT tout useMemo/useCallback
-    const backgroundColor = useThemeColor({}, 'background');
-    const textColor = useThemeColor({}, 'text');
-    const iconColor = useThemeColor({}, 'icon');
-    const tintColor = useThemeColor({}, 'tint');
-    
+    const colors = useAppColors();
+
     // Couleurs thématiques mémorisées
     const themeColors = useMemo(() => ({
-        backgroundColor,
-        textColor,
-        iconColor,
-        tintColor,
-        fieldBackgroundColor: colorScheme === 'dark' ? '#2C2C2E' : '#F3F3F7',
-        fieldTextColor: colorScheme === 'dark' ? '#ECEDEE' : '#1776ba',
-        fieldPlaceholderColor: colorScheme === 'dark' ? '#9BA1A6' : '#A6A6AA',
-        borderColor: colorScheme === 'dark' ? '#3A3A3C' : '#F3F3F7',
-        datePickerBackgroundColor: colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF',
-        cancelTextColor: colorScheme === 'dark' ? '#FF453A' : '#ff0000',
-        confirmTextColor: colorScheme === 'dark' ? '#0A84FF' : '#1776ba',
-    }), [colorScheme, backgroundColor, textColor, iconColor, tintColor]);
+        backgroundColor: colors.scrollBackground,
+        cardBackground: colors.cardBackground,
+        textColor: colors.text,
+        secondaryText: colors.secondaryText,
+        iconColor: colors.icon,
+        tintColor: colors.activeTabColor,
+        fieldBackgroundColor: colors.inputBackground,
+        fieldTextColor: colors.text,
+        fieldPlaceholderColor: colors.placeholder,
+        borderColor: colors.border,
+        headerBackground: colors.headerBackground,
+        headerBorder: colors.headerBorder,
+        datePickerBackgroundColor: colors.modalBackground,
+        cancelTextColor: colors.danger,
+        confirmTextColor: colors.activeTabColor,
+    }), [colors]);
 
     // Ref pour la recherche automatique
     const hasAutoSearched = useRef(false);
@@ -451,7 +495,7 @@ const TripSearch = () => {
         } catch (error: any) {
             console.error('Erreur récupération villes:', error);
             setCities([]);
-            Alert.alert('Erreur', 'Impossible de charger les villes');
+            showAlert('Erreur', 'Impossible de charger les villes');
         } finally {
             setLoadingCities(false);
         }
@@ -462,12 +506,12 @@ const TripSearch = () => {
      */
     const performSearch = useCallback(async () => {
         if (!departureCity || !arrivalCity || !departureDate) {
-            Alert.alert('Attention', 'Veuillez sélectionner une ville de départ, d\'arrivée et une date');
+            showAlert('Attention', 'Veuillez sélectionner une ville de départ, d\'arrivée et une date');
             return;
         }
 
         if (typeDeparture === 'ROUND_TRIP' && !returnDate) {
-            Alert.alert('Attention', 'Veuillez sélectionner une date de retour');
+            showAlert('Attention', 'Veuillez sélectionner une date de retour');
             return;
         }
 
@@ -489,11 +533,11 @@ const TripSearch = () => {
                     }
                 });
             } else {
-                Alert.alert('Information', 'Aucun départ disponible, ajustez vos critères de recherche');
+                showAlert('Information', 'Aucun départ disponible, ajustez vos critères de recherche');
             }
         } catch (error: any) {
             console.error('Erreur recherche départs:', error);
-            Alert.alert('Erreur', 'Une erreur est survenue lors de la recherche');
+            showAlert('Erreur', 'Une erreur est survenue lors de la recherche');
         } finally {
             setLoadingDepartures(false);
         }
@@ -527,6 +571,11 @@ const TripSearch = () => {
         setNumberOfPersons(value);
         setModal('passenger', false);
     }, [setModal]);
+
+    const handleSwapCities = useCallback(() => {
+        setDepartureCity(arrivalCity);
+        setArrivalCity(departureCity);
+    }, [arrivalCity, departureCity]);
 
     /**
      * Handlers pour les dates Android
@@ -727,78 +776,149 @@ const TripSearch = () => {
 
     return (
         <View style={[styles.container, { backgroundColor: themeColors.backgroundColor }]}>
-            {/* Header */}
-            <Header
+            <ScreenHeader
                 onBack={() => navigation.goBack()}
+                title="Rechercher un trajet"
                 iconColor={themeColors.iconColor}
+                textColor={themeColors.textColor}
+                backgroundColor={themeColors.headerBackground}
+                borderColor={themeColors.headerBorder}
                 paddingTop={insets.top}
             />
 
             <ScrollView
-                contentContainerStyle={styles.scrollContent}
+                contentContainerStyle={[
+                    styles.scrollContent,
+                    { paddingBottom: Math.max(insets.bottom, 16) + 24 },
+                ]}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
             >
-                <Text style={[styles.sectionTitle, { color: themeColors.textColor }]}>
-                    Rechercher un trajet
+                <Text style={[styles.heroSubtitle, { color: themeColors.secondaryText }]}>
+                    Indiquez votre itinéraire pour trouver les prochains départs
                 </Text>
 
-                <View style={styles.formContainer}>
-                    {/* Ville de départ */}
+                {/* Itinéraire */}
+                <View
+                    style={[
+                        styles.card,
+                        {
+                            backgroundColor: themeColors.cardBackground,
+                            borderColor: themeColors.borderColor,
+                        },
+                    ]}
+                >
+                    <Text style={[styles.cardTitle, { color: themeColors.textColor }]}>
+                        Itinéraire
+                    </Text>
+
                     <SearchField
                         icon="map-marker"
+                        label="Départ"
                         placeholder="Ville de départ"
                         value={displayValues.departureCityName}
                         onPress={() => setModal('departure', true)}
                         backgroundColor={themeColors.fieldBackgroundColor}
+                        borderColor={themeColors.borderColor}
                         textColor={themeColors.fieldTextColor}
+                        labelColor={themeColors.secondaryText}
                         placeholderColor={themeColors.fieldPlaceholderColor}
                         iconColor={themeColors.tintColor}
                     />
 
-                    {/* Ville d'arrivée */}
+                    <View style={styles.swapRow}>
+                        <View style={[styles.swapDivider, { backgroundColor: themeColors.borderColor }]} />
+                        <Pressable
+                            style={[
+                                styles.swapButton,
+                                {
+                                    backgroundColor: themeColors.cardBackground,
+                                    borderColor: themeColors.borderColor,
+                                },
+                            ]}
+                            onPress={handleSwapCities}
+                            android_ripple={{ color: 'rgba(23, 118, 186, 0.12)', borderless: true, radius: 22 }}
+                            hitSlop={6}
+                        >
+                            <Icon name="swap-vertical" size={20} color={themeColors.tintColor} />
+                        </Pressable>
+                        <View style={[styles.swapDivider, { backgroundColor: themeColors.borderColor }]} />
+                    </View>
+
                     <SearchField
                         icon="map-marker"
+                        label="Arrivée"
                         placeholder="Ville d'arrivée"
                         value={displayValues.arrivalCityName}
                         onPress={() => setModal('arrival', true)}
                         backgroundColor={themeColors.fieldBackgroundColor}
+                        borderColor={themeColors.borderColor}
                         textColor={themeColors.fieldTextColor}
+                        labelColor={themeColors.secondaryText}
                         placeholderColor={themeColors.fieldPlaceholderColor}
                         iconColor={themeColors.tintColor}
                     />
+                </View>
 
-                    {/* Type de départ */}
+                {/* Type de trajet */}
+                <TripTypeToggle
+                    value={typeDeparture}
+                    onChange={handleSelectTypeDeparture}
+                    backgroundColor={themeColors.cardBackground}
+                    borderColor={themeColors.borderColor}
+                    textColor={themeColors.textColor}
+                    secondaryText={themeColors.secondaryText}
+                />
+
+                {/* Dates & voyageurs */}
+                <View
+                    style={[
+                        styles.card,
+                        {
+                            backgroundColor: themeColors.cardBackground,
+                            borderColor: themeColors.borderColor,
+                        },
+                    ]}
+                >
+                    <Text style={[styles.cardTitle, { color: themeColors.textColor }]}>
+                        Détails du voyage
+                    </Text>
+
                     <SearchField
-                        icon="bus"
-                        placeholder="Type de départ"
-                        value={displayValues.typeDepartureLabel}
-                        onPress={() => setModal('typeDeparture', true)}
-                        backgroundColor={themeColors.fieldBackgroundColor}
-                        textColor={themeColors.fieldTextColor}
-                        placeholderColor={themeColors.fieldPlaceholderColor}
-                        iconColor={themeColors.tintColor}
-                    />
+                            icon="calendar"
+                            label="Date de départ"
+                            placeholder="Choisir une date"
+                            value={displayValues.departureDateFormatted}
+                            onPress={() => {
+                                setDepartureDate(tempDepartureDate);
+                                setModal('datePicker', true);
+                            }}
+                            backgroundColor={themeColors.fieldBackgroundColor}
+                            borderColor={themeColors.borderColor}
+                            textColor={themeColors.fieldTextColor}
+                            labelColor={themeColors.secondaryText}
+                            placeholderColor={themeColors.fieldPlaceholderColor}
+                            iconColor={themeColors.tintColor}
+                        />
 
-                    {/* Date de départ */}
-                    <SearchField
-                        icon="calendar"
-                        placeholder="Date de départ"
-                        value={displayValues.departureDateFormatted}
-                        onPress={() => {
-                            setDepartureDate(tempDepartureDate);
-                            setModal('datePicker', true);
-                        }}
-                        backgroundColor={themeColors.fieldBackgroundColor}
-                        textColor={themeColors.fieldTextColor}
-                        placeholderColor={themeColors.fieldPlaceholderColor}
-                        iconColor={themeColors.tintColor}
-                    />
+                        <SearchField
+                            icon="account-group"
+                            label="Voyageurs"
+                            placeholder="1 voyageur"
+                            value={displayValues.passengerLabel}
+                            onPress={() => setModal('passenger', true)}
+                            backgroundColor={themeColors.fieldBackgroundColor}
+                            borderColor={themeColors.borderColor}
+                            textColor={themeColors.fieldTextColor}
+                            labelColor={themeColors.secondaryText}
+                            placeholderColor={themeColors.fieldPlaceholderColor}
+                            iconColor={themeColors.tintColor}
+                        />
 
-                    {/* Date de retour */}
                     {typeDeparture === 'ROUND_TRIP' && (
                         <SearchField
-                            icon="calendar"
+                            icon="calendar-arrow-right"
+                            label="Retour"
                             placeholder="Date de retour"
                             value={displayValues.returnDateFormatted}
                             onPress={() => {
@@ -806,27 +926,16 @@ const TripSearch = () => {
                                 setModal('returnDatePicker', true);
                             }}
                             backgroundColor={themeColors.fieldBackgroundColor}
+                            borderColor={themeColors.borderColor}
                             textColor={themeColors.fieldTextColor}
+                            labelColor={themeColors.secondaryText}
                             placeholderColor={themeColors.fieldPlaceholderColor}
                             iconColor={themeColors.tintColor}
                         />
                     )}
-
-                    {/* Nombre de voyageurs */}
-                    <SearchField
-                        icon="account-group"
-                        placeholder="Nombre de voyageurs"
-                        value={displayValues.passengerLabel}
-                        onPress={() => setModal('passenger', true)}
-                        backgroundColor={themeColors.fieldBackgroundColor}
-                        textColor={themeColors.fieldTextColor}
-                        placeholderColor={themeColors.fieldPlaceholderColor}
-                        iconColor={themeColors.tintColor}
-                    />
-
-                    {/* Bouton Rechercher */}
-                    <SearchButton loading={loadingDepartures} onPress={performSearch} />
                 </View>
+
+                <SearchButton loading={loadingDepartures} onPress={performSearch} />
             </ScrollView>
 
             {/* BottomSheets */}
@@ -951,49 +1060,117 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
-    header: {
-        position: 'absolute',
-        zIndex: 1000,
-    },
-    sectionTitle: {
-        fontSize: 20,
-        fontFamily: 'Ubuntu_Bold',
-        marginBottom: 10,
-        textAlign: 'center',
-    },
-    backButton: {
-        flexDirection: 'row',
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 15,
-        paddingLeft: 20,
-    },
     scrollContent: {
         flexGrow: 1,
-        justifyContent: 'center',
+        paddingHorizontal: 16,
+        paddingTop: 20,
+        gap: 14,
     },
-    formContainer: {
-        borderRadius: 20,
-        padding: 20,
-        gap: 15,
-        justifyContent: 'center',
-        alignItems: 'center',
+    heroSubtitle: {
+        fontSize: 15,
+        fontFamily: 'Ubuntu_Regular',
+        lineHeight: 22,
+        marginBottom: 4,
+    },
+    card: {
+        borderRadius: 12,
+        borderWidth: 1,
+        padding: 14,
+        gap: 10,
+    },
+    cardTitle: {
+        fontSize: 13,
+        fontFamily: 'Ubuntu_Medium',
+        textTransform: 'uppercase',
+        letterSpacing: 0.4,
+        marginBottom: 2,
     },
     field: {
-        borderRadius: 15,
-        height: 60,
+        borderRadius: 10,
+        borderWidth: 1,
+        minHeight: 64,
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 15,
-        gap: 12,
-        marginVertical: 3,
+        paddingHorizontal: 10,
+        paddingVertical: 10,
+        gap: 10,
         width: '100%',
         overflow: 'hidden',
     },
-    fieldText: {
+    fieldCompact: {
         flex: 1,
+        width: undefined,
+        minWidth: 0,
+    },
+    fieldIconBlock: {
+        width: 40,
+        height: 40,
+        borderRadius: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    fieldContent: {
+        flex: 1,
+        minWidth: 0,
+        gap: 2,
+    },
+    fieldLabel: {
+        fontSize: 11,
+        fontFamily: 'Ubuntu_Medium',
+        textTransform: 'uppercase',
+        letterSpacing: 0.3,
+    },
+    fieldText: {
         fontSize: 15,
         fontFamily: 'Ubuntu_Medium',
+    },
+    swapRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: 36,
+        marginVertical: -2,
+    },
+    swapDivider: {
+        flex: 1,
+        height: StyleSheet.hairlineWidth,
+    },
+    swapButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 10,
+        borderWidth: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginHorizontal: 10,
+    },
+    tripTypeRow: {
+        flexDirection: 'row',
+        borderRadius: 12,
+        borderWidth: 1,
+        padding: 4,
+        gap: 4,
+    },
+    tripTypeChip: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        height: 44,
+        borderRadius: 10,
+        overflow: 'hidden',
+    },
+    tripTypeChipSelected: {
+        backgroundColor: BRAND_BLUE,
+    },
+    tripTypeChipText: {
+        fontSize: 14,
+        fontFamily: 'Ubuntu_Medium',
+    },
+    detailsRow: {
+        flexDirection: 'row',
+        gap: 10,
     },
     datePickerModal: {
         flex: 1,
@@ -1038,21 +1215,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingVertical: 8,
     },
-    searchButtonContainer: {
-        marginTop: 10,
-    },
     searchButton: {
-        backgroundColor: '#1776ba',
-        borderRadius: 100,
-        height: 55,
-        width: 55,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        overflow: 'hidden',
-    },
-    searchButtonLoading: {
-        opacity: 0.7,
+        marginTop: 6,
     },
     cityItem: {
         flexDirection: 'row',

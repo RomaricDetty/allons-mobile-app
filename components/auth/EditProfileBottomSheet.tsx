@@ -1,12 +1,12 @@
 // @ts-nocheck
 import { FormField } from '@/components/passengers/FormField';
 import { PhoneField } from '@/components/passengers/PhoneField';
+import { AppButton } from '@/components/ui/AppButton';
 import { User } from '@/interfaces';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     Dimensions,
     KeyboardAvoidingView,
     Modal,
@@ -15,7 +15,7 @@ import {
     ScrollView,
     StyleSheet,
     Text,
-    View
+    View,
 } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, {
@@ -27,6 +27,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { showAlert } from '@/utils/alert';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const MAX_TRANSLATE_Y = SCREEN_HEIGHT * 0.1;
@@ -183,23 +184,23 @@ export const EditProfileBottomSheet = ({
      */
     const validateForm = (): boolean => {
         if (!formData.firstName.trim()) {
-            Alert.alert('Erreur', 'Le prénom est requis');
+            showAlert('Erreur', 'Le prénom est requis');
             return false;
         }
         if (!formData.lastName.trim()) {
-            Alert.alert('Erreur', 'Le nom est requis');
+            showAlert('Erreur', 'Le nom est requis');
             return false;
         }
         if (!formData.email.trim()) {
-            Alert.alert('Erreur', 'L\'email est requis');
+            showAlert('Erreur', 'L\'email est requis');
             return false;
         }
         if (!formData.dateOfBirth.trim()) {
-            Alert.alert('Erreur', 'La date de naissance est requise');
+            showAlert('Erreur', 'La date de naissance est requise');
             return false;
         }
         if (!formData.phone.trim()) {
-            Alert.alert('Erreur', 'Le téléphone est requis');
+            showAlert('Erreur', 'Le téléphone est requis');
             return false;
         }
         return true;
@@ -236,10 +237,10 @@ export const EditProfileBottomSheet = ({
 
             await onSave(updatedUser);
             closeBottomSheet();
-            Alert.alert('Succès', 'Les informations ont été mises à jour avec succès');
+            showAlert('Succès', 'Les informations ont été mises à jour avec succès');
         } catch (error) {
             console.error('Erreur lors de la sauvegarde:', error);
-            Alert.alert('Erreur', 'Une erreur est survenue lors de la mise à jour');
+            showAlert('Erreur', 'Une erreur est survenue lors de la mise à jour');
         } finally {
             setIsLoading(false);
         }
@@ -508,20 +509,13 @@ export const EditProfileBottomSheet = ({
                             </View>
 
                             {/* Bouton de sauvegarde */}
-                            <Pressable
-                                style={[styles.saveButton, isLoading && styles.saveButtonDisabled]}
+                            <AppButton
+                                title="Enregistrer"
                                 onPress={handleSave}
-                                disabled={isLoading}
-                            >
-                                {isLoading ? (
-                                    <ActivityIndicator size="small" color="#FFFFFF" />
-                                ) : (
-                                    <>
-                                        <MaterialCommunityIcons name="check" size={20} color="#FFFFFF" />
-                                        <Text style={styles.saveButtonText}>Enregistrer</Text>
-                                    </>
-                                )}
-                            </Pressable>
+                                loading={isLoading}
+                                icon={<MaterialCommunityIcons name="check" size={20} color="#FFFFFF" />}
+                                style={styles.saveButton}
+                            />
                         </ScrollView>
                     </KeyboardAvoidingView>
                 </Animated.View>
@@ -599,16 +593,10 @@ const styles = StyleSheet.create({
         maxHeight: SCREEN_HEIGHT * 0.95,
         height: SCREEN_HEIGHT * 0.9,
         backgroundColor: '#FFFFFF',
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        shadowColor: '#000',
-        shadowOffset: {
-            width: 0,
-            height: -2,
-        },
-        shadowOpacity: 0.25,
-        shadowRadius: 10,
-        elevation: 10,
+        borderTopLeftRadius: 12,
+        borderTopRightRadius: 12,
+        borderTopWidth: 1,
+        borderTopColor: '#E0E0E0',
         flexDirection: 'column',
     },
     bottomSheetHandle: {
@@ -692,24 +680,8 @@ const styles = StyleSheet.create({
         color: '#666',
     },
     saveButton: {
-        backgroundColor: '#1776BA',
-        borderRadius: 8,
-        paddingVertical: 14,
-        paddingHorizontal: 16,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
         marginTop: 16,
         marginBottom: 16,
-    },
-    saveButtonDisabled: {
-        opacity: 0.6,
-    },
-    saveButtonText: {
-        fontSize: 16,
-        fontFamily: 'Ubuntu_Bold',
-        color: '#FFFFFF',
     },
     datePickerOverlay: {
         flex: 1,

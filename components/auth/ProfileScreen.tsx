@@ -3,20 +3,31 @@ import { getLocationList } from '@/api/auth_register';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { useProfileData } from '@/hooks/useProfileData';
 import { Booking, ProfileScreenProps } from '@/interfaces';
-import { clearAuthData } from '@/utils/storage';
+import { showAlert, showConfirm } from '@/utils/alert';
+import { useAuth } from '@/contexts/AuthContext';
+import { AppButton } from '@/components/ui/AppButton';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Dimensions, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+    ActivityIndicator,
+    Animated,
+    Dimensions,
+    Platform,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
+} from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import {
     BookingCard,
     BookingFilters,
     BusRentalRequestCard,
     BusRentalRequestDetailModal,
-    LogoutModal,
     PersonalInfoCard,
     ProfileHeader,
     StatusModal,
@@ -32,13 +43,13 @@ import {
 
 export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
     const colors = useAppColors();
+    const { signOut } = useAuth();
     const { user, bookingList, isLoading, refreshing, fetchData, handleRefresh } = useProfileData();
 
     const [activeTab, setActiveTab] = useState<'info' | 'tickets' | 'locations'>('info');
     const [searchQuery, setSearchQuery] = useState<string>('');
     const [selectedStatus, setSelectedStatus] = useState<string>('');
     const [showStatusModal, setShowStatusModal] = useState<boolean>(false);
-    const [showLogoutModal, setShowLogoutModal] = useState(false);
     const [locationList, setLocationList] = useState<any[]>([]);
     const [locationsRefreshing, setLocationsRefreshing] = useState(false);
     const [selectedBusRequest, setSelectedBusRequest] = useState<any | null>(null);
@@ -49,29 +60,38 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
     const isProgrammaticScrollRef = useRef(false);
 
     /**
-     * Gère la déconnexion de l'utilisateur
-     */
-    const handleLogout = useCallback(() => {
-        setShowLogoutModal(true);
-    }, []);
-
-    /**
      * Confirme et exécute la déconnexion
      */
     const confirmLogout = useCallback(async () => {
-        setShowLogoutModal(false);
         try {
             const onboardingValue = await AsyncStorage.getItem('onboarding');
-            await clearAuthData();
+            await signOut();
             if (onboardingValue) {
                 await AsyncStorage.setItem('onboarding', onboardingValue);
             }
             onLogout();
         } catch (error) {
             console.error('Erreur lors de la déconnexion:', error);
-            Alert.alert('Erreur', 'Une erreur est survenue lors de la déconnexion');
+            showAlert('Erreur', 'Une erreur est survenue lors de la déconnexion');
         }
-    }, [onLogout]);
+    }, [onLogout, signOut]);
+
+    /**
+     * Demande confirmation avant déconnexion (alerte native)
+     */
+    const handleLogout = useCallback(() => {
+        showConfirm(
+            'Déconnexion',
+            'Êtes-vous sûr de vouloir vous déconnecter ?',
+            () => {
+                void confirmLogout();
+            },
+            {
+                confirmText: 'Se déconnecter',
+                destructive: true,
+            },
+        );
+    }, [confirmLogout]);
 
     /**
      * Charge les données au montage et au focus de l'écran (profil + réservations + demandes de location)
@@ -156,13 +176,12 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
             <PersonalInfoCard user={user} />
             <UserStatsSection user={user} />
             <ThemeAndShareCards />
-            <Pressable
-                style={[styles.upgradeButton, { backgroundColor: colors.activeTabColor }]}
+            <AppButton
+                title="Modifier mes informations"
                 onPress={handleUpdateUserInfo}
-            >
-                <MaterialCommunityIcons name="pencil" size={20} color="#FFFFFF" />
-                <Text style={styles.upgradeButtonText}>Modifier mes informations</Text>
-            </Pressable>
+                icon={<MaterialCommunityIcons name="pencil" size={20} color="#FFFFFF" />}
+                style={styles.upgradeButton}
+            />
         </ScrollView>
     );
 
@@ -180,16 +199,18 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
 
             {filteredBookings.length === 0 ? (
                 <View style={styles.emptyStateContainer}>
-                    <MaterialCommunityIcons name="ticket-outline" size={64} color={colors.inactiveIcon} />
-                    <Text style={[styles.emptyStateText, { color: colors.text }]}>Aucun ticket disponible</Text>
+                    <View style={[styles.emptyIconBlock, { borderColor: colors.border }]}>
+                        <MaterialCommunityIcons name="ticket-confirmation" size={28} color={colors.activeTabColor} />
+                    </View>
+                    <Text style={[styles.emptyStateText, { color: colors.text }]}>Aucune réservation</Text>
                     <Text style={[styles.emptyStateSubtext, { color: colors.secondaryText }]}>
-                        Vos tickets de voyage apparaîtront ici
+                        Vos billets de voyage apparaîtront ici
                     </Text>
                 </View>
             ) : (
                 <ScrollView
                     style={styles.scrollView}
-                    contentContainerStyle={[styles.scrollContent, { paddingBottom: 70 }]}
+                    contentContainerStyle={[styles.ticketsScrollContent, { paddingBottom: 100 }]}
                     showsVerticalScrollIndicator={false}
                     refreshControl={
                         <RefreshControl
@@ -229,14 +250,13 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
      */
     const renderLocationsBusTab = () => (
         <View style={[styles.locationsBusContainer, { backgroundColor: colors.scrollBackground }]}>
-            {/* Bouton en haut : + Nouvelle demande */}
-            <Pressable
-                style={[styles.locationsTopButton, { backgroundColor: colors.activeTabColor }]}
-                onPress={() => router.push('/profile/bus-rental-request')}
-            >
-                <MaterialCommunityIcons name="plus" size={22} color="#FFFFFF" />
-                <Text style={styles.locationsTopButtonText}>Nouvelle demande</Text>
-            </Pressable>
+            <View style={styles.locationsTopButtonWrap}>
+                <AppButton
+                    title="Nouvelle demande"
+                    onPress={() => router.push('/profile/bus-rental-request')}
+                    icon={<MaterialCommunityIcons name="plus" size={20} color="#FFFFFF" />}
+                />
+            </View>
 
             {locationList.length > 0 ? (
                 <ScrollView
@@ -266,7 +286,9 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                 </ScrollView>
             ) : (
                 <View style={styles.emptyStateContainer}>
-                    <MaterialCommunityIcons name="bus-clock" size={64} color={colors.inactiveIcon} />
+                    <View style={[styles.emptyIconBlock, { borderColor: colors.border }]}>
+                        <MaterialCommunityIcons name="bus" size={28} color={colors.activeTabColor} />
+                    </View>
                     <Text style={[styles.emptyStateText, { color: colors.text }]}>Aucune demande de location</Text>
                     <Text style={[styles.emptyStateSubtext, { color: colors.secondaryText }]}>
                         Créez une demande pour louer un bus.
@@ -361,12 +383,6 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                 </ScrollView>
             )}
 
-            <LogoutModal
-                visible={showLogoutModal}
-                onClose={() => setShowLogoutModal(false)}
-                onConfirm={confirmLogout}
-            />
-
             <BusRentalRequestDetailModal
                 visible={!!selectedBusRequest}
                 item={selectedBusRequest}
@@ -392,59 +408,51 @@ const styles = StyleSheet.create({
         paddingBottom: 32,
     },
     upgradeButton: {
-        borderRadius: 12,
-        paddingVertical: 16,
-        paddingHorizontal: 20,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 10,
         marginBottom: 20,
         marginTop: 8,
-        borderWidth: 0,
-    },
-    upgradeButtonText: {
-        fontSize: 16,
-        fontFamily: 'Ubuntu_Bold',
-        color: '#FFFFFF',
     },
     emptyStateContainer: {
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
+        paddingHorizontal: 32,
         paddingVertical: 64,
+        gap: 8,
+    },
+    emptyIconBlock: {
+        width: 56,
+        height: 56,
+        borderRadius: 12,
+        borderWidth: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 8,
     },
     emptyStateText: {
         fontSize: 18,
         fontFamily: 'Ubuntu_Bold',
-        marginTop: 16,
-        marginBottom: 8,
+        textAlign: 'center',
     },
     emptyStateSubtext: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
+        textAlign: 'center',
+        lineHeight: 20,
     },
     ticketsContainer: {
         flex: 1,
     },
+    ticketsScrollContent: {
+        paddingHorizontal: 16,
+        paddingTop: 8,
+    },
     locationsBusContainer: {
         flex: 1,
     },
-    locationsTopButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-        marginHorizontal: 20,
-        marginTop: 12,
-        marginBottom: 8,
-        paddingVertical: 14,
-        borderRadius: 12,
-    },
-    locationsTopButtonText: {
-        fontSize: 16,
-        fontFamily: 'Ubuntu_Bold',
-        color: '#FFFFFF',
+    locationsTopButtonWrap: {
+        paddingHorizontal: 16,
+        paddingTop: 12,
+        paddingBottom: 8,
     },
     loadingContainer: {
         flex: 1,

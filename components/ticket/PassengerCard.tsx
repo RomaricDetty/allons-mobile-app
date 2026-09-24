@@ -1,11 +1,9 @@
+import { AppButton } from '@/components/ui/AppButton';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
-/**
- * Interface pour les données d'un passager
- */
 interface Passenger {
     firstName: string;
     lastName: string;
@@ -16,13 +14,10 @@ interface Passenger {
         digits: string;
     };
     seatNumber: number;
-    id?: string; // ID du booking item (bookingItemId)
-    status?: string; // Statut du passager (CONFIRMED, CANCELLED, etc.)
+    id?: string;
+    status?: string;
 }
 
-/**
- * Interface pour les props du composant PassengerCard
- */
 interface PassengerCardProps {
     passenger: Passenger;
     textColor: string;
@@ -30,12 +25,12 @@ interface PassengerCardProps {
     primaryBlue: string;
     backgroundColor: string;
     borderColor: string;
-    bookingItemId?: string; // ID du booking item pour récupérer les bagages
-    departureId?: string; // ID du départ pour récupérer les feedbacks
+    bookingItemId?: string;
+    departureId?: string;
 }
 
 /**
- * Composant pour afficher les informations d'un passager
+ * Carte passager du billet (siège mis en avant + accès bagages)
  */
 export const PassengerCard: React.FC<PassengerCardProps> = ({
     passenger,
@@ -47,9 +42,6 @@ export const PassengerCard: React.FC<PassengerCardProps> = ({
     bookingItemId,
     departureId,
 }) => {
-    /**
-     * Navigue vers l'écran de liste des bagages du passager
-     */
     const handleBaggagePress = () => {
         const itemId = bookingItemId || passenger.id;
         if (!itemId) {
@@ -66,30 +58,26 @@ export const PassengerCard: React.FC<PassengerCardProps> = ({
         });
     };
 
-    /**
-     * Retourne la couleur du badge de statut selon le statut du passager
-     */
     const getStatusColor = (status?: string): string => {
         switch (status?.toUpperCase()) {
             case 'CONFIRMED':
-                return '#4CAF50'; // Vert
+                return '#2D7A4F';
             case 'CANCELLED':
-                return '#F44336'; // Rouge
+            case 'CANCELED':
+                return '#C44747';
             case 'PENDING':
-                return '#FF9800'; // Orange
+                return '#B86E00';
             default:
-                return '#9E9E9E'; // Gris
+                return '#9E9E9E';
         }
     };
 
-    /**
-     * Formate le libellé du statut
-     */
     const getStatusLabel = (status?: string): string => {
         switch (status?.toUpperCase()) {
             case 'CONFIRMED':
                 return 'Confirmé';
             case 'CANCELLED':
+            case 'CANCELED':
                 return 'Annulé';
             case 'PENDING':
                 return 'En attente';
@@ -98,158 +86,117 @@ export const PassengerCard: React.FC<PassengerCardProps> = ({
         }
     };
 
-    /**
-     * Navigue vers l'écran de feedback du passager
-     */
-    const handleFeedbackPress = () => {
-        router.push({
-            pathname: '/trip/feedback-passenger',
-            params: { bookingItemId: bookingItemId, departureId: departureId },
-        });
-    };
+    const isCancelled =
+        passenger.status?.toUpperCase() === 'CANCELLED' ||
+        passenger.status?.toUpperCase() === 'CANCELED';
 
     return (
-        <>
-            <View style={[styles.passengerCard, { backgroundColor, borderColor, flexDirection: 'column', alignItems: 'flex-start', gap: 15 }]}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-                    <View style={styles.passengerInfo}>
-                        <View style={styles.nameRow}>
-                            <Text style={[styles.passengerName, { color: textColor }]}>
-                                {passenger.firstName} {passenger.lastName}
-                            </Text>
-                            {passenger.status && (passenger.status.toUpperCase() === 'CANCELLED' || passenger.status.toUpperCase() === 'CANCELED') && (
-                                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(passenger.status) }]}>
-                                    <Text style={styles.statusText}>
-                                        {getStatusLabel(passenger.status)}
-                                    </Text>
-                                </View>
-                            )}
-                        </View>
-                        {passenger.email && (
-                            <Text style={[styles.passengerDetail, { color: secondaryTextColor }]}>
-                                {passenger.email}
-                            </Text>
-                        )}
-                        {passenger.phone && (
-                            <Text style={[styles.passengerDetail, { color: secondaryTextColor }]}>
-                                {passenger.phone?.countryCode} {passenger.phone?.digits}
-                            </Text>
-                        )}
-                    </View>
-                    <View style={styles.seatInfo}>
-                        <Text style={[styles.seatLabel, { color: secondaryTextColor }]}>Siège</Text>
-                        <Text style={[styles.seatNumber, { color: primaryBlue }]}>
-                            {passenger.seatNumber}
+        <View style={[styles.card, { backgroundColor, borderColor }]}>
+            <View style={styles.topRow}>
+                <View style={styles.info}>
+                    <View style={styles.nameRow}>
+                        <Text style={[styles.name, { color: textColor }]} numberOfLines={1}>
+                            {passenger.firstName} {passenger.lastName}
                         </Text>
+                        {isCancelled && (
+                            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(passenger.status) }]}>
+                                <Text style={styles.statusText}>
+                                    {getStatusLabel(passenger.status)}
+                                </Text>
+                            </View>
+                        )}
                     </View>
+                    {passenger.email ? (
+                        <Text style={[styles.detail, { color: secondaryTextColor }]} numberOfLines={1}>
+                            {passenger.email}
+                        </Text>
+                    ) : null}
+                    {passenger.phone?.digits ? (
+                        <Text style={[styles.detail, { color: secondaryTextColor }]}>
+                            {passenger.phone.countryCode} {passenger.phone.digits}
+                        </Text>
+                    ) : null}
                 </View>
-                <View style={{ flexDirection: 'row', gap: 18 }}>
-                    <Pressable
-                        onPress={handleBaggagePress}
-                        style={styles.baggageButton}
-                    >
-                        <MaterialCommunityIcons name="bag-suitcase" size={20} color={primaryBlue} />
-                        <Text style={[styles.baggageButtonText, { color: primaryBlue }]}>
-                            Voir les bagages
-                        </Text>
-                    </Pressable>
+
+                <View style={[styles.seatBlock, { borderColor }]}>
+                    <Text style={[styles.seatLabel, { color: secondaryTextColor }]}>Siège</Text>
+                    <Text style={[styles.seatNumber, { color: primaryBlue }]}>
+                        {passenger.seatNumber}
+                    </Text>
                 </View>
             </View>
 
-        </>
+            <AppButton
+                title="Voir les bagages"
+                onPress={handleBaggagePress}
+                variant="secondary"
+                icon={<MaterialCommunityIcons name="bag-suitcase" size={18} color={primaryBlue} />}
+            />
+        </View>
     );
 };
 
 const styles = StyleSheet.create({
-    passengerCard: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: 12,
-        borderRadius: 8,
-        marginBottom: 12,
+    card: {
+        borderRadius: 10,
         borderWidth: 1,
+        padding: 14,
+        marginBottom: 12,
+        gap: 14,
     },
-    passengerInfo: {
+    topRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 12,
+    },
+    info: {
         flex: 1,
+        minWidth: 0,
     },
     nameRow: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
-        marginBottom: 4,
+        marginBottom: 6,
         flexWrap: 'wrap',
     },
-    passengerName: {
+    name: {
         fontSize: 16,
         fontFamily: 'Ubuntu_Bold',
+        flexShrink: 1,
     },
     statusBadge: {
         paddingHorizontal: 8,
         paddingVertical: 3,
-        borderRadius: 12,
+        borderRadius: 8,
     },
     statusText: {
         fontSize: 10,
         fontFamily: 'Ubuntu_Bold',
         color: '#FFFFFF',
     },
-    passengerDetail: {
-        fontSize: 12,
+    detail: {
+        fontSize: 13,
         fontFamily: 'Ubuntu_Regular',
         marginBottom: 2,
     },
-    seatInfo: {
-        alignItems: 'flex-end',
+    seatBlock: {
+        width: 64,
+        borderRadius: 10,
+        borderWidth: 1,
+        paddingVertical: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     seatLabel: {
-        fontSize: 12,
-        fontFamily: 'Ubuntu_Regular',
-        marginBottom: 4,
+        fontSize: 11,
+        fontFamily: 'Ubuntu_Medium',
+        textTransform: 'uppercase',
+        letterSpacing: 0.3,
+        marginBottom: 2,
     },
     seatNumber: {
-        fontSize: 18,
+        fontSize: 22,
         fontFamily: 'Ubuntu_Bold',
     },
-    baggageButton: {
-        paddingHorizontal: 18,
-        paddingVertical: 12,
-        borderRadius: 8,
-        // padding: 12,
-        backgroundColor: 'rgba(23, 118, 186, 0.1)',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexDirection: 'row',
-        // width: '100%',
-        // height: '100%',
-    },
-    baggageButtonText: {
-        fontSize: 16,
-        fontFamily: 'Ubuntu_Regular',
-    },
-    baggageButtonIcon: {
-        fontSize: 14,
-        fontFamily: 'Ubuntu_Regular',
-    },
-    feedbackButton: {
-        paddingHorizontal: 18,
-        paddingVertical: 12,
-        borderRadius: 12,
-        backgroundColor: '#1776BA',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexDirection: 'row',
-        gap: 8,
-    },
-    feedbackButtonText: {
-        fontSize: 16,
-        fontFamily: 'Ubuntu_Regular',
-        color: '#FFFFFF',
-    },
-    feedbackButtonIcon: {
-        fontSize: 14,
-        fontFamily: 'Ubuntu_Regular',
-        color: '#FFFFFF',
-    },
 });
-

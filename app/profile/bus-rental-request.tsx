@@ -10,7 +10,6 @@ import { router } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     KeyboardAvoidingView,
     Modal,
     Platform,
@@ -23,6 +22,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { showAlert } from '@/utils/alert';
+import { AppButton } from '@/components/ui/AppButton';
+import { ScreenHeader } from '@/components/ui/ScreenHeader';
 
 /** Options pour les listes de sélection */
 const TRIP_TYPE_OPTIONS = [
@@ -196,7 +198,7 @@ export default function BusRentalRequestScreen() {
         } catch (error: any) {
             console.error('Erreur récupération villes:', error);
             setCities([]);
-            Alert.alert('Erreur', 'Impossible de charger les villes');
+            showAlert('Erreur', 'Impossible de charger les villes');
         } finally {
             setLoadingCities(false);
         }
@@ -250,7 +252,7 @@ export default function BusRentalRequestScreen() {
                 const res = await getCompanyList(token);
                 if (cancelled) return;
                 if (!Array.isArray(res.data)) {
-                    Alert.alert('Erreur', 'Une erreur est survenue lors de la récupération de la liste des compagnies');
+                    showAlert('Erreur', 'Une erreur est survenue lors de la récupération de la liste des compagnies');
                     return;
                 }
                 const normalized = res.data.map(
@@ -307,7 +309,7 @@ export default function BusRentalRequestScreen() {
             }
             setCompanyError('');
             if (!acceptTerms) {
-                Alert.alert('Attention', 'Veuillez accepter les conditions générales de location');
+                showAlert('Attention', 'Veuillez accepter les conditions générales de location');
                 return;
             }
             const token = await AsyncStorage.getItem('token');
@@ -348,15 +350,15 @@ export default function BusRentalRequestScreen() {
             console.log("createBusRentalRequest response ==>, ", response);
             if (response.status !== 200 && response.status !== 201) {
                 setIsLoading(false);
-                Alert.alert('Erreur', 'Une erreur est survenue lors de l\'enregistrement de la demande');
+                showAlert('Erreur', 'Une erreur est survenue lors de l\'enregistrement de la demande');
                 return;
             }
             setIsLoading(false);
-            Alert.alert('Demande envoyée', 'Votre demande de location a bien été enregistrée.');  
+            showAlert('Demande envoyée', 'Votre demande de location a bien été enregistrée.');  
             router.back();
         } catch (error: any) {
             setIsLoading(false);
-            Alert.alert('Erreur', error?.response?.data?.message || error?.message || 'Une erreur est survenue lors de l\'enregistrement de la demande');
+            showAlert('Erreur', error?.response?.data?.message || error?.message || 'Une erreur est survenue lors de l\'enregistrement de la demande');
             return;
         }
     }, [company, firstName, lastName, phone, phoneCountryCode, email, companyName, departureCity, departureDetail, arrivalCity, arrivalDetail, tripType, departureDate, returnDate, duration, passengerCount, passengerType, busType, capacity, luggage, accessibility, travelObjective, objectiveDetail, selectedServices, budgetMin, budgetMax, specialInstructions, acceptTerms]);
@@ -382,13 +384,15 @@ export default function BusRentalRequestScreen() {
 
     return (
         <View style={[styles.container, { backgroundColor: scrollBg }]}>
-            <View style={[styles.header, { paddingTop: insets.top, backgroundColor: headerBg, borderBottomColor: borderColor }]}>
-                <Pressable style={styles.backButton} onPress={() => router.back()}>
-                    <MaterialCommunityIcons name="arrow-left" size={25} color={iconColor} />
-                </Pressable>
-                <Text style={[styles.headerTitle, { color: textColor }]}>Demande de location de bus</Text>
-                <View style={styles.headerSpacer} />
-            </View>
+            <ScreenHeader
+                title="Demande de location de bus"
+                onBack={() => router.back()}
+                iconColor={iconColor}
+                textColor={textColor}
+                backgroundColor={headerBg}
+                borderColor={borderColor}
+                paddingTop={insets.top}
+            />
 
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -840,7 +844,7 @@ export default function BusRentalRequestScreen() {
                         {/* CGU */}
                         <Pressable style={styles.checkRow} onPress={() => setAcceptTerms((a) => !a)}>
                             <MaterialCommunityIcons
-                                name={acceptTerms ? 'checkbox-marked' : 'checkbox-blank-outline'}
+                                name={acceptTerms ? 'checkbox-marked' : 'checkbox-blank'}
                                 size={24}
                                 color={acceptTerms ? accentColor : iconColor}
                             />
@@ -854,9 +858,13 @@ export default function BusRentalRequestScreen() {
                             <Pressable style={[styles.cancelButton, { borderColor }]} onPress={() => router.back()}>
                                 <Text style={[styles.cancelButtonText, { color: textColor }]}>Annuler</Text>
                             </Pressable>
-                            <Pressable style={[styles.submitButton, { backgroundColor: accentColor }]} onPress={handleSubmit} disabled={isLoading}>
-                                <Text style={styles.submitButtonText}>{isLoading ? 'Envoi en cours...' : 'Envoyer la demande'}</Text>
-                            </Pressable>
+                            <AppButton
+                                title="Envoyer la demande"
+                                onPress={handleSubmit}
+                                loading={isLoading}
+                                disabled={isLoading}
+                                style={{ backgroundColor: accentColor }}
+                            />
                         </View>
                     </View>
                 </ScrollView>
@@ -983,17 +991,6 @@ export default function BusRentalRequestScreen() {
 const styles = StyleSheet.create({
     container: { flex: 1 },
     loader: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingBottom: 12,
-        borderBottomWidth: 1,
-    },
-    backButton: { padding: 8 },
-    headerTitle: { fontSize: 18, fontFamily: 'Ubuntu_Bold', flex: 1, textAlign: 'center' },
-    headerSpacer: { width: 40 },
     keyboardView: { flex: 1 },
     scrollView: { flex: 1 },
     scrollContent: { padding: 16 },
@@ -1110,8 +1107,6 @@ const styles = StyleSheet.create({
     actions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 24 },
     cancelButton: { paddingVertical: 12, paddingHorizontal: 20, borderRadius: 8, borderWidth: 1 },
     cancelButtonText: { fontSize: 14, fontFamily: 'Ubuntu_Bold' },
-    submitButton: { paddingVertical: 12, paddingHorizontal: 20, borderRadius: 8 },
-    submitButtonText: { fontSize: 14, fontFamily: 'Ubuntu_Bold', color: '#FFFFFF' },
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0, 0, 0, 0.5)',

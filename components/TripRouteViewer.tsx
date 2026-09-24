@@ -8,29 +8,31 @@ import { geocodingService } from "@/services/geocodingService";
 import { routingService } from "@/services/routingService";
 import { PassengerLocation } from "@/types/tracking";
 import { Ionicons } from "@expo/vector-icons";
+import { BackButton } from "@/components/ui/BackButton";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
-import React, {
+import React,
+    {
   useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Animated,
-  Image,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+    ActivityIndicator,
+    Animated,
+    Image,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_DEFAULT } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { showAlert } from '@/utils/alert';
 
 // Import des images
 const busImage = require("@/assets/images/bus.png");
@@ -41,10 +43,10 @@ const userLocationPinImage = require("@/assets/images/user-location-pin.png");
 // Constantes de couleurs
 const COLORS = {
   ACCENT: "#1776BA",
-  ACCENT_LIGHT: "rgba(106, 90, 205, 0.1)",
-  START_MARKER: "#4CAF50",
-  END_MARKER: "#F44336",
-  ERROR: "#F44336",
+  ACCENT_LIGHT: "rgba(23, 118, 186, 0.1)",
+  START_MARKER: "#2D7A4F",
+  END_MARKER: "#C44747",
+  ERROR: "#C44747",
   WHITE: "#fff",
   DARK_CARD: "#1C1C1E",
   DARK_BORDER: "#3A3A3C",
@@ -321,7 +323,7 @@ export default function TripRouteViewer({ booking }: TripRouteViewerProps) {
 
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert(
+        showAlert(
           "Permission refusée",
           "L'accès à la localisation est nécessaire pour afficher votre position",
         );
@@ -801,7 +803,7 @@ export default function TripRouteViewer({ booking }: TripRouteViewerProps) {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== "granted") {
-          Alert.alert(
+          showAlert(
             "Permission refusée",
             "L'accès à la localisation est nécessaire pour afficher votre position",
           );
@@ -1133,11 +1135,6 @@ export default function TripRouteViewer({ booking }: TripRouteViewerProps) {
     [insets.top],
   );
 
-  const headerButtonStyle = useMemo(
-    () => [styles.headerButton, { backgroundColor: backgroundColor }],
-    [backgroundColor],
-  );
-
   const panelHeightInterpolation = useMemo(
     () =>
       panelHeightAnim.interpolate({
@@ -1379,9 +1376,12 @@ export default function TripRouteViewer({ booking }: TripRouteViewerProps) {
 
       {/* En-tête de navigation */}
       <View style={headerStyle}>
-        <TouchableOpacity style={headerButtonStyle} onPress={handleBackPress}>
-          <Ionicons name="arrow-back" size={20} color={textColor} />
-        </TouchableOpacity>
+        <BackButton
+          onPress={handleBackPress}
+          color={textColor}
+          backgroundColor={backgroundColor}
+          bordered
+        />
         {/* <Text style={[styles.headerTitle, { color: textColor }]}>Itinéraire du trajet</Text> */}
         {/* <View style={styles.headerRightButtons} /> */}
       </View>
@@ -1400,7 +1400,7 @@ export default function TripRouteViewer({ booking }: TripRouteViewerProps) {
           onPress={toggleLocationMode}
         >
           <Ionicons
-            name={isManualMode ? "location" : "location-outline"}
+            name="location"
             size={20}
             color={isManualMode ? COLORS.WHITE : textColor}
           />
@@ -1437,7 +1437,7 @@ export default function TripRouteViewer({ booking }: TripRouteViewerProps) {
             onPress={toggleFollowBus}
           >
             <Ionicons
-              name={isFollowingBus ? "eye" : "eye-outline"}
+              name="eye"
               size={20}
               color={isFollowingBus ? COLORS.WHITE : textColor}
             />
@@ -1470,7 +1470,7 @@ export default function TripRouteViewer({ booking }: TripRouteViewerProps) {
           ]}
           onPress={centerMapOnRoute}
         >
-          <Ionicons name="expand-outline" size={20} color={textColor} />
+          <Ionicons name="expand" size={20} color={textColor} />
         </TouchableOpacity>
       </View>
 
@@ -1551,7 +1551,7 @@ export default function TripRouteViewer({ booking }: TripRouteViewerProps) {
                     { backgroundColor: COLORS.ACCENT },
                   ]}
                 >
-                  <Ionicons name="bus-outline" size={20} color={COLORS.WHITE} />
+                  <Ionicons name="bus" size={20} color={COLORS.WHITE} />
                 </View>
                 <View
                   style={[
@@ -1628,7 +1628,7 @@ export default function TripRouteViewer({ booking }: TripRouteViewerProps) {
                 ]}
               >
                 <Ionicons
-                  name="hand-left-outline"
+                  name="hand-left"
                   size={16}
                   color={COLORS.WHITE}
                 />
@@ -1721,7 +1721,7 @@ export default function TripRouteViewer({ booking }: TripRouteViewerProps) {
                       ]}
                     >
                       <Ionicons
-                        name="bus-outline"
+                        name="bus"
                         size={16}
                         color={COLORS.WHITE}
                       />
@@ -1770,7 +1770,7 @@ export default function TripRouteViewer({ booking }: TripRouteViewerProps) {
                     </View>
                     <View style={styles.stepCardDetails}>
                       <Ionicons
-                        name="time-outline"
+                        name="time"
                         size={12}
                         color={secondaryTextColor}
                       />
@@ -1806,7 +1806,7 @@ export default function TripRouteViewer({ booking }: TripRouteViewerProps) {
                       ]}
                     >
                       <Ionicons
-                        name="stop-outline"
+                        name="stop"
                         size={16}
                         color={COLORS.WHITE}
                       />
@@ -1849,7 +1849,7 @@ export default function TripRouteViewer({ booking }: TripRouteViewerProps) {
                     </View>
                     <View style={styles.stepCardDetails}>
                       <Ionicons
-                        name="time-outline"
+                        name="time"
                         size={12}
                         color={secondaryTextColor}
                       />
@@ -1937,13 +1937,6 @@ const styles = StyleSheet.create({
     // shadowRadius: 4,
     // elevation: 4,
   },
-  headerButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: "center",
-    alignItems: "center",
-  },
   headerTitle: {
     fontSize: 18,
     fontWeight: "bold",
@@ -1983,17 +1976,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   userLocationPinShadow: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 64,
+    height: 64,
+    borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(23, 118, 186, 0.15)",
-    shadowColor: COLORS.ACCENT,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.5,
-    shadowRadius: 6,
-    elevation: 8,
+    backgroundColor: "rgba(23, 118, 186, 0.12)",
   },
   userLocationPinMarker: {
     width: 32,

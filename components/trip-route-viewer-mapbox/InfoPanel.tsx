@@ -239,7 +239,7 @@ function InfoPanelInner({
                                 { backgroundColor: colors.ACCENT },
                             ]}
                         >
-                            <Ionicons name="hand-left-outline" size={16} color={colors.WHITE} />
+                            <Ionicons name="hand-left" size={16} color={colors.WHITE} />
                         </View>
                         <View style={styles.modeIndicatorTextContainer}>
                             <Text style={[styles.modeIndicatorTitle, { color: colors.ACCENT }]}>

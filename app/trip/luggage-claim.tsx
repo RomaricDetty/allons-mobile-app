@@ -9,18 +9,18 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
     KeyboardAvoidingView,
     Platform,
     Pressable,
     ScrollView,
     StyleSheet,
     Text,
-    View
+    View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { showAlert } from '@/utils/alert';
+import { AppButton } from '@/components/ui/AppButton';
 
 /**
  * Options pour le type de réclamation
@@ -105,21 +105,21 @@ const LuggageClaimScreen = () => {
      */
     const validateForm = useCallback((): boolean => {
         if (!claimForm.type) {
-            Alert.alert('Erreur', 'Veuillez sélectionner un type de réclamation.');
+            showAlert('Erreur', 'Veuillez sélectionner un type de réclamation.');
             return false;
         }
         if (!claimForm.description.trim()) {
-            Alert.alert('Erreur', 'Veuillez décrire le problème rencontré.');
+            showAlert('Erreur', 'Veuillez décrire le problème rencontré.');
             return false;
         }
         // Validation spécifique pour le type "Endommagé"
         if (claimForm.type === 'DAMAGED') {
             if (!claimForm.metadata.damageDescription.trim()) {
-                Alert.alert('Erreur', 'Veuillez décrire les dommages subis par le bagage.');
+                showAlert('Erreur', 'Veuillez décrire les dommages subis par le bagage.');
                 return false;
             }
             if (!claimForm.metadata.estimatedValue || claimForm.metadata.estimatedValue <= 0) {
-                Alert.alert('Erreur', 'Veuillez renseigner la valeur estimée du bagage.');
+                showAlert('Erreur', 'Veuillez renseigner la valeur estimée du bagage.');
                 return false;
             }
         }
@@ -162,7 +162,7 @@ const LuggageClaimScreen = () => {
             );
 
             if (response.data) {
-                Alert.alert(
+                showAlert(
                     'Succès',
                     'Votre réclamation a été enregistrée. Nous vous contacterons sous peu.',
                     [
@@ -175,7 +175,7 @@ const LuggageClaimScreen = () => {
             }
         } catch (error: any) {
             console.error('Erreur lors de la réclamation:', error);
-            Alert.alert(
+            showAlert(
                 'Erreur',
                 error.response?.data?.message || 'Une erreur est survenue lors de la réclamation.',
                 [{ text: 'OK' }]
@@ -320,25 +320,25 @@ const LuggageClaimScreen = () => {
                     },
                 ]}
             >
-                <Pressable
-                    style={[styles.cancelButton, { borderColor: themeColors.borderColor }]}
+                <AppButton
+                    title="Annuler"
                     onPress={handleCancel}
+                    variant="ghost"
                     disabled={isSubmitting}
-                >
-                    <Text style={[styles.cancelButtonText, { color: textColor }]}>Annuler</Text>
-                </Pressable>
+                    fullWidth={false}
+                    style={[styles.cancelButton, { borderColor: themeColors.borderColor }]}
+                    textStyle={{ color: textColor }}
+                />
 
-                <Pressable
-                    style={[styles.submitButton, { backgroundColor: '#F44336' }]}
+                <AppButton
+                    title="Soumettre"
                     onPress={handleSubmit}
+                    loading={isSubmitting}
                     disabled={isSubmitting}
-                >
-                    {isSubmitting ? (
-                        <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                        <Text style={styles.submitButtonText}>Soumettre</Text>
-                    )}
-                </Pressable>
+                    variant="danger"
+                    fullWidth={false}
+                    style={styles.submitButton}
+                />
             </View>
 
             {/* Bottom Sheet pour la sélection du type */}
@@ -431,29 +431,9 @@ const styles = StyleSheet.create({
     },
     cancelButton: {
         flex: 1,
-        paddingVertical: 14,
-        paddingHorizontal: 16,
-        borderRadius: 8,
-        borderWidth: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    cancelButtonText: {
-        fontSize: 14,
-        fontFamily: 'Ubuntu_Medium',
     },
     submitButton: {
         flex: 1,
-        paddingVertical: 14,
-        paddingHorizontal: 16,
-        borderRadius: 8,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    submitButtonText: {
-        fontSize: 14,
-        fontFamily: 'Ubuntu_Medium',
-        color: '#FFFFFF',
     },
 });
 
