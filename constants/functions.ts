@@ -25,20 +25,21 @@ export const capitalizeBusType = (busType: string) => {
 /**
  * Formate la date en français complet
  */
+/**
+ * Formate la date en français compact : « jeudi 24 sept. 2026 »
+ */
 export const formatFullDate = (dateString: string): string => {
     const date = new Date(dateString);
-    const days = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
-    const months = [
-        'Janvier', 'Février', 'Mars', 'Avril', 
-        'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 
-        'Octobre', 'Novembre', 'Décembre'
-    ];
-    const dayName = days[date.getDay()];
-    const day = date.getDate();
-    const month = months[date.getMonth()];
-    const year = date.getFullYear();
+    if (Number.isNaN(date.getTime())) return '—';
 
-    return `${dayName} ${day} ${month} ${year}`;
+    const days = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+    const months = [
+        'janv.', 'févr.', 'mars', 'avr.',
+        'mai', 'juin', 'juil.', 'août', 'sept.',
+        'oct.', 'nov.', 'déc.',
+    ];
+
+    return `${days[date.getDay()]} ${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
 };
 
 /**

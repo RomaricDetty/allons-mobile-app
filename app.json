@@ -25,6 +25,17 @@
             "infoPlist": {
                 "UIViewControllerBasedStatusBarAppearance": false,
                 "UILaunchStoryboardName": "SplashScreen",
+                "UIApplicationSceneManifest": {
+                    "UIApplicationSupportsMultipleScenes": false,
+                    "UISceneConfigurations": {
+                        "UIWindowSceneSessionRoleApplication": [
+                            {
+                                "UISceneConfigurationName": "Default Configuration",
+                                "UISceneDelegateClassName": "$(PRODUCT_MODULE_NAME).SceneDelegate"
+                            }
+                        ]
+                    }
+                },
                 "NSLocationWhenInUseUsageDescription": "AllOn a besoin d'accéder à votre localisation pour vous montrer les arrêts de bus à proximité.",
                 "NSLocationAlwaysAndWhenInUseUsageDescription": "AllOn a besoin d'accéder à votre localisation en arrière-plan pour le suivi en temps réel de votre trajet.",
                 "NSLocationAlwaysUsageDescription": "AllOn a besoin d'accéder à votre localisation en arrière-plan pour le suivi de votre trajet.",

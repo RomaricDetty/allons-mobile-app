@@ -3,6 +3,7 @@ import { busTrackingService } from '@/services/busTrackingService';
 import { routingService } from '@/services/routingService';
 import { BusPosition, BusStop, Trip } from '@/types/tracking';
 import { getAuthToken } from '@/utils/storage';
+import { notifyTripStatusLocally } from '@/utils/tripNotifications';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface UseBusTrackingOptions {
@@ -260,6 +261,28 @@ export function useBusTracking(
             setTrip((prevTrip) => {
                 if (!prevTrip) return next as Trip;
                 return { ...prevTrip, ...next };
+            });
+
+            const tripRecord = next as Record<string, any>;
+            const resolvedTripId = String(tripRecord.id || tripRecord.tripId || tripId || '').trim();
+            const from =
+                tripRecord.stationFrom?.city ||
+                tripRecord.departureCity ||
+                tripRecord.departureLocation ||
+                '';
+            const to =
+                tripRecord.stationTo?.city ||
+                tripRecord.arrivalCity ||
+                tripRecord.arrivalLocation ||
+                '';
+            void notifyTripStatusLocally({
+                tripId: resolvedTripId,
+                status: tripRecord.status || tripRecord.departureStatus,
+                routeLabel:
+                    [from, to].filter(Boolean).join(' → ') ||
+                    tripRecord.route ||
+                    'votre trajet',
+                bookingId,
             });
         };
 

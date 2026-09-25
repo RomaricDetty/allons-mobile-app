@@ -8,6 +8,7 @@ import {
     formatFullDate,
     formatFullDateWithTime,
     formatStatus,
+    getStatusColor,
 } from '@/constants/functions';
 import { formatPaymentMethod } from '@/constants/paymentMethods';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -216,6 +217,7 @@ const TicketDetails = () => {
 
         return {
             formattedStatus: formatStatus(ticket.status),
+            statusColor: getStatusColor(ticket.status),
             routeText: buildRouteText(ticket, fallbackDepartureCity, fallbackArrivalCity),
             passengerCountText: ticket.passengers.length > 1 ? 'Passagers' : 'Passager',
             formattedPaymentMethod: formatPaymentMethod(ticket.paymentProvider),
@@ -467,7 +469,7 @@ const TicketDetails = () => {
                             <View
                                 style={[
                                     styles.statusBadge,
-                                    { backgroundColor: 'rgba(255,255,255,0.18)', borderColor: 'rgba(255,255,255,0.35)' },
+                                    { backgroundColor: ticketDerivedValues.statusColor },
                                 ]}
                             >
                                 <Text style={styles.statusBadgeText}>{ticketDerivedValues.formattedStatus}</Text>
@@ -475,9 +477,9 @@ const TicketDetails = () => {
                         </View>
 
                         <View style={styles.heroMetaRow}>
-                            <View style={styles.heroMetaItem}>
+                            <View style={[styles.heroMetaItem, styles.heroMetaDateItem]}>
                                 <Text style={styles.heroMetaLabel}>Date</Text>
-                                <Text style={styles.heroMetaValue} numberOfLines={2}>
+                                <Text style={styles.heroMetaValue}>
                                     {formatFullDate(ticket.departureDateTime)}
                                 </Text>
                             </View>
@@ -789,7 +791,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
         paddingVertical: 6,
         borderRadius: 8,
-        borderWidth: 1,
     },
     statusBadgeText: {
         fontSize: 12,
@@ -807,6 +808,9 @@ const styles = StyleSheet.create({
         flex: 1,
         gap: 4,
     },
+    heroMetaDateItem: {
+        flex: 1.6,
+    },
     heroMetaDivider: {
         width: StyleSheet.hairlineWidth,
         backgroundColor: 'rgba(255,255,255,0.28)',
@@ -823,6 +827,7 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontFamily: 'Ubuntu_Bold',
         color: '#FFFFFF',
+        lineHeight: 20,
     },
     sectionCard: {
         borderRadius: 12,

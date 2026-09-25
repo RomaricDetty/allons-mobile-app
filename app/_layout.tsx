@@ -14,6 +14,7 @@ import { ThemeProvider } from '@/contexts/ThemeContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { usePendingPaymentRecovery } from '@/hooks/usePendingPaymentRecovery';
 import { usePaymentNotificationResponse } from '@/hooks/usePaymentNotificationResponse';
+import { useTripStatusNotifications } from '@/hooks/useTripStatusNotifications';
 import { ensureLocalNotificationPermissions } from '@/utils/paymentNotifications';
 import { useEffect, useState } from 'react';
 
@@ -143,6 +144,7 @@ function RootContent() {
     const colorScheme = useColorScheme();
     usePendingPaymentRecovery(true);
     usePaymentNotificationResponse();
+    useTripStatusNotifications(true);
 
     useEffect(() => {
         ensureLocalNotificationPermissions().catch(() => undefined);

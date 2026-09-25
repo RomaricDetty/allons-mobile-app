@@ -80,6 +80,8 @@ export interface PendingPaymentSession {
     };
     createdAt: string;
     /** Phase locale pour reprise après kill / appel / reload. */
-    phase?: 'checkout' | 'verifying';
+    phase?: 'checkout' | 'verifying' | 'dismissed';
+    /** L’utilisateur a quitté volontairement l’écran de vérification. */
+    dismissedAt?: string | null;
     updatedAt?: string;
 }

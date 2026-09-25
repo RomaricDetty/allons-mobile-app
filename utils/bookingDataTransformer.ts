@@ -152,8 +152,8 @@ export const transformBookingData = (rawData: RawBookingData) => {
         totalAmount: payment.amount || booking.totalAmount || '0',
         currency: payment.currency || booking.currency || trip?.currency || 'XOF',
         method: payment.method || 'MOBILE_MONEY',
-        provider: payment.provider || payment.paymentProvider || 'N/A',
-        paymentProvider: payment.provider || payment.paymentProvider || 'N/A',
+        provider: payment.provider || payment.paymentProvider || '',
+        paymentProvider: payment.provider || payment.paymentProvider || '',
         createdAt: booking.createdAt || new Date().toISOString(),
         // Informations du voyage aller
         departureDateTime: departureInfo?.departureDateTime || trip?.departureDateTime || '',

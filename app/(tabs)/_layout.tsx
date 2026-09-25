@@ -1,143 +1,58 @@
 // @ts-nocheck
-import {
-    Colors } from '@/constants/theme';
+import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { Icon,
-    Label,
-    NativeTabs,
-    VectorIcon } from 'expo-router/unstable-native-tabs';
+import { Tabs } from 'expo-router';
 import React from 'react';
-import { Platform,
-} from 'react-native';
 
-/** Couleur onglet sélectionné (iOS) */
-const TAB_SELECTED_IOS = '#1776BA';
-/** Couleurs onglet sélectionné (Android) */
-const TAB_SELECTED_BG = 'rgba(23, 118, 186, 1)';
-const TAB_SELECTED_CONTENT = '#FFFFFF';
+const TAB_ACTIVE = '#1776BA';
 
-/** Style barre d'onglets Android (sans ombre) */
-const TAB_BAR_ELEVATION = 0;
-
-/** Icônes : SF Symbols sur iOS, VectorIcon (72px) sur Android pour affichage net */
-const tabIcons = {
-    home:
-        Platform.OS === 'ios'
-            ? { sf: { default: 'house.fill' as const, selected: 'house.fill' as const } }
-            : { src: <VectorIcon family={MaterialCommunityIcons} name="home" /> },
-    profile:
-        Platform.OS === 'ios'
-            ? { sf: { default: 'person.fill' as const, selected: 'person.fill' as const } }
-            : { src: <VectorIcon family={MaterialCommunityIcons} name="account" /> },
-};
-
-/** Retourne les props de style de la barre d’onglets pour Android (couleurs thème) */
-function getAndroidTabBarStyle(scheme: 'light' | 'dark' | null) {
-    if (Platform.OS !== 'android') return undefined;
-    const resolvedScheme = scheme ?? 'light';
-    const colors = Colors[resolvedScheme];
-    return {
-        backgroundColor: colors.background,
-        iconColor: {
-            default: colors.tabIconDefault,
-            selected: TAB_SELECTED_CONTENT,
-        },
-        labelStyle: {
-            default: { color: colors.tabIconDefault },
-            selected: { color: colors.tabIconSelected },
-        },
-        indicatorColor: TAB_SELECTED_BG,
-        style: { elevation: TAB_BAR_ELEVATION },
-    };
-}
-
-/** Retourne les props de style de la barre d'onglets pour iOS (onglet sélectionné #1766AB) */
-function getIOSTabBarStyle(scheme: 'light' | 'dark' | null) {
-    if (Platform.OS !== 'ios') return undefined;
-    const resolvedScheme = scheme ?? 'light';
-    const colors = Colors[resolvedScheme];
-    return {
-        iconColor: {
-            default: colors.tabIconDefault,
-            selected: TAB_SELECTED_IOS,
-        },
-        labelStyle: {
-            default: { color: colors.tabIconDefault },
-            selected: { color: TAB_SELECTED_IOS },
-        },
-        indicatorColor: TAB_SELECTED_IOS,
-    };
-}
-
+/**
+ * Barre d’onglets JS (expo-router Tabs) — plus stable que NativeTabs sur iOS 27.
+ */
 export default function TabLayout() {
-    const colorScheme = useColorScheme();
-    const androidStyle = getAndroidTabBarStyle(colorScheme);
-    const iosStyle = getIOSTabBarStyle(colorScheme);
+    const colorScheme = useColorScheme() ?? 'light';
+    const colors = Colors[colorScheme];
+
     return (
-        <>
-            <NativeTabs {...androidStyle} {...iosStyle}>
-                <NativeTabs.Trigger name="index">
-                    <Label>Accueil</Label>
-                    <Icon {...tabIcons.home} selectedColor={Platform.OS === 'ios' ? TAB_SELECTED_IOS : TAB_SELECTED_CONTENT} />
-                </NativeTabs.Trigger>
-                <NativeTabs.Trigger name="profile">
-                    <Icon {...tabIcons.profile} selectedColor={Platform.OS === 'ios' ? TAB_SELECTED_IOS : TAB_SELECTED_CONTENT} />
-                    <Label>Mon profil</Label>
-                </NativeTabs.Trigger>
-            </NativeTabs>
-
-            {/* {Platform.OS === 'android' && (
-                <Tabs
-                    screenOptions={{
-                        headerShown: false,
-                        tabBarActiveTintColor: '#1776BA',
-                        tabBarInactiveTintColor: '#687076',
-                    }}
-                >
-                    <Tabs.Screen
-                        name="index"
-                        options={{
-                            title: 'Accueil',
-                            tabBarIcon: ({ color, size }) => (
-                                <MaterialIcons name="home" size={size} color={color} />
-                            ),
-                        }}
-                    />
-
-                    <Tabs.Screen
-                        name="profile"
-                        options={{
-                            title: 'Mon profil',
-                            tabBarIcon: ({ color, size }) => (
-                                <MaterialIcons name="person" size={size} color={color} />
-                            ),
-                        }}
-                    />
-                </Tabs>
-            )}
-
-            {Platform.OS === 'ios' && (
-                <NativeTabs>
-                    <NativeTabs.Trigger name="index">
-                        <Label>Accueil</Label>
-                        <Icon
-                            sf="house.fill"
-                            android="home"
-                            drawable="ic_home"
-                        />
-                    </NativeTabs.Trigger>
-
-                    <NativeTabs.Trigger name="profile">
-                        <Label>Mon profil</Label>
-                        <Icon
-                            sf="person.fill"
-                            android="person"
-                            drawable="ic_profile"
-                        />
-                    </NativeTabs.Trigger>
-                </NativeTabs>
-            )} */}
-        </>
+        <Tabs
+            screenOptions={{
+                headerShown: false,
+                tabBarActiveTintColor: TAB_ACTIVE,
+                tabBarInactiveTintColor: colors.tabIconDefault,
+                tabBarLabelStyle: {
+                    fontFamily: 'Ubuntu_Medium',
+                    fontSize: 12,
+                },
+                tabBarStyle: {
+                    backgroundColor: colors.cardBackground,
+                    borderTopColor: colors.border,
+                    borderTopWidth: 1,
+                    elevation: 0,
+                    shadowOpacity: 0,
+                    shadowRadius: 0,
+                    shadowOffset: { width: 0, height: 0 },
+                },
+            }}
+        >
+            <Tabs.Screen
+                name="index"
+                options={{
+                    title: 'Accueil',
+                    tabBarIcon: ({ color, size }) => (
+                        <MaterialCommunityIcons name="home" size={size ?? 24} color={color} />
+                    ),
+                }}
+            />
+            <Tabs.Screen
+                name="profile"
+                options={{
+                    title: 'Mon profil',
+                    tabBarIcon: ({ color, size }) => (
+                        <MaterialCommunityIcons name="account" size={size ?? 24} color={color} />
+                    ),
+                }}
+            />
+        </Tabs>
     );
 }
