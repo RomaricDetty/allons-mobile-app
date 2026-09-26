@@ -4,6 +4,10 @@ import { getAvailableDepartures } from "@/api/departure";
 import { BottomSheet } from "@/components/bottom-sheet";
 import { AppButton } from '@/components/ui/AppButton';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
+import {
+    FORM_FIELD_HEIGHT,
+    FORM_FIELD_RADIUS,
+} from '@/constants/formField';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { City, PopularTrip } from "@/types";
@@ -12,7 +16,6 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation, useRoute } from "@react-navigation/native";
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
     Modal,
     Platform,
     Pressable,
@@ -124,7 +127,7 @@ const SearchField = memo<SearchFieldProps>(({
         style={[
             styles.field,
             compact && styles.fieldCompact,
-            { backgroundColor, borderColor },
+            { backgroundColor, borderColor: 'transparent' },
         ]}
         onPress={onPress}
         android_ripple={{ color: 'rgba(0, 0, 0, 0.06)' }}
@@ -1086,13 +1089,14 @@ const styles = StyleSheet.create({
         marginBottom: 2,
     },
     field: {
-        borderRadius: 10,
-        borderWidth: 1,
-        minHeight: 64,
+        borderRadius: FORM_FIELD_RADIUS,
+        borderWidth: 0,
+        height: FORM_FIELD_HEIGHT,
+        minHeight: FORM_FIELD_HEIGHT,
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 10,
-        paddingVertical: 10,
+        paddingHorizontal: 16,
+        paddingVertical: 0,
         gap: 10,
         width: '100%',
         overflow: 'hidden',
@@ -1103,16 +1107,17 @@ const styles = StyleSheet.create({
         minWidth: 0,
     },
     fieldIconBlock: {
-        width: 40,
-        height: 40,
-        borderRadius: 10,
+        width: 28,
+        height: 28,
+        borderRadius: 8,
         justifyContent: 'center',
         alignItems: 'center',
     },
     fieldContent: {
         flex: 1,
         minWidth: 0,
-        gap: 2,
+        gap: 0,
+        justifyContent: 'center',
     },
     fieldLabel: {
         fontSize: 11,
@@ -1121,8 +1126,8 @@ const styles = StyleSheet.create({
         letterSpacing: 0.3,
     },
     fieldText: {
-        fontSize: 15,
-        fontFamily: 'Ubuntu_Medium',
+        fontSize: 14,
+        fontFamily: 'Ubuntu_Regular',
     },
     swapRow: {
         flexDirection: 'row',

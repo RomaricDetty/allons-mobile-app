@@ -1,4 +1,5 @@
 import { AppButton } from '@/components/ui/AppButton';
+import { SeatBadge } from '@/components/ui/SeatBadge';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React from 'react';
@@ -27,6 +28,8 @@ interface PassengerCardProps {
     borderColor: string;
     bookingItemId?: string;
     departureId?: string;
+    /** Billet échoué / annulé : bouton bagages inactif */
+    baggageDisabled?: boolean;
 }
 
 /**
@@ -41,8 +44,10 @@ export const PassengerCard: React.FC<PassengerCardProps> = ({
     borderColor,
     bookingItemId,
     departureId,
+    baggageDisabled = false,
 }) => {
     const handleBaggagePress = () => {
+        if (baggageDisabled) return;
         const itemId = bookingItemId || passenger.id;
         if (!itemId) {
             console.warn('bookingItemId non disponible pour ce passager');
@@ -118,19 +123,26 @@ export const PassengerCard: React.FC<PassengerCardProps> = ({
                     ) : null}
                 </View>
 
-                <View style={[styles.seatBlock, { borderColor }]}>
-                    <Text style={[styles.seatLabel, { color: secondaryTextColor }]}>Siège</Text>
-                    <Text style={[styles.seatNumber, { color: primaryBlue }]}>
-                        {passenger.seatNumber}
-                    </Text>
-                </View>
+                <SeatBadge
+                    seatNumber={passenger.seatNumber}
+                    primaryBlue={primaryBlue}
+                    secondaryTextColor={secondaryTextColor}
+                    borderColor={borderColor}
+                />
             </View>
 
             <AppButton
                 title="Voir les bagages"
                 onPress={handleBaggagePress}
                 variant="secondary"
-                icon={<MaterialCommunityIcons name="bag-suitcase" size={18} color={primaryBlue} />}
+                disabled={baggageDisabled}
+                icon={
+                    <MaterialCommunityIcons
+                        name="bag-suitcase"
+                        size={18}
+                        color={baggageDisabled ? secondaryTextColor : primaryBlue}
+                    />
+                }
             />
         </View>
     );
@@ -179,24 +191,5 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontFamily: 'Ubuntu_Regular',
         marginBottom: 2,
-    },
-    seatBlock: {
-        width: 64,
-        borderRadius: 10,
-        borderWidth: 1,
-        paddingVertical: 8,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    seatLabel: {
-        fontSize: 11,
-        fontFamily: 'Ubuntu_Medium',
-        textTransform: 'uppercase',
-        letterSpacing: 0.3,
-        marginBottom: 2,
-    },
-    seatNumber: {
-        fontSize: 22,
-        fontFamily: 'Ubuntu_Bold',
     },
 });

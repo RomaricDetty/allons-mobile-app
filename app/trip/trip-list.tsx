@@ -2,15 +2,24 @@
 import { getAvailableDepartures } from '@/api/departure';
 import { BottomSheet } from '@/components/bottom-sheet';
 import { CompanyLogoBadge, getTripCompanyLogoUrl } from '@/components/trip/CompanyLogoBadge';
+import { AppButton } from '@/components/ui/AppButton';
+import { BackButton } from '@/components/ui/BackButton';
 import { capitalizeBusType } from '@/constants/functions';
+import {
+    FORM_FIELD_HEIGHT,
+    FORM_FIELD_RADIUS,
+    getFormFieldColors,
+} from '@/constants/formField';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { Departures, SearchParams, Trip } from '@/types';
+import { showAlert } from '@/utils/alert';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
+    FlatList,
     Modal,
     Pressable,
     ScrollView,
@@ -21,9 +30,6 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { showAlert } from '@/utils/alert';
-import { AppButton } from '@/components/ui/AppButton';
-import { BackButton } from '@/components/ui/BackButton';
 
 /**
  * Convertit une heure au format HH:MM en minutes pour faciliter la comparaison
@@ -190,6 +196,7 @@ const TripList = () => {
     const tintColor = useThemeColor({}, 'tint');
 
     // Couleurs spécifiques pour l'écran
+    const fieldColors = getFormFieldColors(colorScheme);
     const cardBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
     const borderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
     const secondaryTextColor = colorScheme === 'dark' ? '#9BA1A6' : '#666';
@@ -198,6 +205,8 @@ const TripList = () => {
     const modalBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
     const modalBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#F3F3F7';
     const scrollBackgroundColor = colorScheme === 'dark' ? '#000000' : '#F5F5F5';
+    const inputBackgroundColor = fieldColors.background;
+    const placeholderColor = fieldColors.placeholder;
 
     // Récupération des données passées en paramètre
     const { departures, searchParams } = (route.params as { departures?: Departures, searchParams?: SearchParams }) || {};
@@ -239,10 +248,18 @@ const TripList = () => {
         const min = parseInt(minPrice) || 0;
         const max = parseInt(maxPrice) || 50000;
 
-        // Filtrage par prix
+        // Filtrage par prix + sièges disponibles (fail-open si availableSeats absent)
         let filteredTrips = trips.filter(trip => {
             const price = trip.price;
             if (price < min || price > max) return false;
+
+            if (
+                trip.availableSeats != null &&
+                typeof trip.availableSeats === 'number' &&
+                trip.availableSeats <= 0
+            ) {
+                return false;
+            }
 
             // Filtrage par créneaux horaires
             if (selectedTimeSlots.size > 0 && filters?.timeSlots) {
@@ -262,12 +279,6 @@ const TripList = () => {
             if (selectedBusTypes.size > 0) {
                 if (!selectedBusTypes.has(trip.busType.toLowerCase())) return false;
             }
-
-            // Filtrage par équipements (amenities)
-            // Note: Cette logique dépend de la structure des données des trajets
-            // Si les trajets ont une propriété amenities, on peut filtrer ici
-            // Pour l'instant, on suppose que tous les trajets passent ce filtre
-            // si aucun équipement n'est sélectionné ou si le trajet correspond
 
             return true;
         });
@@ -563,64 +574,61 @@ const TripList = () => {
                     </Pressable> */}
                 </View>
 
-                <ScrollView
+                <FlatList
                     style={styles.scrollView}
                     contentContainerStyle={styles.scrollContent}
                     showsVerticalScrollIndicator={false}
-                >
-                    {/* Route */}
-                    <View style={styles.routeContainer}>
-                        <Text style={[styles.routeCity, { color: textColor }]}>{departureCity}</Text>
-                        <Icon name="arrow-right" size={24} color={tintColor} />
-                        <Text style={[styles.routeCity, { color: textColor }]}>{arrivalCity}</Text>
-                    </View>
+                    data={sortedTrips}
+                    keyExtractor={(item) => String(item.id)}
+                    ListHeaderComponent={
+                        <>
+                            <View style={styles.routeContainer}>
+                                <Text style={[styles.routeCity, { color: textColor }]}>{departureCity}</Text>
+                                <Icon name="arrow-right" size={24} color={tintColor} />
+                                <Text style={[styles.routeCity, { color: textColor }]}>{arrivalCity}</Text>
+                            </View>
 
-                    {/* Titre */}
-                    {searchParams?.tripType === 'ROUND_TRIP' && (
-                        <View style={styles.titleContainer}>
-                            <Text style={[styles.title, { color: textColor }]}>Voyages aller disponibles</Text>
-                        </View>
-                    )}
+                            {searchParams?.tripType === 'ROUND_TRIP' && (
+                                <View style={styles.titleContainer}>
+                                    <Text style={[styles.title, { color: textColor }]}>Voyages aller disponibles</Text>
+                                </View>
+                            )}
 
-                    {/* Résumé et Tri */}
-                    <View style={styles.summaryContainer}>
-                        <Text style={[styles.summaryText, { color: secondaryTextColor }]}>
-                            {sortedTrips.length} {sortedTrips.length > 1 ? 'trajets disponibles' : 'trajet disponible'}
-                        </Text>
-                        <Pressable
-                            style={styles.sortButton}
-                            onPress={handleOpenSort}
-                        >
-                            <Text style={[styles.sortButtonText, { color: textColor }]}>{selectedSort}</Text>
-                            <Icon name="chevron-down" size={16} color={iconColor} />
-                        </Pressable>
-                    </View>
-
-                    {/* Liste des trajets */}
-                    {sortedTrips.length > 0 ? (
-                        <View style={styles.tripsList}>
-                            {sortedTrips.map((item) => (
-                                <TripCard
-                                    key={item.id}
-                                    item={item}
-                                    cardBackgroundColor={cardBackgroundColor}
-                                    borderColor={borderColor}
-                                    textColor={textColor}
-                                    secondaryTextColor={secondaryTextColor}
-                                    tintColor={tintColor}
-                                    loadingReturnTrips={loadingReturnTrips}
-                                    searchParams={searchParams}
-                                    onSelectTrip={handleSelectTrip}
-                                />
-                            ))}
-                        </View>
-                    ) : (
+                            <View style={styles.summaryContainer}>
+                                <Text style={[styles.summaryText, { color: secondaryTextColor }]}>
+                                    {sortedTrips.length} {sortedTrips.length > 1 ? 'trajets disponibles' : 'trajet disponible'}
+                                </Text>
+                                <Pressable
+                                    style={styles.sortButton}
+                                    onPress={handleOpenSort}
+                                >
+                                    <Text style={[styles.sortButtonText, { color: textColor }]}>{selectedSort}</Text>
+                                    <Icon name="chevron-down" size={16} color={iconColor} />
+                                </Pressable>
+                            </View>
+                        </>
+                    }
+                    ListEmptyComponent={
                         <View style={styles.emptyContainer}>
                             <MaterialIcons name="directions-bus" size={40} color={tintColor} />
                             <Text style={[styles.emptyText, { color: secondaryTextColor }]}>Aucun trajet disponible</Text>
                         </View>
+                    }
+                    renderItem={({ item }) => (
+                        <TripCard
+                            item={item}
+                            cardBackgroundColor={cardBackgroundColor}
+                            borderColor={borderColor}
+                            textColor={textColor}
+                            secondaryTextColor={secondaryTextColor}
+                            tintColor={tintColor}
+                            loadingReturnTrips={loadingReturnTrips}
+                            searchParams={searchParams}
+                            onSelectTrip={handleSelectTrip}
+                        />
                     )}
-                </ScrollView>
+                    ItemSeparatorComponent={() => <View style={{ height: 15 }} />}
+                />
 
                 {/* Modal Filtres (à implémenter) */}
                 <Modal
@@ -657,14 +665,14 @@ const TripList = () => {
                                     {/* Champ Min */}
                                     <View style={styles.priceInputContainer}>
                                         <Text style={[styles.priceLabel, { color: textColor }]}>Min</Text>
-                                        <View style={[styles.priceInputWrapper, { borderColor, backgroundColor: cardBackgroundColor }]}>
+                                        <View style={[styles.priceInputWrapper, { backgroundColor: inputBackgroundColor }]}>
                                             <TextInput
                                                 style={[styles.priceInput, { color: textColor }]}
                                                 value={minPrice}
                                                 onChangeText={setMinPrice}
                                                 keyboardType="numeric"
                                                 placeholder="0"
-                                                placeholderTextColor={secondaryTextColor}
+                                                placeholderTextColor={placeholderColor}
                                             />
                                             <View style={styles.stepperContainer}>
                                                 <Pressable 
@@ -686,14 +694,14 @@ const TripList = () => {
                                     {/* Champ Max */}
                                     <View style={styles.priceInputContainer}>
                                         <Text style={[styles.priceLabel, { color: textColor }]}>Max</Text>
-                                        <View style={[styles.priceInputWrapper, { borderColor, backgroundColor: cardBackgroundColor }]}>
+                                        <View style={[styles.priceInputWrapper, { backgroundColor: inputBackgroundColor }]}>
                                             <TextInput
                                                 style={[styles.priceInput, { color: textColor }]}
                                                 value={maxPrice}
                                                 onChangeText={setMaxPrice}
                                                 keyboardType="numeric"
                                                 placeholder="50000"
-                                                placeholderTextColor={secondaryTextColor}
+                                                placeholderTextColor={placeholderColor}
                                             />
                                             <View style={styles.stepperContainer}>
                                                 <Pressable 
@@ -1279,15 +1287,17 @@ const styles = StyleSheet.create({
     priceInputWrapper: {
         flexDirection: 'row',
         alignItems: 'center',
-        borderWidth: 1,
-        borderRadius: 8,
-        paddingHorizontal: 12,
+        borderWidth: 0,
+        borderRadius: FORM_FIELD_RADIUS,
+        paddingHorizontal: 16,
+        height: FORM_FIELD_HEIGHT,
     },
     priceInput: {
         flex: 1,
-        fontSize: 16,
+        fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        paddingVertical: 12,
+        paddingVertical: 0,
+        height: FORM_FIELD_HEIGHT,
     },
     stepperContainer: {
         flexDirection: 'column',

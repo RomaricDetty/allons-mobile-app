@@ -66,47 +66,79 @@ export const useSeatsManagement = (
                     if (currentPassengers.length === 0) return currentPassengers;
 
                     const initialSelections = new Map<number, number>();
-                    let lastBookedSeatNumber = 0;
 
-                    seatsArray.forEach(seat => {
-                        if (seat.booked && seat.number > lastBookedSeatNumber) {
-                            lastBookedSeatNumber = seat.number;
+                    // Préserver les sièges déjà choisis
+                    currentPassengers.forEach((passenger, index) => {
+                        const existing =
+                            leg === 'OUTBOUND'
+                                ? passenger?.seatNumber
+                                : passenger?.seatNumberReturn;
+                        if (existing != null && existing > 0) {
+                            initialSelections.set(existing, index);
                         }
                     });
 
-                    let nextAvailableSeatNumber = lastBookedSeatNumber + 1;
+                    // Sièges réellement libres, dans l’ordre du plan (pas « après le dernier réservé »)
+                    const availableSeatNumbers = seatsArray
+                        .filter(
+                            (s) =>
+                                s.available &&
+                                !s.booked &&
+                                !s.locked &&
+                                !s.blocked &&
+                                !initialSelections.has(s.number)
+                        )
+                        .map((s) => s.number)
+                        .sort((a, b) => a - b);
 
+                    let availableIdx = 0;
                     for (let index = 0; index < currentPassengers.length; index++) {
                         const passenger = currentPassengers[index];
-                        const passengerSeatNumber = leg === 'OUTBOUND'
-                            ? passenger?.seatNumber
-                            : passenger?.seatNumberReturn;
+                        const existing =
+                            leg === 'OUTBOUND'
+                                ? passenger?.seatNumber
+                                : passenger?.seatNumberReturn;
 
-                        if (!passengerSeatNumber) {
-                            while (nextAvailableSeatNumber <= totalSeatsCount) {
-                                const seat = seatsArray.find(s => s.number === nextAvailableSeatNumber);
-                                if (seat && seat.available && !initialSelections.has(seat.number)) {
-                                    initialSelections.set(seat.number, index);
-                                    nextAvailableSeatNumber++;
-                                    break;
-                                }
-                                nextAvailableSeatNumber++;
-                            }
+                        if (existing != null && existing > 0) continue;
+
+                        if (availableIdx < availableSeatNumbers.length) {
+                            initialSelections.set(availableSeatNumbers[availableIdx], index);
+                            availableIdx += 1;
                         }
                     }
 
-                    if (initialSelections.size > 0) {
-                        seatsAssigned = true;
-                        const updatedPassengers = [...currentPassengers];
+                    const newlyAssigned = Array.from(initialSelections.entries()).filter(
+                        ([seatNumber, passengerIndex]) => {
+                            const passenger = currentPassengers[passengerIndex];
+                            const existing =
+                                leg === 'OUTBOUND'
+                                    ? passenger?.seatNumber
+                                    : passenger?.seatNumberReturn;
+                            return existing !== seatNumber;
+                        }
+                    );
+
+                    if (newlyAssigned.length > 0 || initialSelections.size > 0) {
+                        const updatedPassengers = currentPassengers.map((p) => ({ ...p }));
+                        let didAssign = false;
                         initialSelections.forEach((passengerIndex, seatNumber) => {
-                            if (updatedPassengers[passengerIndex]) {
-                                if (leg === 'OUTBOUND') {
-                                    updatedPassengers[passengerIndex].seatNumber = seatNumber;
-                                } else {
-                                    updatedPassengers[passengerIndex].seatNumberReturn = seatNumber;
+                            if (!updatedPassengers[passengerIndex]) return;
+                            if (leg === 'OUTBOUND') {
+                                if (updatedPassengers[passengerIndex].seatNumber !== seatNumber) {
+                                    didAssign = true;
                                 }
+                                updatedPassengers[passengerIndex].seatNumber = seatNumber;
+                            } else {
+                                if (
+                                    updatedPassengers[passengerIndex].seatNumberReturn !==
+                                    seatNumber
+                                ) {
+                                    didAssign = true;
+                                }
+                                updatedPassengers[passengerIndex].seatNumberReturn = seatNumber;
                             }
                         });
+                        seatsAssigned = didAssign || newlyAssigned.length > 0;
                         return updatedPassengers;
                     }
 

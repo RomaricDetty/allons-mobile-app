@@ -5,7 +5,7 @@
         "version": "1.0.0",
         "orientation": "portrait",
         "icon": "./assets/images/icon.png",
-        "scheme": ["allonappmobile", "allon"],
+        "scheme": "allonappmobile",
         "userInterfaceStyle": "automatic",
         "newArchEnabled": true,
         "splash": {
@@ -43,8 +43,7 @@
                     {
                         "CFBundleURLSchemes": [
                             "allonappmobile",
-                            "allon",
-                            "com.allon.app"
+                            "allon"
                         ]
                     }
                 ]
@@ -52,8 +51,8 @@
         },
         "android": {
             "adaptiveIcon": {
-                "backgroundColor": "#E6F4FE",
-                "foregroundImage": "./assets/images/android-icon-foreground.png",
+                "backgroundColor": "#1776BA",
+                "foregroundImage": "./assets/images/icon.png",
                 "backgroundImage": "./assets/images/android-icon-background.png",
                 "monochromeImage": "./assets/images/android-icon-monochrome.png"
             },
@@ -113,6 +112,7 @@
         },
         "plugins": [
             "expo-router",
+            "expo-secure-store",
             [
                 "expo-notifications",
                 {
@@ -132,7 +132,7 @@
             [
                 "@rnmapbox/maps",
                 {
-                    "RNMAPBOX_MAPS_DOWNLOAD_TOKEN": "sk.eyJ1IjoiZGV0dHktcm9tYXJpYyIsImEiOiJjbWtxMzRmbzkwam5pM2dzOTkxbDBxOHF0In0.FTLTCaKPMw8mPG_9CvIhiw",
+                    "RNMAPBOX_MAPS_DOWNLOAD_TOKEN": "",
                     "RNMapboxMapsVersion": "11.18.2"
                 }
             ]

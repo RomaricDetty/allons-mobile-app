@@ -8,6 +8,7 @@ import { geocodingService } from "@/services/geocodingService";
 import { routingService } from "@/services/routingService";
 import { PassengerLocation } from "@/types/tracking";
 import { Ionicons } from "@expo/vector-icons";
+import { MapScreenSkeleton } from "@/components/skeletons";
 import { BackButton } from "@/components/ui/BackButton";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
@@ -20,7 +21,6 @@ import React,
     useState,
     } from "react";
 import {
-    ActivityIndicator,
     Animated,
     Image,
     Platform,
@@ -1231,14 +1231,7 @@ export default function TripRouteViewer({ booking }: TripRouteViewerProps) {
    * Retourne le composant de chargement
    */
   if (isLoading) {
-    return (
-      <View style={[styles.loadingContainer, { backgroundColor }]}>
-        <ActivityIndicator size="large" color={COLORS.ACCENT} />
-        <Text style={[styles.loadingText, { color: secondaryTextColor }]}>
-          Calcul de l'itinéraire...
-        </Text>
-      </View>
-    );
+    return <MapScreenSkeleton />;
   }
 
   /**
@@ -1266,14 +1259,7 @@ export default function TripRouteViewer({ booking }: TripRouteViewerProps) {
    * Retourne le composant de chargement si pas de localisation
    */
   if (!passengerLocation) {
-    return (
-      <View style={[styles.loadingContainer, { backgroundColor }]}>
-        <ActivityIndicator size="large" color={COLORS.ACCENT} />
-        <Text style={[styles.loadingText, { color: secondaryTextColor }]}>
-          Obtention de votre position...
-        </Text>
-      </View>
-    );
+    return <MapScreenSkeleton />;
   }
 
   return (

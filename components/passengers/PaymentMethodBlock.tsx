@@ -10,48 +10,60 @@ import { SectionHeader } from './SectionHeader';
 interface PaymentMethodCardProps {
     name: string;
     imageSource?: ImageSourcePropType;
-    icon?: string;
     isSelected: boolean;
     onPress: () => void;
 }
 
+const PAYMENT_OPTIONS = [
+    {
+        id: 'wave',
+        name: 'Wave',
+        image: require('@/assets/images/payment/logo-payment-wave.png'),
+    },
+    {
+        id: 'orange-money',
+        name: 'Orange Money',
+        image: require('@/assets/images/payment/logo-payment-om.png'),
+    },
+    {
+        id: 'mtn-money',
+        name: 'MTN Money',
+        image: require('@/assets/images/payment/logo-payment-mtn.png'),
+    },
+    // Moov Money / Flooz : masqué — non supporté par la gateway actuelle
+] as const;
+
 /**
- * Composant pour une méthode de paiement
+ * Carte logo méthode de paiement — taille égale, image contenue.
  */
-const PaymentMethodCard = ({
-    name,
-    imageSource,
-    icon,
-    isSelected,
-    onPress
-}: PaymentMethodCardProps) => {
+const PaymentMethodCard = ({ name, imageSource, isSelected, onPress }: PaymentMethodCardProps) => {
     const colorScheme = useColorScheme() ?? 'light';
-    
-    // Couleurs dynamiques basées sur le thème
     const tintColor = useThemeColor({}, 'tint');
-    
-    // Couleurs spécifiques pour les cartes de paiement
+
     const cardBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
     const cardBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
     const selectedCardBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#F0F8FF';
-    const selectedCardBorderColor = tintColor === '#fff' ? '#1776BA' : tintColor; // Utilise #1776BA si tintColor est blanc en dark mode
+    const selectedCardBorderColor = tintColor === '#fff' ? '#1776BA' : tintColor;
 
     return (
         <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={name}
+            accessibilityState={{ selected: isSelected }}
             style={[
                 styles.paymentMethodCard,
                 {
                     backgroundColor: isSelected ? selectedCardBackgroundColor : cardBackgroundColor,
                     borderColor: isSelected ? selectedCardBorderColor : cardBorderColor,
-                    borderWidth: isSelected ? 1.5 : 1
-                }
+                    borderWidth: isSelected ? 1.5 : 1,
+                },
             ]}
             onPress={onPress}
         >
             <Image
                 source={imageSource}
                 style={[styles.paymentMethodImage, isSelected && styles.paymentMethodImageSelected]}
-                resizeMode="cover"
+                resizeMode="contain"
             />
         </Pressable>
     );
@@ -60,7 +72,6 @@ const PaymentMethodCard = ({
 interface PaymentMethodBlockProps {
     selectedPaymentMethod: string | null;
     onSelectPaymentMethod: (method: string) => void;
-    // États pour les informations de paiement
     cardName?: string;
     onCardNameChange?: (value: string) => void;
     cardNumber?: string;
@@ -76,7 +87,7 @@ interface PaymentMethodBlockProps {
     onOpenBottomSheet?: (
         type: 'passengerType' | 'relation' | 'countryCode',
         title: string,
-        options: Array<{value: string, label: string}>,
+        options: Array<{ value: string; label: string }>,
         currentValue: string,
         onSelect: (value: string) => void
     ) => void;
@@ -100,68 +111,41 @@ export const PaymentMethodBlock = ({
     onPaymentNumberChange,
     countryCode = '+225',
     onCountryCodeChange,
-    onOpenBottomSheet
+    onOpenBottomSheet,
 }: PaymentMethodBlockProps) => {
-    /**
-     * Formate le numéro de carte pour afficher des espaces tous les 4 chiffres
-     */
     const formatCardNumber = (text: string) => {
-        // Supprime tous les espaces et caractères non numériques
         const cleaned = text.replace(/\s/g, '').replace(/\D/g, '');
-        // Limite à 16 chiffres
         const limited = cleaned.slice(0, 16);
-        // Ajoute des espaces tous les 4 chiffres
         return limited.replace(/(.{4})/g, '$1 ').trim();
     };
 
-    /**
-     * Gère le changement du numéro de carte
-     */
     const handleCardNumberChange = (text: string) => {
         if (onCardNumberChange) {
-            const formatted = formatCardNumber(text);
-            onCardNumberChange(formatted);
+            onCardNumberChange(formatCardNumber(text));
         }
     };
 
-    /**
-     * Formate la date d'expiration au format MM/YY
-     */
     const formatExpirationDate = (text: string) => {
-        // Supprime tous les caractères non numériques
         const cleaned = text.replace(/\D/g, '');
-        // Limite à 4 chiffres
         const limited = cleaned.slice(0, 4);
-        // Ajoute le slash après 2 chiffres
         if (limited.length >= 2) {
             return limited.slice(0, 2) + '/' + limited.slice(2);
         }
         return limited;
     };
 
-    /**
-     * Gère le changement de la date d'expiration
-     */
     const handleExpirationDateChange = (text: string) => {
         if (onExpirationDateChange) {
-            const formatted = formatExpirationDate(text);
-            onExpirationDateChange(formatted);
+            onExpirationDateChange(formatExpirationDate(text));
         }
     };
 
-    /**
-     * Gère le changement du CVV (limite à 3 chiffres)
-     */
     const handleCvvChange = (text: string) => {
         if (onCardCvvChange) {
-            const cleaned = text.replace(/\D/g, '').slice(0, 3);
-            onCardCvvChange(cleaned);
+            onCardCvvChange(text.replace(/\D/g, '').slice(0, 3));
         }
     };
 
-    /**
-     * Détermine le label du champ numéro selon la méthode de paiement
-     */
     const getPaymentNumberLabel = () => {
         switch (selectedPaymentMethod) {
             case 'wave':
@@ -170,6 +154,8 @@ export const PaymentMethodBlock = ({
                 return 'Numéro Orange Money';
             case 'mtn-money':
                 return 'Numéro MTN Money';
+            case 'moov-money':
+                return 'Numéro Moov Money / Flooz';
             default:
                 return 'Numéro';
         }
@@ -180,33 +166,17 @@ export const PaymentMethodBlock = ({
             <SectionHeader number={4} title="Méthode de paiement" />
 
             <View style={styles.paymentMethodsContainer}>
-                {/* <PaymentMethodCard
-                    name="Carte de crédit"
-                    imageSource={require('@/assets/images/payment/logo-payment-card.png')}
-                    isSelected={selectedPaymentMethod === 'credit-card'}
-                    onPress={() => onSelectPaymentMethod('credit-card')}
-                /> */}
-                <PaymentMethodCard
-                    name="Wave"
-                    imageSource={require('@/assets/images/payment/logo-payment-wave.png')}
-                    isSelected={selectedPaymentMethod === 'wave'}
-                    onPress={() => onSelectPaymentMethod('wave')}
-                />
-                <PaymentMethodCard
-                    name="Orange Money"
-                    imageSource={require('@/assets/images/payment/logo-payment-om.png')}
-                    isSelected={selectedPaymentMethod === 'orange-money'}
-                    onPress={() => onSelectPaymentMethod('orange-money')}
-                />
-                <PaymentMethodCard
-                    name="MTN Money"
-                    imageSource={require('@/assets/images/payment/logo-payment-mtn.png')}
-                    isSelected={selectedPaymentMethod === 'mtn-money'}
-                    onPress={() => onSelectPaymentMethod('mtn-money')}
-                />
+                {PAYMENT_OPTIONS.map((option) => (
+                    <PaymentMethodCard
+                        key={option.id}
+                        name={option.name}
+                        imageSource={option.image}
+                        isSelected={selectedPaymentMethod === option.id}
+                        onPress={() => onSelectPaymentMethod(option.id)}
+                    />
+                ))}
             </View>
 
-            {/* Champs conditionnels selon la méthode de paiement */}
             {selectedPaymentMethod === 'credit-card' && (
                 <View style={styles.paymentFieldsContainer}>
                     <FormField
@@ -258,15 +228,19 @@ export const PaymentMethodBlock = ({
                         onChangeText={onPaymentNumberChange}
                         required
                         countryCode={countryCode}
-                        onCountryCodePress={onOpenBottomSheet ? () => {
-                            onOpenBottomSheet(
-                                'countryCode',
-                                'Sélectionner le code pays',
-                                COUNTRY_CODES.map(cc => ({ value: cc.code, label: cc.label })),
-                                countryCode,
-                                (value) => onCountryCodeChange?.(value)
-                            );
-                        } : undefined}
+                        onCountryCodePress={
+                            onOpenBottomSheet
+                                ? () => {
+                                      onOpenBottomSheet(
+                                          'countryCode',
+                                          'Sélectionner le code pays',
+                                          COUNTRY_CODES.map((cc) => ({ value: cc.code, label: cc.label })),
+                                          countryCode,
+                                          (value) => onCountryCodeChange?.(value)
+                                      );
+                                  }
+                                : undefined
+                        }
                     />
                 </View>
             )}
@@ -277,30 +251,28 @@ export const PaymentMethodBlock = ({
 const styles = StyleSheet.create({
     paymentMethodsContainer: {
         flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 12,
+        alignItems: 'stretch',
+        width: '100%',
+        gap: 8,
         marginTop: 8,
         marginBottom: 8,
     },
     paymentMethodCard: {
-        width: '30%',
-        borderRadius: 8,
+        // Colonnes égales : flexBasis 0 évite le débordement lié à la taille intrinsèque des PNG
+        flexGrow: 1,
+        flexShrink: 1,
+        flexBasis: 0,
+        aspectRatio: 1,
+        borderRadius: 10,
         alignItems: 'center',
         justifyContent: 'center',
         overflow: 'hidden',
-        padding: 8,
-    },
-    paymentMethodText: {
-        fontSize: 14,
-        fontFamily: 'Ubuntu_Medium',
-        marginTop: 8,
-        textAlign: 'center',
+        padding: 4,
     },
     paymentMethodImage: {
         width: '100%',
-        height: undefined,
-        aspectRatio: 1,
-        opacity: 0.7,
+        height: '100%',
+        opacity: 0.85,
     },
     paymentMethodImageSelected: {
         opacity: 1,
@@ -316,4 +288,3 @@ const styles = StyleSheet.create({
         flex: 1,
     },
 });
-

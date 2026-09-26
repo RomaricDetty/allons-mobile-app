@@ -13,6 +13,7 @@ import { PaymentMethodBlock } from '@/components/passengers/PaymentMethodBlock';
 import { NoPaymentRequiredBlock, RebookingCodeBlock } from '@/components/passengers/RebookingCodeBlock';
 import { SelectionBottomSheet } from '@/components/passengers/SelectionBottomSheet';
 import { SummaryBlock } from '@/components/passengers/SummaryBlock';
+import { ProcessingOverlaySkeleton } from '@/components/skeletons';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { useBottomSheetSelection } from '@/hooks/useBottomSheetSelection';
@@ -27,7 +28,6 @@ import { getAuthToken } from '@/utils/storage';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -157,6 +157,8 @@ const PassengersInfo = () => {
                 return { method: 'MOBILE_MONEY', provider: 'ORANGE_MONEY' };
             case 'mtn-money':
                 return { method: 'MOBILE_MONEY', provider: 'MTN_MONEY' };
+            case 'moov-money':
+                return { method: 'MOBILE_MONEY', provider: 'MOOV_MONEY' };
             default:
                 return { method: 'MOBILE_MONEY', provider: null };
         }
@@ -284,7 +286,7 @@ const PassengersInfo = () => {
         >
             {isLoading && (
                 <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={tintColor} />
+                    <ProcessingOverlaySkeleton />
                 </View>
             )}
 

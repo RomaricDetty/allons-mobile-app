@@ -1,6 +1,7 @@
 import { getBookingPaymentStatus } from '@/api/booking';
 import { PAYMENT_POLL_INTERVAL_MS, PAYMENT_POLL_MAX_MS } from '@/constants/payment';
 import { BookingPaymentStatusResponse } from '@/interfaces/payment';
+import { parsePaymentDeepLink } from '@/utils/paymentDeepLink';
 
 export type PaymentPollOutcome =
     | { kind: 'succeeded'; status: BookingPaymentStatusResponse }
@@ -109,19 +110,5 @@ export const fetchBookingPaymentOutcome = async (
 /**
  * Indique si une URL de retour correspond au succès ou à l'échec paiement.
  */
-export const classifyPaymentReturnUrl = (url: string): 'success' | 'error' | 'unknown' => {
-    const normalized = url.toLowerCase();
-    if (
-        normalized.includes('/payment/success') ||
-        normalized.includes('payment/success')
-    ) {
-        return 'success';
-    }
-    if (
-        normalized.includes('/payment/error') ||
-        normalized.includes('payment/error')
-    ) {
-        return 'error';
-    }
-    return 'unknown';
-};
+export const classifyPaymentReturnUrl = (url: string): 'success' | 'error' | 'unknown' =>
+    parsePaymentDeepLink(url).kind;

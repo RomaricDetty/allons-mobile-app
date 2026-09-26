@@ -1,4 +1,6 @@
 import { formatFullDate, formatStatus } from '@/constants/functions';
+import { formatPaymentMethodDisplay } from '@/constants/paymentMethods';
+import { resolvePaymentProvider } from '@/utils/bookingDataTransformer';
 
 /**
  * Interface pour les détails d'un ticket (pour le PDF)
@@ -9,6 +11,14 @@ interface TicketForPDF {
     status: string;
     totalAmount: string;
     currency: string;
+    paymentProvider?: string;
+    provider?: string;
+    method?: string;
+    payment?: {
+        provider?: string;
+        paymentProvider?: string;
+        method?: string;
+    };
     departureDateTime: string;
     departureTime: string;
     arrivalTime: string;
@@ -335,6 +345,15 @@ export const generateTicketHTML = (ticket: TicketForPDF): string => {
                         <div class="detail-row">
                             <span class="detail-label">Prix par personne:</span>
                             <span class="detail-value">${formatPriceWithCurrency(ticket.passengers[0]?.price || '0', ticket.currency)}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Méthode de paiement:</span>
+                            <span class="detail-value">${formatPaymentMethodDisplay(
+                                resolvePaymentProvider(ticket.payment, ticket) ||
+                                ticket.paymentProvider ||
+                                ticket.provider ||
+                                ticket.method
+                            )}</span>
                         </div>
                         <div class="separator-line"></div>
                         <div class="total-row">

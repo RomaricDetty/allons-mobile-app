@@ -1,18 +1,33 @@
 // @ts-nocheck
 import { authGetUserInfo, getCountryList, updateUserInfo } from '@/api/auth_register';
 import { FormField } from '@/components/passengers/FormField';
+import { PhoneField } from '@/components/passengers/PhoneField';
 import { SectionHeader } from '@/components/passengers/SectionHeader';
 import { SelectField } from '@/components/passengers/SelectField';
 import { SelectionBottomSheet } from '@/components/passengers/SelectionBottomSheet';
+import { AppButton } from '@/components/ui/AppButton';
+import { ScreenHeader } from '@/components/ui/ScreenHeader';
+import { FormScreenSkeleton } from '@/components/skeletons';
+import {
+    EMERGENCY_RELATION_OPTIONS,
+    getEmergencyRelationCustomText,
+    getEmergencyRelationPickerValue,
+    normalizeEmergencyRelationForStorage,
+} from '@/constants/emergencyRelations';
+import {
+    FORM_FIELD_HEIGHT,
+    FORM_FIELD_RADIUS,
+    getFormFieldColors,
+} from '@/constants/formField';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { COUNTRY_CODES, User } from '@/interfaces';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { showAlert } from '@/utils/alert';
+import { getAuthToken, getUserId } from '@/utils/storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
     KeyboardAvoidingView,
     Modal,
     Platform,
@@ -24,9 +39,6 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import { showAlert } from '@/utils/alert';
-import { AppButton } from '@/components/ui/AppButton';
-import { ScreenHeader } from '@/components/ui/ScreenHeader';
 
 /**
  * Type pour les pays
@@ -42,6 +54,7 @@ interface Country {
 export default function EditProfileScreen() {
     const insets = useSafeAreaInsets();
     const colorScheme = useColorScheme() ?? 'light';
+    const fieldColors = getFormFieldColors(colorScheme);
 
     // Couleurs dynamiques basées sur le thème
     const textColor = useThemeColor({}, 'text');
@@ -49,21 +62,20 @@ export default function EditProfileScreen() {
     const tintColor = useThemeColor({}, 'tint');
 
     // Couleurs spécifiques pour l'écran
-    const scrollBackgroundColor = colorScheme === 'dark' ? '#000000' : '#F5F5F5';
+    const scrollBackgroundColor = colorScheme === 'dark' ? '#000000' : '#F3F3F7';
     const cardBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
     const borderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
     const secondaryTextColor = colorScheme === 'dark' ? '#9BA1A6' : '#666';
     const headerBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
     const headerBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
-    const inputBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#F3F3F7';
-    const placeholderColor = colorScheme === 'dark' ? '#9BA1A6' : '#A6A6AA';
-    const disabledInputBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#F5F5F5';
-    const disabledInputTextColor = colorScheme === 'dark' ? '#9BA1A6' : '#666';
+    const inputBackgroundColor = fieldColors.background;
+    const placeholderColor = fieldColors.placeholder;
+    const disabledInputBackgroundColor = fieldColors.disabledBackground;
+    const disabledInputTextColor = fieldColors.disabledText;
     const sectionBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#F3F3F7';
     const modalBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
     const modalBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
     const datePickerBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
-    const loadingIndicatorColor = tintColor === '#fff' ? '#1776BA' : tintColor;
 
     const [user, setUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -95,6 +107,7 @@ export default function EditProfileScreen() {
         phone: '',
         phoneCountryCode: '+225',
         street: '',
+        apartment: '',
         city: '',
         postalCode: '',
         country: { id: '', name: '' },
@@ -104,6 +117,7 @@ export default function EditProfileScreen() {
         emergencyContactPhone: '',
         emergencyContactCountryCode: '+225',
         emergencyContactRelation: '',
+        emergencyContactRelationOther: '',
     });
 
     /**
@@ -128,16 +142,20 @@ export default function EditProfileScreen() {
      */
     const getUserInfo = async () => {
         try {
-            const token = await AsyncStorage.getItem('token');
-            const userId = await AsyncStorage.getItem('user_id');
-            const response = await authGetUserInfo(userId, token);
-            console.log('response user', response.data);
-            if (response.status === 200) {
-                return response.data;
-            } else {
-                showAlert('Erreur', 'Une erreur est survenue lors de la récupération des informations');
+            const token = await getAuthToken();
+            const userId = await getUserId();
+
+            if (!token?.trim() || !userId?.trim()) {
+                showAlert('Erreur', 'Session expirée. Veuillez vous reconnecter.');
                 return null;
             }
+
+            const response = await authGetUserInfo(userId, token);
+            if (response.status === 200) {
+                return response.data;
+            }
+            showAlert('Erreur', 'Une erreur est survenue lors de la récupération des informations');
+            return null;
         } catch (error) {
             console.error('Erreur lors de la récupération des informations:', error);
             showAlert('Erreur', 'Une erreur est survenue lors de la récupération des informations');
@@ -244,6 +262,7 @@ export default function EditProfileScreen() {
                         phone: phoneNumber,
                         phoneCountryCode: phoneCountryCode,
                         street: street,
+                        apartment: '',
                         city: city,
                         postalCode: postalCode,
                         emergencyContactFirstName: emergencyFirstName,
@@ -251,7 +270,8 @@ export default function EditProfileScreen() {
                         emergencyContactFullName: fullName,
                         emergencyContactPhone: emergencyPhone,
                         emergencyContactCountryCode: emergencyCountryCode,
-                        emergencyContactRelation: emergencyRelation,
+                        emergencyContactRelation: getEmergencyRelationPickerValue(emergencyRelation),
+                        emergencyContactRelationOther: getEmergencyRelationCustomText(emergencyRelation),
                     }));
 
                     // Stocker les informations du pays pour la mise à jour ultérieure
@@ -388,9 +408,7 @@ export default function EditProfileScreen() {
                 dateOfBirth: `${day}/${month}/${year}`,
             }));
         }
-        if (Platform.OS === 'ios') {
-            setShowDatePicker(false);
-        }
+        // iOS spinner : garder le modal ouvert jusqu'à Valider (check)
     };
 
     /**
@@ -430,8 +448,8 @@ export default function EditProfileScreen() {
 
         setIsSaving(true);
         try {
-            const token = await AsyncStorage.getItem('token');
-            const userId = await AsyncStorage.getItem('user_id');
+            const token = await getAuthToken();
+            const userId = await getUserId();
 
             // Vérifier que le token et l'ID utilisateur sont disponibles
             if (!token || token.trim() === '') {
@@ -460,7 +478,12 @@ export default function EditProfileScreen() {
                 address: formData.country && formData.country.id
                     ? {
                         city: formData.city.trim(),
-                        street: formData.street.trim() || '',
+                        street: [
+                            formData.street.trim(),
+                            formData.apartment.trim() ? `Apt ${formData.apartment.trim()}` : '',
+                        ]
+                            .filter(Boolean)
+                            .join(', '),
                         zipCode: formData.postalCode.trim() || '',
                         country: formData.country.name || '',
                     }
@@ -473,7 +496,12 @@ export default function EditProfileScreen() {
                         digits: formData.emergencyContactPhone.trim(),
                         countryCode: formData.emergencyContactPhone.trim() ? formData.emergencyContactCountryCode : '',
                     },
-                    relationship: formData.emergencyContactRelation.trim() || undefined,
+                    relationship: formData.emergencyContactRelation
+                        ? normalizeEmergencyRelationForStorage(
+                            formData.emergencyContactRelation,
+                            formData.emergencyContactRelationOther
+                        )
+                        : undefined,
                 },
             };
 
@@ -520,11 +548,7 @@ export default function EditProfileScreen() {
     })();
 
     if (isLoading) {
-        return (
-            <View style={[styles.container, styles.loadingContainer, { backgroundColor: scrollBackgroundColor }]}>
-                <ActivityIndicator size="large" color={loadingIndicatorColor} />
-            </View>
-        );
+        return <FormScreenSkeleton />;
     }
 
     return (
@@ -586,64 +610,50 @@ export default function EditProfileScreen() {
                                 keyboardType="email-address"
                             />
 
-                            <View style={styles.formField}>
-                                <Text style={[styles.formLabel, { color: textColor, marginBottom: 0 }]}>
-                                    Téléphone
-                                </Text>
-                                <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 5 }}>
-                                    <View
-                                        style={
-                                            {
-                                                flex: 0.4,
-                                                alignItems: 'center',
-                                                justifyContent: 'flex-start',
-                                            }
-                                        }>
-                                        <SelectField
-                                            label=""
-                                            value={formData.phoneCountryCode || ''}
-                                            placeholder="Sélectionner"
-                                            selectionType="countryCode"
-                                            options={countryCodeOptions}
-                                            onSelect={(value) =>
-                                                setFormData((prev) => ({ ...prev, phoneCountryCode: value }))
-                                            }
-                                            onOpenBottomSheet={openSelectionBottomSheet}
-                                        />
-                                    </View>
-                                    <View style={{ flex: 0.6 }}>
-                                        <FormField
-                                            label=""
-                                            value={formData.phone}
-                                            onChangeText={(text) =>
-                                                setFormData((prev) => ({ ...prev, phone: text }))
-                                            }
-                                            placeholder="Ex: 0123456789"
-                                            keyboardType="phone-pad"
-                                        />
-                                    </View>
-                                </View>
-                            </View>
+                            <PhoneField
+                                label="Téléphone"
+                                value={formData.phone}
+                                onChangeText={(text) =>
+                                    setFormData((prev) => ({ ...prev, phone: text }))
+                                }
+                                countryCode={formData.phoneCountryCode || '+225'}
+                                onCountryCodePress={() =>
+                                    openSelectionBottomSheet(
+                                        'countryCode',
+                                        'Code pays',
+                                        countryCodeOptions,
+                                        formData.phoneCountryCode || '+225',
+                                        (value) =>
+                                            setFormData((prev) => ({
+                                                ...prev,
+                                                phoneCountryCode: value,
+                                            }))
+                                    )
+                                }
+                            />
 
                             <View style={styles.formField}>
-                                <Text style={[styles.formLabel, { color: textColor }]}>Date de naissance</Text>
+                                <Text style={[styles.formLabel, { color: textColor }]}>
+                                    Date de naissance
+                                </Text>
                                 <Pressable
                                     style={[
                                         styles.dateInput,
-                                        {
-                                            backgroundColor: inputBackgroundColor,
-                                            borderColor: borderColor
-                                        }
+                                        { backgroundColor: inputBackgroundColor },
                                     ]}
                                     onPress={() => setShowDatePicker(true)}
                                 >
                                     <Text
                                         style={[
                                             styles.dateInputText,
-                                            { color: formData.dateOfBirth ? textColor : placeholderColor },
+                                            {
+                                                color: formData.dateOfBirth
+                                                    ? textColor
+                                                    : placeholderColor,
+                                            },
                                         ]}
                                     >
-                                        {formData.dateOfBirth || 'jj/mm/aaaa'}
+                                        {formData.dateOfBirth || 'jj / mm / aaaa'}
                                     </Text>
                                     <MaterialCommunityIcons
                                         name="calendar"
@@ -658,30 +668,6 @@ export default function EditProfileScreen() {
                         <View style={[styles.section, { borderBottomColor: sectionBorderColor }]}>
                             <SectionHeader number={2} title="Adresse" />
 
-                            {/* <Text style={[styles.formLabel, { color: textColor }]}>Pays</Text> */}
-                            <SelectField
-                                label="Pays"
-                                value={formData.country.id || ''}
-                                placeholder="Sélectionner un pays"
-                                selectionType="country"
-                                options={countryList.map(country => ({
-                                    value: country.id,
-                                    label: country.name,
-                                    name: country.name
-                                }))}
-                                onSelect={(value) => {
-                                    // Trouver le pays correspondant dans la liste pour obtenir l'objet complet
-                                    const selectedCountry = countryList.find(c => c.id === value);
-                                    setFormData((prev) => ({
-                                        ...prev,
-                                        country: selectedCountry
-                                            ? { id: selectedCountry.id, name: selectedCountry.name }
-                                            : { id: '', name: '' }
-                                    }));
-                                }}
-                                onOpenBottomSheet={openSelectionBottomSheet}
-                            />
-
                             <FormField
                                 label="Rue"
                                 value={formData.street}
@@ -689,6 +675,15 @@ export default function EditProfileScreen() {
                                     setFormData((prev) => ({ ...prev, street: text }))
                                 }
                                 placeholder="Votre rue"
+                            />
+
+                            <FormField
+                                label="Appartement / suite (optionnel)"
+                                value={formData.apartment}
+                                onChangeText={(text) =>
+                                    setFormData((prev) => ({ ...prev, apartment: text }))
+                                }
+                                placeholder="Ex: Apt 12B"
                             />
 
                             <FormField
@@ -708,6 +703,28 @@ export default function EditProfileScreen() {
                                 }
                                 placeholder="Votre code postal"
                                 keyboardType="numeric"
+                            />
+
+                            <SelectField
+                                label="Pays"
+                                value={formData.country.id || ''}
+                                placeholder="Sélectionner un pays"
+                                selectionType="country"
+                                options={countryList.map(country => ({
+                                    value: country.id,
+                                    label: country.name,
+                                    name: country.name
+                                }))}
+                                onSelect={(value) => {
+                                    const selectedCountry = countryList.find(c => c.id === value);
+                                    setFormData((prev) => ({
+                                        ...prev,
+                                        country: selectedCountry
+                                            ? { id: selectedCountry.id, name: selectedCountry.name }
+                                            : { id: '', name: '' }
+                                    }));
+                                }}
+                                onOpenBottomSheet={openSelectionBottomSheet}
                             />
                         </View>
 
@@ -767,62 +784,61 @@ export default function EditProfileScreen() {
                                 }
                             />
 
-                            <View style={styles.formField}>
-                                <Text style={[styles.formLabel, { color: textColor }]}>
-                                    Numéro de téléphone du contact d'urgence
-                                </Text>
-                                <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 5 }}>
-                                    <View style={{ flex: 0.4 }}>
-                                        <SelectField
-                                            label=""
-                                            value={formData.emergencyContactCountryCode || ''}
-                                            placeholder="Sélectionner"
-                                            selectionType="countryCode"
-                                            options={countryCodeOptions}
-                                            onSelect={(value) =>
-                                                setFormData((prev) => ({ ...prev, emergencyContactCountryCode: value }))
-                                            }
-                                            onOpenBottomSheet={openSelectionBottomSheet}
-                                        />
-                                    </View>
-                                    <View style={{ flex: 0.6 }}>
-                                        <FormField
-                                            label=""
-                                            value={formData.emergencyContactPhone}
-                                            onChangeText={(text) =>
-                                                setFormData((prev) => ({
-                                                    ...prev,
-                                                    emergencyContactPhone: text,
-                                                }))
-                                            }
-                                            placeholder="Ex: 0123456789"
-                                            keyboardType="phone-pad"
-                                        />
-                                    </View>
-                                </View>
-                            </View>
+                            <PhoneField
+                                label="Numéro de téléphone du contact d'urgence"
+                                value={formData.emergencyContactPhone}
+                                onChangeText={(text) =>
+                                    setFormData((prev) => ({
+                                        ...prev,
+                                        emergencyContactPhone: text,
+                                    }))
+                                }
+                                countryCode={formData.emergencyContactCountryCode || '+225'}
+                                onCountryCodePress={() =>
+                                    openSelectionBottomSheet(
+                                        'countryCode',
+                                        'Code pays',
+                                        countryCodeOptions,
+                                        formData.emergencyContactCountryCode || '+225',
+                                        (value) =>
+                                            setFormData((prev) => ({
+                                                ...prev,
+                                                emergencyContactCountryCode: value,
+                                            }))
+                                    )
+                                }
+                            />
 
                             <SelectField
                                 label="Relation"
                                 value={formData.emergencyContactRelation}
                                 placeholder="Sélectionner une relation"
                                 selectionType="relation"
-                                options={[
-                                    { value: 'parent', label: 'Parent' },
-                                    { value: 'conjoint', label: 'Conjoint(e)' },
-                                    { value: 'enfant', label: 'Enfant' },
-                                    { value: 'frere-soeur', label: 'Frère/Sœur' },
-                                    { value: 'ami', label: 'Ami(e)' },
-                                    { value: 'autre', label: 'Autre' }
-                                ]}
+                                options={[...EMERGENCY_RELATION_OPTIONS]}
                                 onSelect={(value) =>
                                     setFormData((prev) => ({
                                         ...prev,
                                         emergencyContactRelation: value,
+                                        emergencyContactRelationOther:
+                                            value === 'autre' ? prev.emergencyContactRelationOther : '',
                                     }))
                                 }
                                 onOpenBottomSheet={openSelectionBottomSheet}
                             />
+
+                            {formData.emergencyContactRelation === 'autre' && (
+                                <FormField
+                                    label="Précisez la relation"
+                                    value={formData.emergencyContactRelationOther}
+                                    placeholder="Ex: Cousin, Collègue…"
+                                    onChangeText={(text) =>
+                                        setFormData((prev) => ({
+                                            ...prev,
+                                            emergencyContactRelationOther: text,
+                                        }))
+                                    }
+                                />
+                            )}
                         </View>
                     </View>
 
@@ -846,10 +862,11 @@ export default function EditProfileScreen() {
                     animationType="slide"
                     onRequestClose={() => setShowDatePicker(false)}
                 >
-                    <Pressable
-                        style={styles.datePickerOverlay}
-                        onPress={() => setShowDatePicker(false)}
-                    >
+                    <View style={styles.datePickerOverlay}>
+                        <Pressable
+                            style={StyleSheet.absoluteFill}
+                            onPress={() => setShowDatePicker(false)}
+                        />
                         <View
                             style={[
                                 styles.datePickerContainer,
@@ -858,11 +875,10 @@ export default function EditProfileScreen() {
                                     paddingBottom: insets.bottom + 20
                                 }
                             ]}
-                            onStartShouldSetResponder={() => true}
                         >
                             <View style={[styles.datePickerHeader, { borderBottomColor: modalBorderColor }]}>
                                 <Text style={[styles.datePickerTitle, { color: textColor }]}>Date de naissance</Text>
-                                <Pressable onPress={() => setShowDatePicker(false)}>
+                                <Pressable onPress={() => setShowDatePicker(false)} hitSlop={12}>
                                     <MaterialCommunityIcons name="check" size={24} color={tintColor === '#fff' ? '#1776BA' : tintColor} />
                                 </Pressable>
                             </View>
@@ -878,7 +894,7 @@ export default function EditProfileScreen() {
                                 />
                             </View>
                         </View>
-                    </Pressable>
+                    </View>
                 </Modal>
             )}
 
@@ -947,25 +963,26 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     dateInput: {
-        borderRadius: 16,
+        borderRadius: FORM_FIELD_RADIUS,
         paddingHorizontal: 16,
         paddingVertical: 12,
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         borderWidth: 0,
-        height: 50,
+        height: FORM_FIELD_HEIGHT,
     },
     dateInputText: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
     },
     disabledInput: {
-        borderRadius: 16,
+        borderRadius: FORM_FIELD_RADIUS,
         paddingHorizontal: 16,
         paddingVertical: 12,
-        borderWidth: 1,
-        height: 50,
+        borderWidth: 0,
+        height: FORM_FIELD_HEIGHT,
+        justifyContent: 'center',
     },
     disabledInputText: {
         fontSize: 14,

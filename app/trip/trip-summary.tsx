@@ -456,7 +456,7 @@ const TripSummary = () => {
                     />
 
                     <AppButton
-                        title="Annuler la réservation"
+                        title="Retour à l'accueil"
                         onPress={handleNavigateToHome}
                         variant="ghost"
                         style={{

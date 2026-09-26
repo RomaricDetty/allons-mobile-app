@@ -1,11 +1,10 @@
+import { SectionCardHeader } from '@/components/ui/SectionCardHeader';
 import { formatFullDateWithTime } from '@/constants/functions';
+import { formatPaymentMethodDisplay } from '@/constants/paymentMethods';
 import React, { memo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-/**
- * Interface pour les données de paiement
- */
 interface PaymentData {
     prices: {
         outboundPricePerPerson: number;
@@ -20,9 +19,6 @@ interface PaymentData {
     createdAt: string;
 }
 
-/**
- * Interface pour les props du composant
- */
 interface PaymentDetailsSectionProps {
     payment: PaymentData;
     isRoundTrip: boolean;
@@ -32,14 +28,14 @@ interface PaymentDetailsSectionProps {
     secondaryTextColor: string;
     primaryBlue: string;
     formatPriceWithCurrency: (amount: string | number) => string;
-    formatPaymentMethod: (method: string) => string;
+    formatPaymentMethod?: (method: string) => string;
     rebookingCode: string;
     creditRemaining: number;
     remainingTokenCode: string;
 }
 
 /**
- * Composant pour afficher les détails du paiement
+ * Bloc paiement — en-tête et lignes alignés sur le billet.
  */
 export const PaymentDetailsSection = memo<PaymentDetailsSectionProps>(({
     payment,
@@ -57,86 +53,118 @@ export const PaymentDetailsSection = memo<PaymentDetailsSectionProps>(({
 }) => {
     return (
         <View style={[styles.sectionCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
-            <View style={[styles.sectionHeader, { marginBottom: 20 }]}>
-                <Icon name="wallet" size={20} color={primaryBlue} />
-                <Text style={[styles.sectionTitle, { color: textColor }]}>Détails du paiement</Text>
-            </View>
-            
-            {/* Prix du voyage aller */}
-            <View style={styles.detailRow}>
+            <SectionCardHeader
+                title="Détails du paiement"
+                textColor={textColor}
+                icon={<Icon name="credit-card-outline" size={22} color={primaryBlue} />}
+            />
+
+            <View style={[styles.detailRow, { borderBottomColor: borderColor }]}>
                 <Text style={[styles.detailLabel, { color: secondaryTextColor }]}>
                     {isRoundTrip ? 'Prix voyage aller' : 'Prix du ticket'}
                 </Text>
-                <Text style={[styles.detailValue, { color: textColor, textAlign: 'right', width: '45%' }]}>
+                <Text style={[styles.detailValue, { color: textColor }]}>
                     {formatPriceWithCurrency(payment.prices.outboundTotalPrice)}
                 </Text>
             </View>
             {payment.prices.numberOfPassengers > 1 && (
                 <Text style={[styles.priceSubtext, { color: secondaryTextColor }]}>
-                    ({formatPriceWithCurrency(payment.prices.outboundPricePerPerson)} × {payment.prices.numberOfPassengers} passager{payment.prices.numberOfPassengers > 1 ? 's' : ''})
+                    ({formatPriceWithCurrency(payment.prices.outboundPricePerPerson)} ×{' '}
+                    {payment.prices.numberOfPassengers} passager
+                    {payment.prices.numberOfPassengers > 1 ? 's' : ''})
                 </Text>
             )}
-            
-            {/* Prix du voyage retour (si aller-retour) */}
+
             {isRoundTrip && (
                 <>
-                    <View style={[styles.detailRow, { marginTop: 12 }]}>
-                        <Text style={[styles.detailLabel, { color: secondaryTextColor }]}>Prix voyage retour</Text>
-                        <Text style={[styles.detailValue, { color: textColor, textAlign: 'right', width: '45%' }]}>
+                    <View style={[styles.detailRow, { borderBottomColor: borderColor }]}>
+                        <Text style={[styles.detailLabel, { color: secondaryTextColor }]}>
+                            Prix voyage retour
+                        </Text>
+                        <Text style={[styles.detailValue, { color: textColor }]}>
                             {formatPriceWithCurrency(payment.prices.returnTotalPrice)}
                         </Text>
                     </View>
                     {payment.prices.numberOfPassengers > 1 && (
                         <Text style={[styles.priceSubtext, { color: secondaryTextColor }]}>
-                            ({formatPriceWithCurrency(payment.prices.returnPricePerPerson)} × {payment.prices.numberOfPassengers} passager{payment.prices.numberOfPassengers > 1 ? 's' : ''})
+                            ({formatPriceWithCurrency(payment.prices.returnPricePerPerson)} ×{' '}
+                            {payment.prices.numberOfPassengers} passager
+                            {payment.prices.numberOfPassengers > 1 ? 's' : ''})
                         </Text>
                     )}
                 </>
             )}
-            
-            <View style={[styles.separator, { backgroundColor: borderColor, marginTop: 12 }]} />
-            <View style={styles.detailRow}>
+
+            <View style={[styles.totalRow, { borderBottomColor: borderColor }]}>
                 <Text style={[styles.totalLabel, { color: textColor }]}>Total payé</Text>
                 <Text style={[styles.totalValue, { color: primaryBlue }]}>
                     {formatPriceWithCurrency(payment.totalAmount)}
                 </Text>
             </View>
-            <View style={styles.detailRow}>
-                <Text style={[styles.detailLabel, { color: secondaryTextColor }]}>Méthode de paiement</Text>
+            <View style={[styles.detailRow, { borderBottomColor: borderColor }]}>
+                <Text style={[styles.detailLabel, { color: secondaryTextColor }]}>
+                    Méthode de paiement
+                </Text>
                 <Text style={[styles.detailValue, { color: textColor }]}>
-                    {formatPaymentMethod(payment.provider)}
+                    {formatPaymentMethod
+                        ? formatPaymentMethod(payment.provider) || '—'
+                        : formatPaymentMethodDisplay(payment.provider)}
                 </Text>
             </View>
-            <View style={styles.detailRow}>
-                <Text style={[styles.detailLabel, { color: secondaryTextColor }]}>Date de réservation</Text>
-                <Text style={[styles.detailValue, { color: textColor, textAlign: 'right', width: '45%' }]}>
+            <View
+                style={[
+                    styles.detailRow,
+                    !rebookingCode && creditRemaining <= 0 && !remainingTokenCode
+                        ? styles.detailRowLast
+                        : null,
+                    { borderBottomColor: borderColor },
+                ]}
+            >
+                <Text style={[styles.detailLabel, { color: secondaryTextColor }]}>
+                    Date de réservation
+                </Text>
+                <Text style={[styles.detailValue, { color: textColor }]} numberOfLines={2}>
                     {formatFullDateWithTime(payment.createdAt)}
                 </Text>
             </View>
-            {rebookingCode && (
-                <View style={styles.detailRow}>
-                    <Text style={[styles.detailLabel, { color: secondaryTextColor }]}>Code de rebooking</Text>
-                    <Text style={[styles.detailValue, { color: textColor, textAlign: 'right', width: '45%' }]}>
-                        {rebookingCode}
+            {rebookingCode ? (
+                <View
+                    style={[
+                        styles.detailRow,
+                        creditRemaining <= 0 && !remainingTokenCode ? styles.detailRowLast : null,
+                        { borderBottomColor: borderColor },
+                    ]}
+                >
+                    <Text style={[styles.detailLabel, { color: secondaryTextColor }]}>
+                        Code de rebooking
                     </Text>
+                    <Text style={[styles.detailValue, { color: textColor }]}>{rebookingCode}</Text>
                 </View>
-            )}
-            {creditRemaining > 0 && (
-                <View style={styles.detailRow}>
-                    <Text style={[styles.detailLabel, { color: secondaryTextColor }]}>Crédit restant</Text>
-                    <Text style={[styles.detailValue, { color: textColor, textAlign: 'right', width: '45%' }]}>
-                        {creditRemaining}
+            ) : null}
+            {creditRemaining > 0 ? (
+                <View
+                    style={[
+                        styles.detailRow,
+                        !remainingTokenCode ? styles.detailRowLast : null,
+                        { borderBottomColor: borderColor },
+                    ]}
+                >
+                    <Text style={[styles.detailLabel, { color: secondaryTextColor }]}>
+                        Crédit restant
                     </Text>
+                    <Text style={[styles.detailValue, { color: textColor }]}>{creditRemaining}</Text>
                 </View>
-            )}
-            {remainingTokenCode && (
-                <View style={styles.detailRow}>
-                    <Text style={[styles.detailLabel, { color: secondaryTextColor }]}>Code de token restant</Text>
-                    <Text style={[styles.detailValue, { color: textColor, textAlign: 'right', width: '45%' }]}>
+            ) : null}
+            {remainingTokenCode ? (
+                <View style={[styles.detailRow, styles.detailRowLast]}>
+                    <Text style={[styles.detailLabel, { color: secondaryTextColor }]}>
+                        Code de token restant
+                    </Text>
+                    <Text style={[styles.detailValue, { color: textColor }]}>
                         {remainingTokenCode}
                     </Text>
                 </View>
-            )}
+            ) : null}
         </View>
     );
 });
@@ -147,30 +175,29 @@ const styles = StyleSheet.create({
     sectionCard: {
         borderRadius: 12,
         padding: 16,
-        marginBottom: 16,
+        marginBottom: 14,
         borderWidth: 1,
-    },
-    sectionHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 16,
-        gap: 8,
-    },
-    sectionTitle: {
-        fontSize: 18,
-        fontFamily: 'Ubuntu_Bold',
     },
     detailRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 12,
+        alignItems: 'flex-start',
+        paddingVertical: 10,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        gap: 12,
+    },
+    detailRowLast: {
+        borderBottomWidth: 0,
+        paddingBottom: 0,
     },
     detailLabel: {
-        fontSize: 14,
-        fontFamily: 'Ubuntu_Regular',
+        fontSize: 13,
+        fontFamily: 'Ubuntu_Medium',
+        flexShrink: 0,
+        maxWidth: '48%',
     },
     detailValue: {
+        flex: 1,
         fontSize: 14,
         fontFamily: 'Ubuntu_Medium',
         textAlign: 'right',
@@ -178,26 +205,24 @@ const styles = StyleSheet.create({
     priceSubtext: {
         fontSize: 11,
         fontFamily: 'Ubuntu_Regular',
+        textAlign: 'right',
         marginTop: -4,
         marginBottom: 4,
-        marginLeft: 0,
-        textAlign: 'right',
+    },
+    totalRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 12,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        gap: 12,
     },
     totalLabel: {
-        fontSize: 16,
+        fontSize: 15,
         fontFamily: 'Ubuntu_Bold',
     },
     totalValue: {
         fontSize: 18,
         fontFamily: 'Ubuntu_Bold',
     },
-    separator: {
-        height: 1,
-        marginVertical: 12,
-    },
 });
-
-
-
-
-

@@ -1,0 +1,22 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "LUL3596K2Y.com.allon.app",
+        "paths": [
+          "/payment/*",
+          "/payment/success",
+          "/payment/success/*",
+          "/payment/error",
+          "/payment/error/*"
+        ]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": [
+      "LUL3596K2Y.com.allon.app"
+    ]
+  }
+}

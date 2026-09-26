@@ -1,5 +1,9 @@
+import {
+    FORM_FIELD_HEIGHT,
+    formFieldBaseStyles,
+    getFormFieldColors,
+} from '@/constants/formField';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useThemeColor } from '@/hooks/use-theme-color';
 import React from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -11,10 +15,12 @@ interface FormFieldProps {
     required?: boolean;
     keyboardType?: 'default' | 'numeric' | 'email-address' | 'phone-pad';
     editable?: boolean;
+    autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
+    error?: boolean;
 }
 
 /**
- * Composant pour un champ de formulaire standard
+ * Champ de formulaire standard AllOn
  */
 export const FormField = ({
     label,
@@ -23,76 +29,41 @@ export const FormField = ({
     placeholder,
     required = false,
     keyboardType = 'default',
-    editable = true
+    editable = true,
+    autoCapitalize,
+    error = false,
 }: FormFieldProps) => {
     const colorScheme = useColorScheme() ?? 'light';
-
-    // Couleurs dynamiques basées sur le thème
-    const textColor = useThemeColor({}, 'text');
-    const secondaryTextColor = colorScheme === 'dark' ? '#9BA1A6' : '#666';
-
-    // Couleurs spécifiques pour le champ
-    const inputBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#F3F3F7';
-    const inputBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
-    const placeholderColor = colorScheme === 'dark' ? '#9BA1A6' : '#A6A6AA';
-    const inputDisabledBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#F5F5F5';
-    const inputDisabledTextColor = colorScheme === 'dark' ? '#9BA1A6' : '#666';
+    const colors = getFormFieldColors(colorScheme);
 
     return (
-        <View style={styles.formField}>
-            <Text style={[styles.formLabel, { color: textColor }]}>
-                {label} {required && <Text style={styles.required}>*</Text>}
-            </Text>
+        <View style={[formFieldBaseStyles.field, !label && { marginBottom: 0 }]}>
+            {!!label && (
+                <Text style={[formFieldBaseStyles.label, { color: colors.text }]}>
+                    {label}{' '}
+                    {required && <Text style={{ color: colors.danger }}>*</Text>}
+                </Text>
+            )}
             <TextInput
                 style={[
-                    styles.formInput,
+                    formFieldBaseStyles.input,
                     {
-                        backgroundColor: inputBackgroundColor,
-                        borderColor: inputBorderColor,
-                        color: textColor
+                        backgroundColor: editable ? colors.background : colors.disabledBackground,
+                        color: editable ? colors.text : colors.disabledText,
+                        borderWidth: error ? 1 : 0,
+                        borderColor: error ? colors.danger : 'transparent',
+                        height: FORM_FIELD_HEIGHT,
                     },
-                    !editable && {
-                        backgroundColor: inputDisabledBackgroundColor,
-                        color: inputDisabledTextColor
-                    }
                 ]}
                 value={value}
                 onChangeText={onChangeText}
                 placeholder={placeholder}
-                placeholderTextColor={placeholderColor}
+                placeholderTextColor={colors.placeholder}
                 keyboardType={keyboardType}
                 editable={editable}
+                autoCapitalize={autoCapitalize}
+                accessibilityLabel={required ? `${label}, obligatoire` : label}
             />
         </View>
     );
 };
-
-const styles = StyleSheet.create({
-    formField: {
-        marginBottom: 16,
-    },
-    formLabel: {
-        fontSize: 14,
-        fontFamily: 'Ubuntu_Medium',
-        marginBottom: 8,
-    },
-    required: {
-        color: '#FF0000',
-    },
-    formInput: {
-        borderRadius: 16,
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        fontSize: 14,
-        fontFamily: 'Ubuntu_Regular',
-        borderWidth: 0,
-        height: 50,
-    },
-    formInputDisabled: {
-        // Styles gérés dynamiquement
-    },
-});
-
-
-
-

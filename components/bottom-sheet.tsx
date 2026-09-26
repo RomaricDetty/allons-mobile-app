@@ -1,9 +1,14 @@
 // @ts-nocheck
+import {
+    FORM_FIELD_HEIGHT,
+    FORM_FIELD_RADIUS,
+    getFormFieldColors,
+} from '@/constants/formField';
+import { BottomSheetListSkeleton } from '@/components/skeletons';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import React from 'react';
 import {
-    ActivityIndicator,
     Dimensions,
     KeyboardAvoidingView,
     Modal,
@@ -74,10 +79,11 @@ export function BottomSheet<T>({
     const tintColor = useThemeColor({}, 'tint');
     
     // Couleurs spécifiques pour le BottomSheet
+    const fieldColors = getFormFieldColors(colorScheme);
     const containerBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
     const borderColor = colorScheme === 'dark' ? '#3A3A3C' : '#F3F3F7';
-    const searchBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#F3F3F7';
-    const placeholderColor = colorScheme === 'dark' ? '#9BA1A6' : '#A6A6AA';
+    const searchBackgroundColor = fieldColors.background;
+    const placeholderColor = fieldColors.placeholder;
     const handleColor = colorScheme === 'dark' ? '#48484A' : '#CCCCCC';
     const emptyTextColor = colorScheme === 'dark' ? '#9BA1A6' : '#666666';
     
@@ -271,9 +277,7 @@ export function BottomSheet<T>({
 
                     {/* Content */}
                     {loading ? (
-                        <View style={styles.loadingContainer}>
-                            <ActivityIndicator size="large" color={tintColor} />
-                        </View>
+                        <BottomSheetListSkeleton />
                     ) : filteredData.length === 0 ? (
                         <View style={styles.emptyContainer}>
                             <Text style={[styles.emptyText, { color: emptyTextColor }]}>
@@ -358,23 +362,23 @@ const styles = StyleSheet.create({
     searchContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        borderRadius: 12,
+        borderRadius: FORM_FIELD_RADIUS,
         marginHorizontal: 20,
         marginTop: 10,
         marginBottom: 10,
-        paddingHorizontal: 12,
-        height: 48,
+        paddingHorizontal: 16,
+        height: FORM_FIELD_HEIGHT,
     },
     searchIcon: {
         marginRight: 8,
     },
     searchInput: {
         flex: 1,
-        fontSize: 15,
+        fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
         paddingVertical: 0,
-    },
-    searchClearButton: {
+        height: FORM_FIELD_HEIGHT,
+    },    searchClearButton: {
         marginLeft: 8,
         padding: 4,
     },

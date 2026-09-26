@@ -1,5 +1,10 @@
 import { RebookingCodeResponse } from '@/api/rebooking';
 import { formatFullDate, formatPrice } from '@/constants/functions';
+import {
+    FORM_FIELD_HEIGHT,
+    FORM_FIELD_RADIUS,
+    getFormFieldColors,
+} from '@/constants/formField';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -40,14 +45,12 @@ export const RebookingCodeBlock = ({
     const tintColor = useThemeColor({}, 'tint');
     
     // Couleurs spécifiques
+    const colors = getFormFieldColors(colorScheme);
     const infoBgColor = colorScheme === 'dark' ? 'rgba(23, 118, 186, 0.15)' : '#E8F4FD';
     const infoTextColor = colorScheme === 'dark' ? '#5BA3D9' : '#1776BA';
-    const inputBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#FFFFFF';
-    const inputBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#1776BA';
-    const placeholderColor = colorScheme === 'dark' ? '#9BA1A6' : '#A6A6AA';
     const buttonColor = '#1776BA';
     const successColor = '#4CAF50';
-    const errorColor = '#FF3B30';
+    const errorColor = colors.danger;
 
     return (
         <View style={styles.container}>
@@ -63,15 +66,16 @@ export const RebookingCodeBlock = ({
                         style={[
                             styles.input,
                             {
-                                backgroundColor: inputBackgroundColor,
-                                borderColor: isCodeValid === false ? errorColor : inputBorderColor,
-                                color: textColor
-                            }
+                                backgroundColor: colors.background,
+                                color: textColor,
+                                borderWidth: isCodeValid === false ? 1 : 0,
+                                borderColor: isCodeValid === false ? errorColor : 'transparent',
+                            },
                         ]}
                         value={rebookingCode}
                         onChangeText={onRebookingCodeChange}
                         placeholder="Entrez votre code"
-                        placeholderTextColor={placeholderColor}
+                        placeholderTextColor={colors.placeholder}
                         autoCapitalize="characters"
                         editable={!isVerifying}
                     />
@@ -149,20 +153,20 @@ const styles = StyleSheet.create({
     },
     input: {
         flex: 1,
-        borderRadius: 16,
+        borderRadius: FORM_FIELD_RADIUS,
         paddingHorizontal: 16,
         paddingVertical: 12,
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        // borderWidth: 2,
+        height: FORM_FIELD_HEIGHT,
     },
     verifyButton: {
-        borderRadius: 16,
+        borderRadius: FORM_FIELD_RADIUS,
         paddingHorizontal: 24,
-        paddingVertical: 12,
         justifyContent: 'center',
         alignItems: 'center',
         minWidth: 110,
+        height: FORM_FIELD_HEIGHT,
     },
     verifyButtonDisabled: {
         opacity: 0.5,

@@ -13,7 +13,9 @@ import { ConnectivityProvider } from '@/contexts/ConnectivityContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { usePendingPaymentRecovery } from '@/hooks/usePendingPaymentRecovery';
+import { usePaymentDeepLink } from '@/hooks/usePaymentDeepLink';
 import { usePaymentNotificationResponse } from '@/hooks/usePaymentNotificationResponse';
+import { useSessionIdleTimeout } from '@/hooks/useSessionIdleTimeout';
 import { useTripStatusNotifications } from '@/hooks/useTripStatusNotifications';
 import { ensureLocalNotificationPermissions } from '@/utils/paymentNotifications';
 import { useEffect, useState } from 'react';
@@ -143,8 +145,10 @@ export default function RootLayout() {
 function RootContent() {
     const colorScheme = useColorScheme();
     usePendingPaymentRecovery(true);
+    usePaymentDeepLink();
     usePaymentNotificationResponse();
     useTripStatusNotifications(true);
+    useSessionIdleTimeout(true);
 
     useEffect(() => {
         ensureLocalNotificationPermissions().catch(() => undefined);

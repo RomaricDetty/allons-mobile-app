@@ -1,11 +1,9 @@
+import { SectionCardHeader } from '@/components/ui/SectionCardHeader';
+import { formatFullDate } from '@/constants/functions';
 import React, { memo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { formatFullDate } from '@/constants/functions';
 
-/**
- * Interface pour les données d'un trajet
- */
 interface TripData {
     stationFrom: {
         city: string;
@@ -23,9 +21,6 @@ interface TripData {
     };
 }
 
-/**
- * Interface pour les props du composant
- */
 interface TripDetailsSectionProps {
     trip: TripData;
     title: string;
@@ -37,7 +32,7 @@ interface TripDetailsSectionProps {
 }
 
 /**
- * Composant pour afficher les détails d'un trajet
+ * Bloc trajet — en-tête et lignes alignés sur le billet.
  */
 export const TripDetailsSection = memo<TripDetailsSectionProps>(({
     trip,
@@ -50,41 +45,46 @@ export const TripDetailsSection = memo<TripDetailsSectionProps>(({
 }) => {
     return (
         <View style={[styles.sectionCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
-            <View style={[styles.sectionHeader, { marginBottom: 20 }]}>
-                <Icon name="map" size={20} color={primaryBlue} />
-                <Text style={[styles.sectionTitle, { color: textColor }]}>{title}</Text>
-            </View>
-            <View style={styles.detailRow}>
+            <SectionCardHeader
+                title={title}
+                textColor={textColor}
+                icon={<Icon name="map-marker-path" size={22} color={primaryBlue} />}
+            />
+            <View style={[styles.detailRow, { borderBottomColor: borderColor }]}>
                 <Text style={[styles.detailLabel, { color: secondaryTextColor }]}>Itinéraire</Text>
-                <Text style={[styles.detailValue, { color: textColor, textAlign: 'right', width: '45%' }]}>
+                <Text style={[styles.detailValue, { color: textColor }]} numberOfLines={2}>
                     {trip.stationFrom.city} → {trip.stationTo.city}
                 </Text>
             </View>
-            <View style={styles.detailRow}>
+            <View style={[styles.detailRow, { borderBottomColor: borderColor }]}>
                 <Text style={[styles.detailLabel, { color: secondaryTextColor }]}>Date</Text>
-                <Text style={[styles.detailValue, { color: textColor, textAlign: 'right', width: '45%' }]}>
+                <Text style={[styles.detailValue, { color: textColor }]} numberOfLines={2}>
                     {formatFullDate(trip.departureDateTime)}
                 </Text>
             </View>
-            <View style={styles.detailRow}>
-                <Text style={[styles.detailLabel, { color: secondaryTextColor }]}>Heure de départ</Text>
+            <View style={[styles.detailRow, { borderBottomColor: borderColor }]}>
+                <Text style={[styles.detailLabel, { color: secondaryTextColor }]}>Départ</Text>
                 <Text style={[styles.detailValue, { color: textColor }]}>{trip.departureTime}</Text>
             </View>
-            <View style={styles.detailRow}>
-                <Text style={[styles.detailLabel, { color: secondaryTextColor }]}>Heure d'arrivée estimée</Text>
+            <View style={[styles.detailRow, { borderBottomColor: borderColor }]}>
+                <Text style={[styles.detailLabel, { color: secondaryTextColor }]}>Arrivée estimée</Text>
                 <Text style={[styles.detailValue, { color: textColor }]}>{trip.arrivalTime}</Text>
             </View>
-            <View style={styles.detailRow}>
+            <View style={[styles.detailRow, { borderBottomColor: borderColor }]}>
                 <Text style={[styles.detailLabel, { color: secondaryTextColor }]}>Durée</Text>
                 <Text style={[styles.detailValue, { color: textColor }]}>{trip.duration}</Text>
             </View>
-            <View style={styles.detailRow}>
+            <View style={[styles.detailRow, { borderBottomColor: borderColor }]}>
                 <Text style={[styles.detailLabel, { color: secondaryTextColor }]}>Compagnie</Text>
-                <Text style={[styles.detailValue, { color: textColor }]}>{trip.companyName}</Text>
+                <Text style={[styles.detailValue, { color: textColor }]} numberOfLines={2}>
+                    {trip.companyName}
+                </Text>
             </View>
-            <View style={styles.detailRow}>
+            <View style={[styles.detailRow, styles.detailRowLast]}>
                 <Text style={[styles.detailLabel, { color: secondaryTextColor }]}>Véhicule</Text>
-                <Text style={[styles.detailValue, { color: textColor }]}> {trip.bus.licencePlate} </Text>
+                <Text style={[styles.detailValue, { color: textColor }]}>
+                    {trip.bus.licencePlate}
+                </Text>
             </View>
         </View>
     );
@@ -96,37 +96,30 @@ const styles = StyleSheet.create({
     sectionCard: {
         borderRadius: 12,
         padding: 16,
-        marginBottom: 16,
+        marginBottom: 14,
         borderWidth: 1,
-    },
-    sectionHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 16,
-        gap: 8,
-    },
-    sectionTitle: {
-        fontSize: 18,
-        fontFamily: 'Ubuntu_Bold',
     },
     detailRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 12,
+        alignItems: 'flex-start',
+        paddingVertical: 10,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        gap: 12,
+    },
+    detailRowLast: {
+        borderBottomWidth: 0,
+        paddingBottom: 0,
     },
     detailLabel: {
-        fontSize: 14,
-        fontFamily: 'Ubuntu_Regular',
+        fontSize: 13,
+        fontFamily: 'Ubuntu_Medium',
+        flexShrink: 0,
     },
     detailValue: {
+        flex: 1,
         fontSize: 14,
         fontFamily: 'Ubuntu_Medium',
         textAlign: 'right',
     },
 });
-
-
-
-
-

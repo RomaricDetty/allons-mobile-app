@@ -21,6 +21,7 @@ interface AppButtonProps {
     icon?: ReactNode;
     style?: StyleProp<ViewStyle>;
     textStyle?: StyleProp<TextStyle>;
+    accessibilityLabel?: string;
 }
 
 const BRAND = '#1776BA';
@@ -39,6 +40,7 @@ export const AppButton = memo<AppButtonProps>(({
     icon,
     style,
     textStyle,
+    accessibilityLabel,
 }) => {
     const isDisabled = disabled || loading;
     const variantStyle = variantStyles[variant];
@@ -60,6 +62,7 @@ export const AppButton = memo<AppButtonProps>(({
             ]}
             android_ripple={{ color: ripple }}
             accessibilityRole="button"
+            accessibilityLabel={accessibilityLabel || title}
             accessibilityState={{ disabled: isDisabled, busy: loading }}
         >
             {loading ? (
@@ -103,7 +106,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     disabled: {
-        opacity: 0.65,
+        opacity: 0.45,
     },
 });
 

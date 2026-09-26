@@ -1,8 +1,8 @@
 // @ts-nocheck
 import { useAppColors } from '@/hooks/use-app-colors';
 import * as Haptics from 'expo-haptics';
-import React, { useCallback, useEffect, useRef } from 'react';
-import { Dimensions, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 interface TabNavigationProps {
@@ -10,144 +10,106 @@ interface TabNavigationProps {
     onTabPress: (tab: 'info' | 'tickets' | 'locations') => void;
 }
 
-const TAB_WIDTH = 140;
-const PADDING_H = 16;
-const TAB_INDEX: Record<'info' | 'tickets' | 'locations', number> = {
-    info: 0,
-    tickets: 1,
-    locations: 2,
-};
-
 const TABS = [
-    { key: 'info' as const, label: 'Informations', icon: 'account' },
-    { key: 'tickets' as const, label: 'Réservations', icon: 'ticket-confirmation' },
-    { key: 'locations' as const, label: 'Locations bus', icon: 'bus' },
+    { key: 'info' as const, label: 'Infos', icon: 'account-outline' },
+    { key: 'tickets' as const, label: 'Réservations', icon: 'ticket-confirmation-outline' },
+    { key: 'locations' as const, label: 'Locations', icon: 'bus' },
 ];
 
-const getScrollOffsetForTab = (tab: 'info' | 'tickets' | 'locations') => {
-    const screenWidth = Dimensions.get('window').width;
-    const contentWidth = 2 * PADDING_H + 3 * TAB_WIDTH;
-    const maxScroll = Math.max(0, contentWidth - screenWidth);
-    const index = TAB_INDEX[tab];
-    const tabCenterX = PADDING_H + (index + 0.5) * TAB_WIDTH;
-    const offset = tabCenterX - screenWidth / 2;
-    return Math.max(0, Math.min(offset, maxScroll));
-};
-
 /**
- * Navigation par onglets du profil
+ * Onglets profil — barre égale + indicateur bas (sans pastille / bordure).
  */
 export const TabNavigation: React.FC<TabNavigationProps> = ({ activeTab, onTabPress }) => {
     const colors = useAppColors();
-    const scrollViewRef = useRef<ScrollView>(null);
-
-    const scrollToTab = useCallback((tab: 'info' | 'tickets' | 'locations') => {
-        scrollViewRef.current?.scrollTo({ x: getScrollOffsetForTab(tab), animated: true });
-    }, []);
-
-    useEffect(() => {
-        scrollToTab(activeTab);
-    }, [activeTab, scrollToTab]);
 
     const handleTabPress = useCallback(
         (tab: 'info' | 'tickets' | 'locations') => {
+            if (tab === activeTab) return;
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             onTabPress(tab);
-            scrollToTab(tab);
         },
-        [onTabPress, scrollToTab],
+        [activeTab, onTabPress],
     );
 
     return (
         <View
             style={[
-                styles.tabsContainer,
+                styles.container,
                 {
                     backgroundColor: colors.headerBackground,
                     borderBottomColor: colors.headerBorder,
                 },
             ]}
         >
-            <ScrollView
-                ref={scrollViewRef}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={[styles.tabsScrollContent, { paddingHorizontal: PADDING_H }]}
-                style={styles.tabsScrollView}
-            >
-                {TABS.map((tab) => {
-                    const active = activeTab === tab.key;
-                    return (
-                        <Pressable
-                            key={tab.key}
-                            style={[styles.tab, { width: TAB_WIDTH }]}
-                            onPress={() => handleTabPress(tab.key)}
+            {TABS.map((tab) => {
+                const active = activeTab === tab.key;
+                const tint = active ? colors.activeTabColor : colors.inactiveTabText;
+
+                return (
+                    <Pressable
+                        key={tab.key}
+                        style={styles.tab}
+                        onPress={() => handleTabPress(tab.key)}
+                        accessibilityRole="tab"
+                        accessibilityState={{ selected: active }}
+                        accessibilityLabel={tab.label}
+                    >
+                        <MaterialCommunityIcons
+                            name={active ? tab.icon.replace('-outline', '') : tab.icon}
+                            size={20}
+                            color={tint}
+                        />
+                        <Text
+                            style={[
+                                styles.label,
+                                {
+                                    color: tint,
+                                    fontFamily: active ? 'Ubuntu_Medium' : 'Ubuntu_Regular',
+                                },
+                            ]}
+                            numberOfLines={1}
                         >
-                            <View
-                                style={[
-                                    styles.tabInner,
-                                    active && {
-                                        backgroundColor: colors.infoMuted,
-                                        borderColor: colors.activeTabColor,
-                                    },
-                                    !active && { borderColor: 'transparent' },
-                                ]}
-                            >
-                                <MaterialCommunityIcons
-                                    name={tab.icon}
-                                    size={18}
-                                    color={active ? colors.activeTabColor : colors.inactiveIcon}
-                                />
-                                <Text
-                                    style={[
-                                        styles.tabText,
-                                        {
-                                            color: active ? colors.activeTabColor : colors.inactiveTabText,
-                                            fontFamily: active ? 'Ubuntu_Bold' : 'Ubuntu_Regular',
-                                        },
-                                    ]}
-                                    numberOfLines={1}
-                                >
-                                    {tab.label}
-                                </Text>
-                            </View>
-                        </Pressable>
-                    );
-                })}
-            </ScrollView>
+                            {tab.label}
+                        </Text>
+                        <View
+                            style={[
+                                styles.indicator,
+                                {
+                                    backgroundColor: active ? colors.activeTabColor : 'transparent',
+                                },
+                            ]}
+                        />
+                    </Pressable>
+                );
+            })}
         </View>
     );
 };
 
 const styles = StyleSheet.create({
-    tabsContainer: {
+    container: {
+        flexDirection: 'row',
         borderBottomWidth: StyleSheet.hairlineWidth,
     },
-    tabsScrollView: {
-        flexGrow: 0,
-    },
-    tabsScrollContent: {
-        flexDirection: 'row',
-        paddingVertical: 10,
-        gap: 8,
-    },
     tab: {
+        flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
+        gap: 4,
+        paddingTop: 12,
+        paddingBottom: 10,
+        paddingHorizontal: 4,
     },
-    tabInner: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 6,
-        paddingVertical: 10,
-        paddingHorizontal: 12,
-        borderRadius: 10,
-        borderWidth: 1,
-        minHeight: 40,
-        width: '100%',
+    label: {
+        fontSize: 12,
+        letterSpacing: 0.1,
     },
-    tabText: {
-        fontSize: 13,
+    indicator: {
+        position: 'absolute',
+        left: 12,
+        right: 12,
+        bottom: 0,
+        height: 2,
+        borderRadius: 1,
     },
 });

@@ -1,11 +1,16 @@
 //@ts-nocheck
+import { AppButton } from '@/components/ui/AppButton';
+import { FormScreenSkeleton } from '@/components/skeletons';
+import { EMERGENCY_RELATION_OPTIONS, normalizeEmergencyRelationForStorage } from '@/constants/emergencyRelations';
+import { FORM_FIELD_RADIUS, getFormFieldColors } from '@/constants/formField';
+import { useAuth } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { showAlert } from '@/utils/alert';
+import { saveAuthSession } from '@/utils/storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
     Animated,
     Dimensions,
     Keyboard,
@@ -32,12 +37,10 @@ import {
 import { Civility, PhoneType } from '../../types';
 import { SelectField } from '../passengers/SelectField';
 import { SelectionBottomSheet } from '../passengers/SelectionBottomSheet';
+import { PhoneField } from '../passengers/PhoneField';
 import { AuthFormField } from './AuthFormField';
 import { Checkbox } from './Checkbox';
 import { PasswordField } from './PasswordField';
-import { showAlert } from '@/utils/alert';
-import { useAuth } from '@/contexts/AuthContext';
-import { AppButton } from '@/components/ui/AppButton';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
@@ -58,14 +61,15 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
     // const inputBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
     // const placeholderColor = colorScheme === 'dark' ? '#9BA1A6' : '#A6A6AA';
 
-    const inputBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#F5F5F5';
-    const inputBorderColor = colorScheme === 'dark' ? '#3A3A3C' : 'transparent';
-    const placeholderColor = colorScheme === 'dark' ? '#9BA1A6' : '#999999';
+    const fieldColors = getFormFieldColors(colorScheme);
+    const inputBackgroundColor = fieldColors.background;
+    const inputBorderColor = 'transparent';
+    const dangerColor = fieldColors.danger;
+    const placeholderColor = fieldColors.placeholder;
     const separatorLineColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
     const linkColor = tintColor === '#fff' ? '#1776BA' : tintColor;
     const modalBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
     const modalBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
-    const loadingIndicatorColor = tintColor === '#fff' ? '#1776BA' : tintColor;
 
     // Dans les variables de couleurs, ajouter :
     const sectionBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
@@ -92,6 +96,7 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
         emergencyContactPhone: '',
         emergencyContactCountryCode: '+225',
         emergencyContactRelation: '',
+        emergencyContactRelationOther: '',
         agreeToTerms: false,
     });
 
@@ -179,15 +184,7 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
         { value: 'MISS', label: 'Mademoiselle' },
     ];
 
-    // Options pour la relation du contact d'urgence
-    const relationOptions = [
-        { value: 'parent', label: 'Parent' },
-        { value: 'conjoint', label: 'Conjoint(e)' },
-        { value: 'enfant', label: 'Enfant' },
-        { value: 'frere-soeur', label: 'Frère/Sœur' },
-        { value: 'ami', label: 'Ami(e)' },
-        { value: 'autre', label: 'Autre' },
-    ];
+    const relationOptions = EMERGENCY_RELATION_OPTIONS;
 
     /**
      * Marque un champ comme "touché" (l'utilisateur a interagi avec)
@@ -438,7 +435,12 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
                         firstName: formData.emergencyContactFirstName,
                         lastName: formData.emergencyContactLastName,
                         phone: { type: formData.emergencyContactPhoneType as PhoneType, digits: formData.emergencyContactPhone, countryCode: formData.emergencyContactCountryCode || '+225' },
-                        relationship: formData.emergencyContactRelation || undefined,
+                        relationship: formData.emergencyContactRelation
+                            ? normalizeEmergencyRelationForStorage(
+                                formData.emergencyContactRelation,
+                                formData.emergencyContactRelationOther
+                            )
+                            : undefined,
                     }
                     : undefined,
                 email: formData.email,
@@ -469,23 +471,15 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
                         throw new Error('Informations utilisateur manquantes dans la réponse');
                     }
 
-                    // Stockage des tokens dans AsyncStorage de manière sécurisée
+                    // Stockage des tokens (SecureStore)
                     try {
-                        await AsyncStorage.setItem('token', accessToken);
-
-                        if (refreshToken && refreshToken.trim() !== '') {
-                            await AsyncStorage.setItem('refresh_token', refreshToken);
-                        }
-
-                        if (expiresIn !== undefined && expiresIn !== null) {
-                            await AsyncStorage.setItem('expires_at', String(expiresIn));
-                        }
-
-                        if (tokenType && tokenType.trim() !== '') {
-                            await AsyncStorage.setItem('token_type', tokenType);
-                        }
-
-                        await AsyncStorage.setItem('user_id', user.id);
+                        await saveAuthSession({
+                            accessToken,
+                            refreshToken,
+                            expiresIn,
+                            tokenType,
+                            userId: user.id,
+                        });
                         await setSessionUser({
                             ...user,
                             firstName: user.firstName || formData.firstName,
@@ -597,6 +591,9 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
      */
     const handleSelectRelation = (value: string) => {
         updateField('emergencyContactRelation', value);
+        if (value !== 'autre') {
+            updateField('emergencyContactRelationOther', '');
+        }
         setShowRelationPicker(false);
     };
 
@@ -617,9 +614,7 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
     return (
         <>
             {isLoading ? (
-                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: scrollBackgroundColor }}>
-                    <ActivityIndicator size="large" color={loadingIndicatorColor} />
-                </View>
+                <FormScreenSkeleton withHeader={false} />
             ) : (
                 <KeyboardAvoidingView
                     style={[styles.container, { backgroundColor: scrollBackgroundColor }]}
@@ -707,19 +702,17 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
                                 {/* Date de naissance */}
                                 <View style={styles.formField}>
                                     <Text style={[styles.formLabel, { color: textColor }]}>
-                                        Date de naissance <Text style={{ color: inputBorderColor }}>*</Text>
+                                        Date de naissance <Text style={{ color: dangerColor }}>*</Text>
                                     </Text>
-                                    {/* errors.dateOfBirth && touchedFields.has('dateOfBirth') 
-                                                ? '#FF0000' 
-                                                : inputBorderColor */}
                                     <Pressable
                                         style={[
                                             styles.dateInput,
                                             {
                                                 backgroundColor: inputBackgroundColor,
+                                                borderWidth: errors.dateOfBirth && touchedFields.has('dateOfBirth') ? 1 : 0,
                                                 borderColor: errors.dateOfBirth && touchedFields.has('dateOfBirth')
-                                                    ? '#FF0000'
-                                                    : inputBorderColor
+                                                    ? dangerColor
+                                                    : 'transparent',
                                             }
                                         ]}
                                         onPress={() => {
@@ -743,16 +736,17 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
                                     <Text style={styles.errorText}>{errors.civility}</Text>
                                 )} */}
                                     <Text style={[styles.formLabel, { color: textColor }]}>
-                                        Civilité <Text style={{ color: inputBorderColor }}>*</Text>
+                                        Civilité <Text style={{ color: dangerColor }}>*</Text>
                                     </Text>
                                     <Pressable
                                         style={[
                                             styles.selectInput,
                                             {
                                                 backgroundColor: inputBackgroundColor,
+                                                borderWidth: errors.civility && touchedFields.has('civility') ? 1 : 0,
                                                 borderColor: errors.civility && touchedFields.has('civility')
-                                                    ? '#FF0000'
-                                                    : inputBorderColor
+                                                    ? dangerColor
+                                                    : 'transparent',
                                             }
                                         ]}
                                         onPress={() => {
@@ -793,48 +787,30 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
                                 </View>
 
                                 {/* Téléphone */}
-                                <View style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
-                                    <Text
-                                        style={[
-                                            styles.formLabel,
-                                            { 
-                                                color: textColor, 
-                                                marginBottom: 0,
+                                <PhoneField
+                                    label="Numéro de téléphone"
+                                    value={formData.phone}
+                                    onChangeText={(text) => updateField('phone', text)}
+                                    required
+                                    countryCode={formData.phoneCountryCode || '+225'}
+                                    onCountryCodePress={() =>
+                                        handleOpenCountryCodePicker(
+                                            'countryCode',
+                                            'Code pays',
+                                            countryCodeOptions,
+                                            formData.phoneCountryCode || '+225',
+                                            (value) => {
+                                                const selectedCountry = COUNTRY_CODES.find(
+                                                    (country) => country.code === value
+                                                );
+                                                if (selectedCountry) {
+                                                    setSelectedCountryCode(selectedCountry);
+                                                }
+                                                updateField('phoneCountryCode', value);
                                             }
-                                        ]}
-                                    >
-                                        Numéro de téléphone
-                                    </Text>
-                                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 5 }}>
-                                        <View style={{ flex: 0.4 }}>
-                                            <SelectField
-                                                label=""
-                                                value={formData.phoneCountryCode || ''}
-                                                placeholder="Sélectionner"
-                                                selectionType="countryCode"
-                                                options={countryCodeOptions}
-                                                onSelect={(value) => {
-                                                    const selectedCountry = COUNTRY_CODES.find(country => country.code === value);
-                                                    if (selectedCountry) {
-                                                        setSelectedCountryCode(selectedCountry);
-                                                    }
-                                                    updateField('phoneCountryCode', value);
-                                                }}
-                                                onOpenBottomSheet={handleOpenCountryCodePicker}
-                                            />
-                                        </View>
-                                        <View style={{ flex: 0.6 }}>
-                                            <AuthFormField
-                                                label=""
-                                                value={formData.phone}
-                                                onChangeText={(text) => updateField('phone', text)}
-                                                onBlur={() => handleFieldBlur('phone')}
-                                                placeholder="Ex: 0123456789"
-                                                keyboardType="phone-pad"
-                                            />
-                                        </View>
-                                    </View>
-                                </View>
+                                        )
+                                    }
+                                />
 
                                 {/* Mot de passe */}
                                 <View>
@@ -894,48 +870,29 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
                                 </View>
 
                                 {/* Contact d'urgence - Téléphone */}
-                                <View style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
-                                    <Text
-                                        style={[
-                                            styles.formLabel,
-                                            { 
-                                                color: textColor, 
-                                                marginBottom: 0,
+                                <PhoneField
+                                    label="Numéro de téléphone"
+                                    value={formData.emergencyContactPhone}
+                                    onChangeText={(text) => updateField('emergencyContactPhone', text)}
+                                    countryCode={formData.emergencyContactCountryCode || '+225'}
+                                    onCountryCodePress={() =>
+                                        handleOpenCountryCodePicker(
+                                            'countryCode',
+                                            'Code pays',
+                                            countryCodeOptions,
+                                            formData.emergencyContactCountryCode || '+225',
+                                            (value) => {
+                                                const selectedCountry = COUNTRY_CODES.find(
+                                                    (country) => country.code === value
+                                                );
+                                                if (selectedCountry) {
+                                                    setSelectedCountryCode(selectedCountry);
+                                                }
+                                                updateField('emergencyContactCountryCode', value);
                                             }
-                                        ]}
-                                    >
-                                        Numéro de téléphone
-                                    </Text>
-                                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 5 }}>
-                                        <View style={{ flex: 0.4 }}>
-                                            <SelectField
-                                                label=""
-                                                value={formData.emergencyContactCountryCode || ''}
-                                                placeholder="Sélectionner"
-                                                selectionType="countryCode"
-                                                options={countryCodeOptions}
-                                                onSelect={(value) => {
-                                                    const selectedCountry = COUNTRY_CODES.find(country => country.code === value);
-                                                    if (selectedCountry) {
-                                                        setSelectedCountryCode(selectedCountry);
-                                                    }
-                                                    updateField('emergencyContactCountryCode', value);
-                                                }}
-                                                onOpenBottomSheet={handleOpenCountryCodePicker}
-                                            />
-                                        </View>
-                                        <View style={{ flex: 0.6 }}>
-                                            <AuthFormField
-                                                label=""
-                                                value={formData.emergencyContactPhone}
-                                                onChangeText={(text) => updateField('emergencyContactPhone', text)}
-                                                onBlur={() => handleFieldBlur('emergencyContactPhone')}
-                                                placeholder="Ex: 0123456789"
-                                                keyboardType="phone-pad"
-                                            />
-                                        </View>
-                                    </View>
-                                </View>
+                                        )
+                                    }
+                                />
 
                                 {/* Contact d'urgence - Relation */}
                                 <View style={styles.formField}>
@@ -966,6 +923,15 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
                                         <MaterialCommunityIcons name="chevron-down" size={20} color={iconColor} />
                                     </Pressable>
                                 </View>
+
+                                {formData.emergencyContactRelation === 'autre' && (
+                                    <AuthFormField
+                                        label="Précisez la relation"
+                                        value={formData.emergencyContactRelationOther || ''}
+                                        onChangeText={(text) => updateField('emergencyContactRelationOther', text)}
+                                        placeholder="Ex: Cousin, Collègue…"
+                                    />
+                                )}
                             </View>
 
                             {/* Checkbox conditions d'utilisation */}
@@ -974,7 +940,7 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
                                     <Text style={styles.errorText}>{errors.agreeToTerms}</Text>
                                 )}
                                 <Checkbox
-                                    label="J'accepte les conditions d'utilisation et la politique de confidentialité"
+                                    withLegalLinks
                                     checked={formData.agreeToTerms}
                                     onToggle={() => {
                                         updateField('agreeToTerms', !formData.agreeToTerms);
@@ -1003,7 +969,7 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
                         </Pressable>
                     </View> */}
 
-                        {/* Date Picker Modal */}
+                        {/* Date Picker Modal — iOS : modal stable jusqu'à Valider */}
                         {showDatePicker && (
                             <>
                                 {Platform.OS === 'ios' && (
@@ -1013,24 +979,28 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
                                         animationType="slide"
                                         onRequestClose={() => setShowDatePicker(false)}
                                     >
-                                        <Pressable
-                                            style={styles.modalOverlay}
-                                            onPress={() => setShowDatePicker(false)}
-                                        >
+                                        <View style={styles.modalOverlay}>
+                                            <Pressable
+                                                style={StyleSheet.absoluteFill}
+                                                onPress={() => setShowDatePicker(false)}
+                                            />
                                             <View
                                                 style={[
                                                     styles.datePickerContainer,
                                                     {
                                                         backgroundColor: modalBackgroundColor,
-                                                        paddingBottom: insets.bottom + 20
-                                                    }
+                                                        paddingBottom: insets.bottom + 20,
+                                                    },
                                                 ]}
-                                                onStartShouldSetResponder={() => true}
                                             >
                                                 <View style={[styles.datePickerHeader, { borderBottomColor: modalBorderColor }]}>
                                                     <Text style={[styles.datePickerTitle, { color: textColor }]}>Date de naissance</Text>
-                                                    <Pressable onPress={() => setShowDatePicker(false)}>
-                                                        <MaterialCommunityIcons name="close" size={24} color={iconColor} />
+                                                    <Pressable onPress={() => setShowDatePicker(false)} hitSlop={12}>
+                                                        <MaterialCommunityIcons
+                                                            name="check"
+                                                            size={24}
+                                                            color={linkColor === '#fff' ? '#1776BA' : linkColor}
+                                                        />
                                                     </Pressable>
                                                 </View>
                                                 <View style={styles.datePickerContent}>
@@ -1045,7 +1015,7 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
                                                     />
                                                 </View>
                                             </View>
-                                        </Pressable>
+                                        </View>
                                     </Modal>
                                 )}
                                 {Platform.OS === 'android' && (
@@ -1131,20 +1101,16 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     required: {
-        color: '#FF0000',
+        color: '#C44747',
     },
     dateInput: {
-        // borderRadius: 8,
-        // paddingHorizontal: 16,
-        // paddingVertical: 12,
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        // borderWidth: 1,
-        borderRadius: 16,
+        borderRadius: FORM_FIELD_RADIUS,
         paddingHorizontal: 16,
-        paddingVertical: 14,
-        fontSize: 16,
+        paddingVertical: 12,
+        fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
         borderWidth: 0,
         height: 50,
@@ -1154,17 +1120,13 @@ const styles = StyleSheet.create({
         fontFamily: 'Ubuntu_Regular',
     },
     selectInput: {
-        // borderRadius: 8,
-        // paddingHorizontal: 16,
-        // paddingVertical: 12,
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        // borderWidth: 1,
         borderRadius: 16,
         paddingHorizontal: 16,
-        paddingVertical: 14,
-        fontSize: 16,
+        paddingVertical: 12,
+        fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
         borderWidth: 0,
         height: 50,
@@ -1176,10 +1138,9 @@ const styles = StyleSheet.create({
     errorText: {
         fontSize: 12,
         fontFamily: 'Ubuntu_Regular',
-        color: '#FF0000',
+        color: '#C44747',
         marginTop: 4,
         marginBottom: 8,
-        // marginLeft: 4,
     },
     checkboxContainer: {
         marginTop: 8,

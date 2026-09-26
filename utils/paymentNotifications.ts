@@ -4,6 +4,8 @@ import {
     PaymentNotificationStatus,
     } from '@/interfaces/paymentNotification';
 import { PendingPaymentSession } from '@/interfaces/payment';
+import { resolvePaymentProvider } from '@/utils/bookingDataTransformer';
+import { formatPaymentMethodDisplay } from '@/constants/paymentMethods';
 import * as Notifications from 'expo-notifications';
 import { Platform,
 } from 'react-native';
@@ -95,7 +97,11 @@ export const buildPaymentNotificationPayload = (
         ) || '—';
 
     const currency = String(payment.currency || trip.currency || 'XOF');
-    const provider = String(payment.provider || booking.paymentProvider || 'Mobile Money');
+    const bookingEntity = booking.newBooking && typeof booking.newBooking === 'object'
+        ? booking.newBooking
+        : booking;
+    const resolvedProvider = resolvePaymentProvider(payment, bookingEntity);
+    const provider = formatPaymentMethodDisplay(resolvedProvider) || 'Mobile Money';
 
     const travelDateRaw =
         trip.departureDateTime ||
@@ -142,18 +148,14 @@ const titleForStatus = (status: PaymentNotificationStatus): string => {
 };
 
 const bodyForPayload = (payload: PaymentNotificationPayload): string => {
-    const amountLabel =
-        payload.amount && payload.amount !== '—'
-            ? `${payload.amount} ${payload.currency}`
-            : payload.currency;
-
+    // Corps générique sur lock screen — détails réservés au tap in-app
     if (payload.status === 'success') {
-        return `${payload.routeLabel} · ${amountLabel} · Réf. ${payload.bookingCode}`;
+        return 'Votre billet est confirmé. Ouvrez AllOn pour le consulter.';
     }
     if (payload.status === 'expired') {
-        return `Votre session pour ${payload.routeLabel} a expiré. Réf. ${payload.bookingCode}`;
+        return 'La session de paiement a expiré. Ouvrez AllOn pour réessayer.';
     }
-    return `Le paiement pour ${payload.routeLabel} n’a pas abouti. Réf. ${payload.bookingCode}`;
+    return 'Le paiement n’a pas abouti. Ouvrez AllOn pour plus de détails.';
 };
 
 /**

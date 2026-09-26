@@ -1,7 +1,11 @@
+import {
+    FORM_FIELD_HEIGHT,
+    formFieldBaseStyles,
+    getFormFieldColors,
+} from '@/constants/formField';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useThemeColor } from '@/hooks/use-theme-color';
 import React from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { Text, TextInput, View } from 'react-native';
 
 interface AuthFormFieldProps {
     label: string;
@@ -13,10 +17,11 @@ interface AuthFormFieldProps {
     keyboardType?: 'default' | 'numeric' | 'email-address' | 'phone-pad';
     errors?: string;
     touchedFields?: boolean;
+    autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
 }
 
 /**
- * Composant pour un champ de formulaire d'authentification avec fond blanc
+ * Champ auth — même look que FormField
  */
 export const AuthFormField = ({
     label,
@@ -28,71 +33,40 @@ export const AuthFormField = ({
     keyboardType = 'default',
     errors,
     touchedFields,
+    autoCapitalize = 'none',
 }: AuthFormFieldProps) => {
     const colorScheme = useColorScheme() ?? 'light';
-    
-    // Couleurs dynamiques basées sur le thème
-    const textColor = useThemeColor({}, 'text');
-    
-    // Couleurs spécifiques pour le champ - style moderne avec fond gris clair
-    const inputBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#F5F5F5';
-    const inputBorderColor = colorScheme === 'dark' ? '#3A3A3C' : 'transparent';
-    const placeholderColor = colorScheme === 'dark' ? '#9BA1A6' : '#999999';
+    const colors = getFormFieldColors(colorScheme);
+    const showError = Boolean(errors && touchedFields);
 
     return (
-        <View style={styles.formField}>
-            <Text style={[styles.formLabel, { color: textColor }]}>
-                {label} {required && <Text style={{ color: inputBorderColor }}>*</Text>}
-            </Text>
+        <View style={formFieldBaseStyles.field}>
+            {!!label && (
+                <Text style={[formFieldBaseStyles.label, { color: colors.text }]}>
+                    {label}{' '}
+                    {required && <Text style={{ color: colors.danger }}>*</Text>}
+                </Text>
+            )}
             <TextInput
                 style={[
-                    styles.formInput,
-                    // {
-                    //     backgroundColor: inputBackgroundColor,
-                    //     borderColor: inputBorderColor,
-                    //     color: textColor
-                    // }
+                    formFieldBaseStyles.input,
                     {
-                        backgroundColor: inputBackgroundColor,
-                        color: textColor,
-                        borderColor: errors && touchedFields 
-                        ? '#FF0000' 
-                        : inputBorderColor
-                    }
+                        backgroundColor: colors.background,
+                        color: colors.text,
+                        borderWidth: showError ? 1 : 0,
+                        borderColor: showError ? colors.danger : 'transparent',
+                        height: FORM_FIELD_HEIGHT,
+                    },
                 ]}
                 value={value}
                 onChangeText={onChangeText}
                 onBlur={onBlur}
                 placeholder={placeholder}
-                placeholderTextColor={placeholderColor}
+                placeholderTextColor={colors.placeholder}
                 keyboardType={keyboardType}
-                autoCapitalize="none"
+                autoCapitalize={autoCapitalize}
+                accessibilityLabel={required ? `${label}, obligatoire` : label}
             />
         </View>
     );
 };
-
-const styles = StyleSheet.create({
-    formField: {
-        marginBottom: 16,
-    },
-    formLabel: {
-        fontSize: 14,
-        fontFamily: 'Ubuntu_Medium',
-        marginBottom: 8,
-    },
-    required: {
-        color: '#FF0000',
-    },
-    formInput: {
-        borderRadius: 16,
-        paddingHorizontal: 16,
-        paddingVertical: 14,
-        fontSize: 16,
-        fontFamily: 'Ubuntu_Regular',
-        borderWidth: 0,
-        height: 50,
-    },
-});
-
-

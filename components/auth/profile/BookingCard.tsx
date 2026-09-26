@@ -60,6 +60,12 @@ function getStatusTone(status: string, colors: ReturnType<typeof useAppColors>) 
     return { backgroundColor: colors.inputBackground, color: colors.secondaryText };
 }
 
+/** Paiement encore finalisable (en attente / en cours uniquement). */
+function canFinalizePayment(status?: string): boolean {
+    const key = (status || '').toUpperCase();
+    return key === 'PENDING' || key === 'PROCESSING';
+}
+
 /**
  * Carte de réservation — hiérarchie route / horaire / prix / actions
  */
@@ -92,6 +98,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({ booking }) => {
     const fromCity = booking?.trip?.stationFrom?.city || '—';
     const toCity = booking?.trip?.stationTo?.city || '—';
     const passengerCount = booking?.passengers?.length ?? 0;
+    const showFinalizePayment = canFinalizePayment(booking.status);
 
     return (
         <View style={[styles.card, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
@@ -144,10 +151,29 @@ export const BookingCard: React.FC<BookingCardProps> = ({ booking }) => {
             </View>
 
             <View style={styles.actions}>
+                {showFinalizePayment ? (
+                    <AppButton
+                        title="Finaliser le paiement"
+                        onPress={() => {
+                            navigation.navigate('payment/success' as never, {
+                                bookingId: booking.id,
+                                recovered: '1',
+                            } as never);
+                        }}
+                        icon={<MaterialCommunityIcons name="wallet-outline" size={18} color="#FFFFFF" />}
+                    />
+                ) : null}
                 <AppButton
                     title="Voir le ticket"
                     onPress={handleViewBooking}
-                    icon={<MaterialCommunityIcons name="ticket-confirmation" size={18} color="#FFFFFF" />}
+                    variant={showFinalizePayment ? 'secondary' : 'primary'}
+                    icon={
+                        <MaterialCommunityIcons
+                            name="ticket-confirmation"
+                            size={18}
+                            color={showFinalizePayment ? colors.activeTabColor : '#FFFFFF'}
+                        />
+                    }
                 />
                 {showItineraryButton && (
                     <AppButton

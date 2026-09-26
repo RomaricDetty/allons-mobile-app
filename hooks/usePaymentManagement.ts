@@ -4,23 +4,19 @@ import {
     createRebookingBooking,
     RebookingPassengerPayload,
 } from '@/api/booking';
-import { PAYMENT_RETURN_URL_PREFIX } from '@/constants/payment';
 import { mapUiPaymentMethod } from '@/constants/paymentMethods';
 import { PayBookingRequest } from '@/interfaces/payment';
 import { savePendingPayment } from '@/utils/pendingPayment';
-import { classifyPaymentReturnUrl } from '@/utils/paymentPolling';
+import { isAllowedPaymentRedirectUrl } from '@/utils/paymentRedirectUrl';
 import { toInternationalPhone } from '@/utils/phoneFormat';
 import { getAuthToken, getUserId } from '@/utils/storage';
+import { showAlert } from '@/utils/alert';
 import { CommonActions } from '@react-navigation/native';
 import * as Linking from 'expo-linking';
-import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useEffect, useState } from 'react';
-import { showAlert } from '@/utils/alert';
-
-WebBrowser.maybeCompleteAuthSession();
 
 /**
- * Hook pour gérer le paiement Mobile Money (checkout PSP + deep link).
+ * Hook pour gérer le paiement Mobile Money (checkout navigateur système + deeplink).
  */
 export const usePaymentManagement = (defaultCountryCode: string = '+225') => {
     const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string | null>(null);
@@ -129,42 +125,43 @@ export const usePaymentManagement = (defaultCountryCode: string = '+225') => {
         );
     }, []);
 
-    const openCheckoutAndAwaitReturn = useCallback(async (
+    /**
+     * Ouvre le checkout dans le navigateur système (hors app) pour que
+     * le retour passe bien par Universal Links / App Links / custom scheme.
+     * L’écran de vérification est affiché avant de quitter l’app.
+     */
+    const openCheckoutExternally = useCallback(async (
         redirectUrl: string,
         bookingId: string,
         navigation: any
     ) => {
-        let settled = false;
-
-        const settleFromUrl = (url: string) => {
-            const kind = classifyPaymentReturnUrl(url);
-            if (kind === 'unknown' || settled) return false;
-            settled = true;
-            WebBrowser.dismissBrowser().catch(() => undefined);
-            navigatePaymentResult(navigation, bookingId, kind);
-            return true;
-        };
-
-        const linkingSub = Linking.addEventListener('url', ({ url }) => {
-            settleFromUrl(url);
-        });
+        navigatePaymentResult(navigation, bookingId, 'success');
 
         try {
-            const result = await WebBrowser.openAuthSessionAsync(
-                redirectUrl,
-                PAYMENT_RETURN_URL_PREFIX
+            if (!isAllowedPaymentRedirectUrl(redirectUrl)) {
+                showAlert(
+                    'Lien de paiement invalide',
+                    'L’URL de checkout n’est pas sécurisée. Réessayez ou changez de wallet.'
+                );
+                return;
+            }
+            const supported = await Linking.canOpenURL(redirectUrl);
+            if (!supported) {
+                showAlert(
+                    'Navigateur indisponible',
+                    'Impossible d’ouvrir la page de paiement. Utilisez « Rouvrir le paiement » sur l’écran suivant.'
+                );
+                return;
+            }
+            // Laisse le temps à la navigation de peindre l’écran de vérif
+            await new Promise((r) => setTimeout(r, 350));
+            await Linking.openURL(redirectUrl);
+        } catch (error) {
+            console.warn('Ouverture checkout externe échouée', error);
+            showAlert(
+                'Erreur',
+                'Impossible d’ouvrir le paiement dans le navigateur. Réessayez via « Rouvrir le paiement ».'
             );
-
-            if (!settled && result.type === 'success' && result.url) {
-                settleFromUrl(result.url);
-            }
-
-            if (!settled) {
-                // Fermeture manuelle : confirmation via polling sur l'écran succès.
-                navigatePaymentResult(navigation, bookingId, 'success');
-            }
-        } finally {
-            linkingSub.remove();
         }
     }, [navigatePaymentResult]);
 
@@ -289,7 +286,7 @@ export const usePaymentManagement = (defaultCountryCode: string = '+225') => {
             }
 
             if (paymentMethod === 'MOBILE_MONEY' && !provider) {
-                throw new Error('Sélectionnez un wallet Mobile Money (Wave, Orange ou MTN).');
+                throw new Error('Sélectionnez un wallet Mobile Money (Wave, Orange, MTN ou Moov).');
             }
 
             const rawPhone = paymentNumber.trim() || passengers[0]?.phone?.trim() || emergencyContact.phone.trim();
@@ -318,7 +315,17 @@ export const usePaymentManagement = (defaultCountryCode: string = '+225') => {
                 throw new Error('Erreur paiement');
             }
 
-            const payData = paymentResponse.data;
+            const payData = {
+                ...paymentResponse.data,
+                // L’API omet parfois provider : on conserve celui choisi à l’UI
+                provider: paymentResponse.data?.provider || paymentResponse.data?.paymentProvider || provider || undefined,
+                paymentProvider:
+                    paymentResponse.data?.paymentProvider ||
+                    paymentResponse.data?.provider ||
+                    provider ||
+                    undefined,
+                method: paymentResponse.data?.method || paymentMethod,
+            };
             const paymentStatus = (payData.paymentStatus || payData.status || '').toUpperCase();
             const redirectUrl = payData.redirectUrl;
 
@@ -328,7 +335,7 @@ export const usePaymentManagement = (defaultCountryCode: string = '+225') => {
             ) {
                 navigateToConfirmation(navigation, {
                     bookingResponse,
-                    paymentResponse,
+                    paymentResponse: { ...paymentResponse, data: payData },
                     trip,
                     returnTrip,
                     passengers,
@@ -363,7 +370,7 @@ export const usePaymentManagement = (defaultCountryCode: string = '+225') => {
                 phase: 'checkout',
             });
 
-            await openCheckoutAndAwaitReturn(redirectUrl, bookingId, navigation);
+            await openCheckoutExternally(redirectUrl, bookingId, navigation);
         } catch (error: any) {
             console.error('Erreur réservation:', error);
             showAlert('Erreur', error?.response?.data?.message || error?.message || 'Erreur lors de la réservation');
@@ -375,7 +382,7 @@ export const usePaymentManagement = (defaultCountryCode: string = '+225') => {
         paymentCountryCode,
         buildRebookingPassengers,
         navigateToConfirmation,
-        openCheckoutAndAwaitReturn,
+        openCheckoutExternally,
     ]);
 
     return {

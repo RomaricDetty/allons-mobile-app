@@ -5,7 +5,7 @@ import { SelectionBottomSheet } from '@/components/passengers/SelectionBottomShe
 import { TextAreaField } from '@/components/passengers/TextAreaField';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getAuthToken } from '@/utils/storage';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
@@ -136,7 +136,7 @@ const LuggageClaimScreen = () => {
 
         setIsSubmitting(true);
         try {
-            const token = await AsyncStorage.getItem('token');
+            const token = await getAuthToken();
             if (!token) {
                 throw new Error('Token non disponible');
             }
@@ -242,8 +242,8 @@ const LuggageClaimScreen = () => {
                             style={[
                                 styles.selectInput,
                                 {
-                                    backgroundColor: colorScheme === 'dark' ? '#2C2C2E' : '#F5F5F5',
-                                    borderColor: themeColors.borderColor,
+                                    backgroundColor: colorScheme === 'dark' ? '#2C2C2E' : '#F3F3F7',
+                                    borderColor: 'transparent',
                                 },
                             ]}
                             onPress={handleOpenBottomSheet}
@@ -405,14 +405,16 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     required: {
-        color: '#FF0000',
+        color: '#C44747',
     },
     selectInput: {
         borderRadius: 16,
         paddingHorizontal: 16,
-        paddingVertical: 14,
+        paddingVertical: 12,
+        fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        borderWidth: 1,
+        borderWidth: 0,
+        height: 50,
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',

@@ -1,6 +1,13 @@
+import {
+    FORM_FIELD_HEIGHT,
+    FORM_FIELD_RADIUS,
+    formFieldBaseStyles,
+    getFormFieldColors,
+} from '@/constants/formField';
+import { useAppColors } from '@/hooks/use-app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useThemeColor } from '@/hooks/use-theme-color';
-import React from 'react';
+import { COUNTRY_CODES } from '@/interfaces';
+import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
@@ -14,7 +21,7 @@ interface PhoneFieldProps {
 }
 
 /**
- * Composant pour un champ téléphone avec code pays sélectionnable
+ * Téléphone + code pays (flag + indicatif) — fill uniforme, sans bordure
  */
 export const PhoneField = ({
     label,
@@ -22,55 +29,59 @@ export const PhoneField = ({
     onChangeText,
     required = false,
     countryCode = '+225',
-    onCountryCodePress
+    onCountryCodePress,
 }: PhoneFieldProps) => {
     const colorScheme = useColorScheme() ?? 'light';
-    
-    // Couleurs dynamiques basées sur le thème
-    const textColor = useThemeColor({}, 'text');
-    const tintColor = useThemeColor({}, 'tint');
-    
-    // Couleurs spécifiques pour le champ téléphone
-    const inputBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#F3F3F7';
-    const inputBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
-    const placeholderColor = colorScheme === 'dark' ? '#9BA1A6' : '#A6A6AA';
+    const colors = getFormFieldColors(colorScheme);
+    const appColors = useAppColors();
+
+    const countryCodeLabel = useMemo(() => {
+        return (
+            COUNTRY_CODES.find((c) => c.code === countryCode)?.label ?? countryCode
+        );
+    }, [countryCode]);
 
     return (
-        <View style={styles.formField}>
-            <Text style={[styles.formLabel, { color: textColor }]}>
-                {label} {required && <Text style={styles.required}>*</Text>}
-            </Text>
+        <View style={formFieldBaseStyles.field}>
+            {!!label && (
+                <Text style={[formFieldBaseStyles.label, { color: colors.text }]}>
+                    {label}{' '}
+                    {required && <Text style={{ color: colors.danger }}>*</Text>}
+                </Text>
+            )}
             <View style={styles.phoneContainer}>
-                <Pressable 
+                <Pressable
                     style={[
                         styles.countryCode,
-                        {
-                            backgroundColor: inputBackgroundColor,
-                            borderColor: inputBorderColor
-                        }
+                        { backgroundColor: colors.background },
                     ]}
                     onPress={onCountryCodePress}
                     android_ripple={{ color: 'rgba(0, 0, 0, 0.1)' }}
                 >
-                    <Text style={[styles.countryCodeText, { color: textColor }]}>{countryCode}</Text>
+                    <Text style={[styles.countryCodeText, { color: colors.text }]}>
+                        {countryCodeLabel}
+                    </Text>
                     {onCountryCodePress && (
-                        <Icon name="chevron-down" size={16} color={tintColor} style={styles.chevronIcon} />
+                        <Icon
+                            name="chevron-down"
+                            size={16}
+                            color={appColors.activeTabColor}
+                        />
                     )}
                 </Pressable>
                 <TextInput
                     style={[
                         styles.phoneInput,
                         {
-                            backgroundColor: inputBackgroundColor,
-                            borderColor: inputBorderColor,
-                            color: textColor
-                        }
+                            backgroundColor: colors.background,
+                            color: colors.text,
+                        },
                     ]}
                     value={value}
                     onChangeText={onChangeText}
                     placeholder="XX XX XX XX"
-                    placeholderTextColor={placeholderColor}
-                    keyboardType="numeric"
+                    placeholderTextColor={colors.placeholder}
+                    keyboardType="phone-pad"
                 />
             </View>
         </View>
@@ -78,49 +89,34 @@ export const PhoneField = ({
 };
 
 const styles = StyleSheet.create({
-    formField: {
-        marginBottom: 16,
-    },
-    formLabel: {
-        fontSize: 14,
-        fontFamily: 'Ubuntu_Medium',
-        marginBottom: 8,
-    },
-    required: {
-        color: '#FF0000',
-    },
     phoneContainer: {
         flexDirection: 'row',
         gap: 8,
     },
     countryCode: {
-        borderRadius: 16,
+        borderRadius: FORM_FIELD_RADIUS,
         paddingHorizontal: 12,
-        paddingVertical: 12,
+        height: FORM_FIELD_HEIGHT,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 1,
+        borderWidth: 0,
         gap: 4,
+        maxWidth: '42%',
     },
     countryCodeText: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Medium',
-    },
-    chevronIcon: {
-        marginLeft: 2,
+        flexShrink: 1,
     },
     phoneInput: {
         flex: 1,
-        borderRadius: 16,
+        borderRadius: FORM_FIELD_RADIUS,
         paddingHorizontal: 16,
         paddingVertical: 12,
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        borderWidth: 1,
+        borderWidth: 0,
+        height: FORM_FIELD_HEIGHT,
     },
 });
-
-
-
-

@@ -1,6 +1,7 @@
 // import TripRouteViewerMapbox from '@/components/TripRouteViewerMapbox';
 // @ts-nocheck
 import TripRouteViewerMapbox from '@/components/TripRouteViewerMapbox';
+import { MapScreenSkeleton } from '@/components/skeletons';
 import { AppButton } from '@/components/ui/AppButton';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
@@ -9,7 +10,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import {
-    ActivityIndicator,
     StyleSheet,
     Text,
     View
@@ -66,12 +66,7 @@ export default function RouteViewerScreen() {
     if (!booking) {
         return (
             <SafeAreaView style={[styles.container, { backgroundColor }]} edges={['top', 'bottom']}>
-                <View style={styles.centerContainer}>
-                    <ActivityIndicator size="large" color={accentColor} />
-                    <Text style={[styles.loadingText, { color: secondaryTextColor }]}>
-                        Chargement des données...
-                    </Text>
-                </View>
+                <MapScreenSkeleton />
             </SafeAreaView>
         );
     }

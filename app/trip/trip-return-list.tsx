@@ -95,7 +95,14 @@ const TripReturnList = () => {
      * Trie la liste des trajets selon le critère sélectionné
      */
     const sortedTrips = useMemo(() => {
-        const tripsCopy = [...trips];
+        // Fail-open: ne masque que si availableSeats est explicitement 0
+        const withSeats = trips.filter((trip) => {
+            if (trip.availableSeats != null && typeof trip.availableSeats === 'number') {
+                return trip.availableSeats > 0;
+            }
+            return true;
+        });
+        const tripsCopy = [...withSeats];
 
         switch (selectedSort) {
             case 'Prix croissant':

@@ -1,6 +1,10 @@
-import React from 'react';
-import { View, Text, TextInput, StyleSheet } from 'react-native';
 import { useAppColors } from '@/hooks/use-app-colors';
+import {
+    FORM_FIELD_RADIUS,
+    FORM_FIELD_TEXTAREA_MIN_HEIGHT,
+} from '@/constants/formField';
+import React from 'react';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 interface CancellationReasonInputProps {
     value: string;
@@ -24,7 +28,6 @@ export const CancellationReasonInput: React.FC<CancellationReasonInputProps> = (
                     styles.textArea,
                     {
                         backgroundColor: colors.inputBackground,
-                        borderColor: colors.border,
                         color: colors.text,
                     },
                 ]}
@@ -36,14 +39,16 @@ export const CancellationReasonInput: React.FC<CancellationReasonInputProps> = (
                 numberOfLines={4}
                 textAlignVertical="top"
             />
-            <Text style={[styles.helperText, { color: colors.secondaryText }]}>Ce champ est obligatoire</Text>
+            <Text style={[styles.helperText, { color: colors.secondaryText }]}>
+                Ce champ est obligatoire
+            </Text>
         </View>
     );
 };
 
 const styles = StyleSheet.create({
     section: {
-        borderRadius: 16,
+        borderRadius: FORM_FIELD_RADIUS,
         padding: 20,
         marginBottom: 20,
         borderWidth: 1,
@@ -54,12 +59,13 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     textArea: {
-        borderRadius: 12,
-        borderWidth: 1,
-        padding: 12,
+        borderRadius: FORM_FIELD_RADIUS,
+        borderWidth: 0,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        minHeight: 120,
+        minHeight: FORM_FIELD_TEXTAREA_MIN_HEIGHT,
     },
     helperText: {
         fontSize: 12,

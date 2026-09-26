@@ -1,11 +1,15 @@
 // @ts-nocheck
 import { getDepartureAvailableSeats } from '@/api/departure';
+import { AppButton } from '@/components/ui/AppButton';
+import { BackButton } from '@/components/ui/BackButton';
+import { SeatMapSkeleton } from '@/components/skeletons';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
+import { showAlert } from '@/utils/alert';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import * as Haptics from 'expo-haptics';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
     Dimensions,
     Pressable,
     ScrollView,
@@ -15,13 +19,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { showAlert } from '@/utils/alert';
-import { AppButton } from '@/components/ui/AppButton';
-import { BackButton } from '@/components/ui/BackButton';
 
-/**
- * Interface pour un siège
- */
 interface Seat {
     number: number;
     available: boolean;
@@ -32,8 +30,10 @@ interface Seat {
     passengerIndex?: number;
 }
 
+type SeatVisualState = 'available' | 'selected' | 'unavailable';
+
 /**
- * Écran de sélection de sièges avec design amélioré
+ * Écran de sélection de sièges — plan en focus, chrome UI compact.
  */
 const SeatSelection = () => {
     const route = useRoute();
@@ -41,27 +41,29 @@ const SeatSelection = () => {
     const insets = useSafeAreaInsets();
     const colorScheme = useColorScheme() ?? 'light';
 
-    // Couleurs dynamiques
-    const backgroundColor = useThemeColor({}, 'background');
     const textColor = useThemeColor({}, 'text');
     const iconColor = useThemeColor({}, 'icon');
     const tintColor = useThemeColor({}, 'tint');
-    const secondaryTextColor = colorScheme === 'dark' ? '#9BA1A6' : '#666';
+    const secondaryTextColor = colorScheme === 'dark' ? '#9BA1A6' : '#6B7280';
     const headerBackgroundColor = colorScheme === 'dark' ? '#1E1E1E' : '#FFFFFF';
-    const headerBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
-    const scrollBackgroundColor = colorScheme === 'dark' ? '#121212' : '#F5F5F5';
+    const headerBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E8E8EC';
+    const scrollBackgroundColor = colorScheme === 'dark' ? '#121212' : '#F3F3F7';
     const cardBackgroundColor = colorScheme === 'dark' ? '#1E1E1E' : '#FFFFFF';
-    const borderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
+    const borderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E8E8EC';
     const primaryBlue = tintColor === '#fff' ? '#1776BA' : tintColor;
+    const availableBg = colorScheme === 'dark' ? '#2A2A2E' : '#EEF6FC';
+    const availableBorder = colorScheme === 'dark' ? '#4A4A4E' : '#B6D4EA';
+    const unavailableBg = colorScheme === 'dark' ? '#2C2C2E' : '#E5E7EB';
+    const mapSurface = colorScheme === 'dark' ? '#1A1A1C' : '#F7F7F9';
+    const aisleColor = colorScheme === 'dark' ? '#3A3A3C' : '#E5E7EB';
 
-    // Récupération des paramètres
-    const { 
-        trip, 
-        returnTrip, 
-        passengers, 
+    const {
+        trip,
+        returnTrip,
+        passengers,
         numberOfPassengers,
         currentLeg,
-        onSeatsSelected 
+        onSeatsSelected,
     } = (route.params as any) || {};
 
     const isRoundTrip = !!returnTrip;
@@ -70,15 +72,11 @@ const SeatSelection = () => {
     const currentTrip = isReturnLeg && returnTrip ? returnTrip : trip;
     const totalPassengers = numberOfPassengers ?? passengers?.length ?? 0;
 
-    // États
     const [isLoading, setIsLoading] = useState(true);
     const [seats, setSeats] = useState<Seat[]>([]);
     const [selectedSeats, setSelectedSeats] = useState<Map<number, number>>(new Map());
     const [totalSeats, setTotalSeats] = useState(0);
 
-    /**
-     * Récupère les sièges disponibles depuis l'API
-     */
     const fetchSeats = async () => {
         if (!currentTrip?.id) {
             showAlert('Erreur', 'Aucun trajet sélectionné');
@@ -86,43 +84,34 @@ const SeatSelection = () => {
             return;
         }
 
-        console.log('currentTrip => ', currentTrip);
-
         try {
             setIsLoading(true);
             const response = await getDepartureAvailableSeats(currentTrip.id);
-            
+
             if (response.status === 200 && response.data) {
                 const seatsData = response.data.seats || response.data || [];
                 const totalSeatsCount = response.data.totalSeats || currentTrip.totalSeats || 50;
-                
+
                 setTotalSeats(totalSeatsCount);
 
                 const seatsArray: Seat[] = [];
                 for (let i = 1; i <= totalSeatsCount; i++) {
-                    const seatData = Array.isArray(seatsData) 
+                    const seatData = Array.isArray(seatsData)
                         ? seatsData.find((s: any) => s.number === i || s.seatNumber === i)
                         : seatsData[i];
-                    
+
                     const seatStatus = seatData?.status?.toUpperCase() || 'AVAILABLE';
-                    const isAvailable = seatStatus === 'AVAILABLE';
-                    const isBooked = seatStatus === 'BOOKED';
-                    const isLocked = seatStatus === 'LOCKED';
-                    const isBlocked = seatStatus === 'BLOCKED';
-                    
                     seatsArray.push({
                         number: i,
-                        available: isAvailable,
-                        booked: isBooked,
-                        locked: isLocked,
-                        blocked: isBlocked,
-                        selected: false
+                        available: seatStatus === 'AVAILABLE',
+                        booked: seatStatus === 'BOOKED',
+                        locked: seatStatus === 'LOCKED',
+                        blocked: seatStatus === 'BLOCKED',
+                        selected: false,
                     });
                 }
 
-                // Utiliser les sièges déjà attribués depuis passengers-info
                 const initialSelections = new Map<number, number>();
-                
                 if (totalPassengers > 0 && passengers) {
                     passengers.forEach((passenger, index) => {
                         const passengerSeatNumber = passenger?.seatNumber;
@@ -133,14 +122,12 @@ const SeatSelection = () => {
                 }
 
                 setSelectedSeats(initialSelections);
-
-                seatsArray.forEach(seat => {
+                seatsArray.forEach((seat) => {
                     if (initialSelections.has(seat.number)) {
                         seat.selected = true;
                         seat.passengerIndex = initialSelections.get(seat.number);
                     }
                 });
-
                 setSeats(seatsArray);
             } else {
                 throw new Error('Erreur lors de la récupération des sièges');
@@ -158,13 +145,8 @@ const SeatSelection = () => {
         fetchSeats();
     }, [currentTrip?.id, leg]);
 
-    /**
-     * Gère la sélection d'un siège
-     */
     const handleSeatSelect = (seatNumber: number) => {
-        const seat = seats.find(s => s.number === seatNumber);
-        
-        // Ne peut pas sélectionner les sièges non disponibles, réservés, verrouillés ou bloqués
+        const seat = seats.find((s) => s.number === seatNumber);
         if (!seat || !seat.available || seat.booked || seat.locked || seat.blocked) {
             return;
         }
@@ -172,12 +154,12 @@ const SeatSelection = () => {
         const newSelections = new Map(selectedSeats);
 
         if (selectedSeats.has(seatNumber)) {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             newSelections.delete(seatNumber);
             setSelectedSeats(newSelections);
-            
-            setSeats(prevSeats => 
-                prevSeats.map(s => 
-                    s.number === seatNumber 
+            setSeats((prevSeats) =>
+                prevSeats.map((s) =>
+                    s.number === seatNumber
                         ? { ...s, selected: false, passengerIndex: undefined }
                         : s
                 )
@@ -187,31 +169,30 @@ const SeatSelection = () => {
 
         const passengerIndices = Array.from({ length: totalPassengers }, (_, i) => i);
         const passengersWithSeats = Array.from(selectedSeats.values());
-        const targetPassengerIndex = passengerIndices.find(idx => !passengersWithSeats.includes(idx));
+        const targetPassengerIndex = passengerIndices.find(
+            (idx) => !passengersWithSeats.includes(idx)
+        );
 
         if (targetPassengerIndex === undefined) {
             showAlert(
                 'Attention',
-                'Tous les passagers ont déjà un siège. Désélectionnez d\'abord un siège.'
+                "Tous les passagers ont déjà un siège. Désélectionnez d'abord un siège."
             );
             return;
         }
 
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         newSelections.set(seatNumber, targetPassengerIndex);
         setSelectedSeats(newSelections);
-
-        setSeats(prevSeats => 
-            prevSeats.map(s => 
-                s.number === seatNumber 
+        setSeats((prevSeats) =>
+            prevSeats.map((s) =>
+                s.number === seatNumber
                     ? { ...s, selected: true, passengerIndex: targetPassengerIndex }
                     : s
             )
         );
     };
 
-    /**
-     * Confirme la sélection
-     */
     const handleConfirm = () => {
         if (selectedSeats.size < totalPassengers) {
             showAlert(
@@ -221,121 +202,145 @@ const SeatSelection = () => {
             return;
         }
 
-        const seatsData = Array.from(selectedSeats.entries()).map(([seatNumber, passengerIndex]) => ({
-            passengerIndex,
-            seatNumber,
-            leg
-        }));
+        const seatsData = Array.from(selectedSeats.entries()).map(
+            ([seatNumber, passengerIndex]) => ({
+                passengerIndex,
+                seatNumber,
+                leg,
+            })
+        );
 
         if (onSeatsSelected) {
             onSeatsSelected(seatsData);
         }
-
         navigation.goBack();
     };
 
-    /**
-     * Récupère la disposition des sièges
-     */
     const getSeatLayout = (): [number, number] => {
         const layout = currentTrip?.busSeatLayout;
         return Array.isArray(layout) && layout.length >= 2 ? [layout[0], layout[1]] : [2, 2];
     };
 
-    /**
-     * Calcule la taille optimale des sièges selon la disposition
-     * @returns Un objet avec width et height pour les sièges
-     */
     const seatDimensions = useMemo(() => {
         const [leftSeatsCount, rightSeatsCount] = getSeatLayout();
-        const maxSeatsPerSide = Math.max(leftSeatsCount, rightSeatsCount);
-        const totalSeatsPerRow = leftSeatsCount + rightSeatsCount;
-        
-        // Obtenir la largeur réelle de l'écran
+        const maxSeatsPerSide = Math.max(leftSeatsCount, rightSeatsCount, 1);
         const screenWidth = Dimensions.get('window').width;
-        
-        // Largeur disponible (en tenant compte de tous les éléments fixes)
-        // scrollContent padding: 16 de chaque côté = 32px
-        // busSeatsArea padding: 16 de chaque côté = 32px
-        // rowNumberContainer: 30 de chaque côté = 60px
-        // aisle: 50px
-        // gap entre sièges: 6px (pour chaque groupe de sièges)
-        const scrollContentPadding = 32; // 16 * 2
-        const busSeatsAreaPadding = 32; // 16 * 2
-        const rowNumbersWidth = 60; // 30 * 2
-        const aisleWidth = 50;
-        const leftGapsWidth = (leftSeatsCount - 1) * 6; // Espacement entre sièges gauche
-        const rightGapsWidth = (rightSeatsCount - 1) * 6; // Espacement entre sièges droite
-        const maxGapsWidth = Math.max(leftGapsWidth, rightGapsWidth);
-        
-        // Calculer la largeur disponible pour les sièges avec une marge de sécurité réduite
-        // On calcule pour le côté avec le plus de sièges (le plus contraignant)
-        const totalFixedWidth = scrollContentPadding + busSeatsAreaPadding + rowNumbersWidth + aisleWidth;
-        const safetyMargin = 20; // Marge de sécurité réduite pour permettre des sièges plus grands
-        
-        // Largeur disponible pour un côté (gauche ou droite)
-        // On divise l'espace restant en deux (gauche et droite) et on soustrait les gaps
-        const availableWidthForOneSide = (screenWidth - totalFixedWidth - safetyMargin) / 2;
-        const gapsForMaxSide = (maxSeatsPerSide - 1) * 6;
-        const seatWidth = Math.floor((availableWidthForOneSide - gapsForMaxSide) / maxSeatsPerSide);
-        
-        // Limites ajustées pour permettre des sièges plus grands
-        // Pour [3, 2], maxSeatsPerSide = 3, on permet des sièges jusqu'à 45px
-        const optimizedWidth = Math.max(35, Math.min(45, seatWidth));
-        
-        // La hauteur est proportionnelle à la largeur
-        const optimizedHeight = Math.max(42, Math.min(52, optimizedWidth + 2));
-        
-        return {
-            width: optimizedWidth,
-            height: optimizedHeight
-        };
+
+        // marges écran 16*2 + pad carte 8*2 + index rangée 24*2 + allée 36
+        const horizontalChrome = 32 + 16 + 48 + 36;
+        const gaps = Math.max(0, maxSeatsPerSide - 1) * 8;
+        const sideWidth = Math.max(80, (screenWidth - horizontalChrome) / 2);
+        const rawWidth = Math.floor((sideWidth - gaps) / maxSeatsPerSide);
+        const optimizedWidth = Math.max(44, Math.min(56, Number.isFinite(rawWidth) ? rawWidth : 48));
+        const optimizedHeight = Math.max(48, Math.round(optimizedWidth * 1.12));
+
+        return { width: optimizedWidth, height: optimizedHeight };
     }, [currentTrip?.busSeatLayout]);
 
-    /**
-     * Organise les sièges en rangées
-     */
-    const organizeSeatsInRows = (): Array<{ leftSeats: Seat[]; rightSeats: Seat[]; rowNumber: number }> => {
+    const organizeSeatsInRows = () => {
         const [leftSeatsCount, rightSeatsCount] = getSeatLayout();
         const seatsPerRow = leftSeatsCount + rightSeatsCount;
         const rows: Array<{ leftSeats: Seat[]; rightSeats: Seat[]; rowNumber: number }> = [];
-        
+
         for (let i = 0; i < seats.length; i += seatsPerRow) {
             const rowSeats = seats.slice(i, i + seatsPerRow);
-            const leftSeats = rowSeats.slice(0, leftSeatsCount);
-            const rightSeats = rowSeats.slice(leftSeatsCount);
-            
-            rows.push({ 
-                leftSeats, 
-                rightSeats,
-                rowNumber: Math.floor(i / seatsPerRow) + 1
+            rows.push({
+                leftSeats: rowSeats.slice(0, leftSeatsCount),
+                rightSeats: rowSeats.slice(leftSeatsCount),
+                rowNumber: Math.floor(i / seatsPerRow) + 1,
             });
         }
-        
         return rows;
     };
 
     const seatRows = organizeSeatsInRows();
+    const [leftLayout, rightLayout] = getSeatLayout();
+    const allSelected = selectedSeats.size >= totalPassengers && totalPassengers > 0;
 
-    /**
-     * Couleur d'un siège selon son statut
-     */
-    const getSeatColor = (seat: Seat) => {
-        if (seat.locked) return '#ffc107'; // Jaune pour verrouillé
-        if (seat.blocked) return '#17a2b8'; // Cyan pour bloqué
-        if (seat.booked) return colorScheme === 'dark' ? '#4A3A3A' : '#FFB3B3'; // Rouge clair pour réservé
-        if (seat.selected) return primaryBlue; // Bleu pour sélectionné
-        return colorScheme === 'dark' ? '#2C4A2C' : '#C8E6C9'; // Vert clair pour disponible
+    const getSeatVisualState = (seat: Seat): SeatVisualState => {
+        // selectedSeats est la source de vérité (évite désync avec seat.selected)
+        if (selectedSeats.has(seat.number)) return 'selected';
+        if (!seat.available || seat.booked || seat.locked || seat.blocked) return 'unavailable';
+        return 'available';
     };
 
-    /**
-     * Couleur du texte selon le statut du siège
-     */
+    const getSeatStyle = (seat: Seat) => {
+        const state = getSeatVisualState(seat);
+        if (state === 'selected') {
+            return {
+                backgroundColor: primaryBlue,
+                borderColor: primaryBlue,
+                borderWidth: 0,
+            };
+        }
+        if (state === 'unavailable') {
+            return {
+                backgroundColor: unavailableBg,
+                borderColor: 'transparent',
+                borderWidth: 0,
+            };
+        }
+        return {
+            backgroundColor: availableBg,
+            borderColor: availableBorder,
+            borderWidth: 1.5,
+        };
+    };
+
     const getSeatTextColor = (seat: Seat) => {
-        if (seat.locked || seat.blocked) return '#000000'; // Noir pour locked et blocked
-        if (seat.selected) return '#FFFFFF'; // Blanc pour sélectionné
-        if (seat.booked) return '#FFFFFF'; // Blanc pour réservé
-        return colorScheme === 'dark' ? '#FFFFFF' : '#000000'; // Selon le thème pour disponible
+        const state = getSeatVisualState(seat);
+        if (state === 'selected') return '#FFFFFF';
+        if (state === 'unavailable') return colorScheme === 'dark' ? '#6B7280' : '#9CA3AF';
+        return textColor;
+    };
+
+    const renderSeat = (seat: Seat) => {
+        if (!seat) return null;
+        const state = getSeatVisualState(seat);
+        const disabled = state === 'unavailable';
+        const passengerIndex = selectedSeats.get(seat.number);
+
+        return (
+            <Pressable
+                key={seat.number}
+                accessibilityRole="button"
+                accessibilityLabel={
+                    state === 'selected'
+                        ? `Siège ${seat.number}, passager ${(passengerIndex ?? 0) + 1}`
+                        : state === 'unavailable'
+                          ? `Siège ${seat.number}, indisponible`
+                          : `Siège ${seat.number}, disponible`
+                }
+                style={[
+                    styles.seat,
+                    getSeatStyle(seat),
+                    {
+                        width: seatDimensions.width,
+                        height: seatDimensions.height,
+                        marginHorizontal: 4,
+                    },
+                ]}
+                onPress={() => handleSeatSelect(seat.number)}
+                disabled={disabled}
+            >
+                {state === 'unavailable' ? (
+                    <Icon name="close" size={16} color={getSeatTextColor(seat)} />
+                ) : state === 'selected' ? (
+                    <View style={styles.seatContent}>
+                        <Text style={[styles.seatPassenger, { color: '#FFFFFF' }]}>
+                            P{(passengerIndex ?? 0) + 1}
+                        </Text>
+                        <Text style={[styles.seatNumberSelected, { color: 'rgba(255,255,255,0.85)' }]}>
+                            {seat.number}
+                        </Text>
+                    </View>
+                ) : (
+                    <Text style={[styles.seatNumber, { color: getSeatTextColor(seat) }]}>
+                        {seat.number}
+                    </Text>
+                )}
+            </Pressable>
+        );
     };
 
     if (!trip) {
@@ -346,265 +351,251 @@ const SeatSelection = () => {
         );
     }
 
+    const confirmTitle = !allSelected
+        ? `Choisir ${totalPassengers - selectedSeats.size} siège${totalPassengers - selectedSeats.size > 1 ? 's' : ''}`
+        : isRoundTrip && !isReturnLeg
+          ? 'Continuer vers le retour'
+          : 'Confirmer la sélection';
+
     return (
         <View style={[styles.container, { backgroundColor: scrollBackgroundColor }]}>
-            {/* Header */}
-            <View style={[
-                styles.header,
-                {
-                    paddingTop: insets.top,
-                    backgroundColor: headerBackgroundColor,
-                    borderBottomColor: headerBorderColor
-                }
-            ]}>
+            <View
+                style={[
+                    styles.header,
+                    {
+                        paddingTop: insets.top,
+                        backgroundColor: headerBackgroundColor,
+                        borderBottomColor: headerBorderColor,
+                    },
+                ]}
+            >
                 <BackButton onPress={() => navigation.goBack()} color={iconColor} />
-
                 <View style={styles.headerTitleContainer}>
                     <Text style={[styles.headerTitle, { color: textColor }]}>
                         Sélection des sièges
                     </Text>
                     {isRoundTrip && (
                         <Text style={[styles.headerSubtitle, { color: secondaryTextColor }]}>
-                            {isReturnLeg ? 'Retour' : 'Aller'}
+                            {isReturnLeg ? 'Retour' : 'Aller'} · {selectedSeats.size}/{totalPassengers}
+                        </Text>
+                    )}
+                    {!isRoundTrip && (
+                        <Text style={[styles.headerSubtitle, { color: secondaryTextColor }]}>
+                            {selectedSeats.size}/{totalPassengers} sélectionné
+                            {selectedSeats.size > 1 ? 's' : ''}
                         </Text>
                     )}
                 </View>
-
                 <View style={{ width: 40 }} />
             </View>
 
             {isLoading ? (
-                <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={primaryBlue} />
-                    <Text style={[styles.loadingText, { color: secondaryTextColor }]}>
-                        Chargement des sièges...
-                    </Text>
-                </View>
+                <SeatMapSkeleton />
             ) : (
                 <>
-                    {/* Légende */}
-                    <View style={[styles.legendContainer, { backgroundColor: cardBackgroundColor, borderColor }]}>
+                    {/* Légende compacte 1 ligne */}
+                    <View style={styles.legendRow}>
                         <View style={styles.legendItem}>
-                            <View style={[styles.legendColor, { backgroundColor: colorScheme === 'dark' ? '#2C4A2C' : '#C8E6C9' }]} />
-                            <Text style={[styles.legendText, { color: textColor }]}>Disponible</Text>
+                            <View
+                                style={[
+                                    styles.legendDot,
+                                    {
+                                        backgroundColor: availableBg,
+                                        borderColor: availableBorder,
+                                        borderWidth: 1.5,
+                                    },
+                                ]}
+                            />
+                            <Text style={[styles.legendLabel, { color: secondaryTextColor }]}>
+                                Libre
+                            </Text>
                         </View>
                         <View style={styles.legendItem}>
-                            <View style={[styles.legendColor, { backgroundColor: primaryBlue }]} />
-                            <Text style={[styles.legendText, { color: textColor }]}>Sélectionné</Text>
+                            <View style={[styles.legendDot, { backgroundColor: primaryBlue }]} />
+                            <Text style={[styles.legendLabel, { color: secondaryTextColor }]}>
+                                Choisi
+                            </Text>
                         </View>
                         <View style={styles.legendItem}>
-                            <View style={[styles.legendColor, { backgroundColor: colorScheme === 'dark' ? '#4A3A3A' : '#FFB3B3' }]}>
-                                <Icon name="close" size={12} color="#FFFFFF" />
+                            <View style={[styles.legendDot, { backgroundColor: unavailableBg }]}>
+                                <Icon name="close" size={10} color={secondaryTextColor} />
                             </View>
-                            <Text style={[styles.legendText, { color: textColor }]}>Réservé</Text>
+                            <Text style={[styles.legendLabel, { color: secondaryTextColor }]}>
+                                Pris
+                            </Text>
                         </View>
-                        <View style={styles.legendItem}>
-                            <View style={[styles.legendColor, { backgroundColor: '#17a2b8' }]}>
-                                <Icon name="close" size={12} color="#000" />
-                            </View>
-                            <Text style={[styles.legendText, { color: textColor }]}>Bloqué</Text>
-                        </View>
-                        <View style={styles.legendItem}>
-                            <View style={[styles.legendColor, { backgroundColor: '#ffc107' }]}>
-                                <Icon name="close" size={12} color="#000" />
-                            </View>
-                            <Text style={[styles.legendText, { color: textColor }]}>Verrouillé</Text>
-                        </View>
-                    </View>
-
-                    {/* Note explicative */}
-                    <View style={[styles.infoNoteContainer, { backgroundColor: cardBackgroundColor, borderColor }]}>
-                        <Icon name="information" size={16} color={primaryBlue} />
-                        <Text style={[styles.infoNoteText, { color: secondaryTextColor }]}>
-                            Sélectionnez un siège distinct pour chaque passager. Le numéro du passager (P1, P2...) apparaît sur le siège sélectionné.
+                        <Text style={[styles.layoutHint, { color: secondaryTextColor }]}>
+                            {leftLayout}+{rightLayout} · {seatRows.length} rangs
                         </Text>
                     </View>
 
-                    {/* Informations passagers */}
-                    <View style={[styles.passengersInfoContainer, { backgroundColor: cardBackgroundColor, borderColor }]}>
-                        <Text style={[styles.passengersInfoTitle, { color: textColor }]}>
-                            Sièges sélectionnés ({selectedSeats.size}/{totalPassengers})
+                    <View
+                        style={[
+                            styles.passengerLogicHint,
+                            {
+                                backgroundColor:
+                                    colorScheme === 'dark' ? 'rgba(23,118,186,0.12)' : 'rgba(23,118,186,0.08)',
+                            },
+                        ]}
+                    >
+                        <Icon name="account-multiple-outline" size={16} color={primaryBlue} />
+                        <Text style={[styles.passengerLogicHintText, { color: secondaryTextColor }]}>
+                            Un siège distinct par passager. Le siège choisi affiche P1, P2… selon
+                            l’ordre des voyageurs.
                         </Text>
-                        {Array.from({ length: totalPassengers }, (_, index) => {
-                            const passenger = passengers?.[index];
-                            const seatNumber = Array.from(selectedSeats.entries())
-                                .find(([_, passengerIdx]) => passengerIdx === index)?.[0];
-                            const hasSeat = seatNumber !== undefined;
-                            
-                            return (
-                                <View key={index} style={styles.passengerSeatInfo}>
-                                    <Text style={[styles.passengerSeatText, { color: textColor }]}>
-                                        Passager {index + 1}: {passenger?.firstName || ''} {passenger?.lastName || ''}
-                                    </Text>
-                                    <Text style={[
-                                        styles.passengerSeatStatus, 
-                                        { color: hasSeat ? '#4CAF50' : secondaryTextColor }
-                                    ]}>
-                                        {hasSeat ? `✓ Siège ${seatNumber}` : 'En attente'}
-                                    </Text>
-                                </View>
-                            );
-                        })}
                     </View>
 
-                    {/* Grille des sièges */}
-                    <ScrollView 
+                    <ScrollView
                         style={styles.scrollView}
-                        contentContainerStyle={styles.scrollContent}
+                        contentContainerStyle={[
+                            styles.scrollContent,
+                            { paddingBottom: 140 + insets.bottom },
+                        ]}
                         showsVerticalScrollIndicator={false}
                     >
-                        {/* Header du plan de bus */}
-                        <View style={[styles.busHeaderInfo, { backgroundColor: cardBackgroundColor, borderColor }]}>
-                            <Text style={[styles.busHeaderTitle, { color: primaryBlue }]}>Plan du Bus</Text>
-                            <View style={styles.busHeaderDetails}>
-                                <Text style={[styles.busHeaderDetailText, { color: secondaryTextColor }]}>
-                                    {seatRows.length} rangées
-                                </Text>
-                                <Text style={[styles.busHeaderDetailText, { color: secondaryTextColor }]}>
-                                    {getSeatLayout()[0]}+{getSeatLayout()[1]} sièges
+                        <View
+                            style={[
+                                styles.mapCard,
+                                {
+                                    backgroundColor: cardBackgroundColor,
+                                    borderColor,
+                                },
+                            ]}
+                        >
+                            <View style={styles.mapOrientation}>
+                                <View style={[styles.driverBadge, { backgroundColor: primaryBlue }]}>
+                                    <Icon name="steering" size={14} color="#FFFFFF" />
+                                </View>
+                                <Text style={[styles.orientationLabel, { color: secondaryTextColor }]}>
+                                    Avant
                                 </Text>
                             </View>
-                        </View>
 
-                        {/* Représentation du bus stylisée */}
-                        <View style={[styles.busVisualContainer, { backgroundColor: primaryBlue }]}>
-                            {/* Avant du bus arrondi */}
-                            <View style={styles.busFrontRounded}>
-                                <View style={[styles.busFrontWindow, { borderColor: 'rgba(255,255,255,0.3)' }]} />
-                                <View style={[styles.busWindshield, { borderColor: 'rgba(255,255,255,0.3)' }]} />
-                            </View>
+                            <View style={[styles.mapSurface, { backgroundColor: mapSurface }]}>
+                                {seatRows.map((row) => (
+                                    <View key={row.rowNumber} style={styles.seatRow}>
+                                        <Text style={[styles.rowIndex, { color: secondaryTextColor }]}>
+                                            {row.rowNumber}
+                                        </Text>
 
-                            {/* Zone des sièges */}
-                            <View style={[styles.busSeatsArea, { backgroundColor: cardBackgroundColor }]}>
-                               
-
-                                {seatRows.map((row, rowIndex) => (
-                                    <View key={rowIndex} style={styles.seatRowWithNumbers}>
-                                        {/* Numéro de rangée gauche */}
-                                        <View style={styles.rowNumberContainer}>
-                                            <Text style={[styles.rowNumber, { color: primaryBlue }]}>
-                                                {row.rowNumber}
-                                            </Text>
-                                        </View>
-
-                                        {/* Sièges gauche */}
                                         <View style={styles.seatsGroup}>
-                                            {row.leftSeats.map((seat) => (
-                                                <Pressable
-                                                    key={seat.number}
-                                                    style={[
-                                                        styles.seat,
-                                                        {
-                                                            backgroundColor: getSeatColor(seat),
-                                                            borderColor: seat.selected ? primaryBlue : 'transparent',
-                                                            borderWidth: seat.selected ? 2 : 0,
-                                                            width: seatDimensions.width,
-                                                            height: seatDimensions.height,
-                                                        }
-                                                    ]}
-                                                    onPress={() => handleSeatSelect(seat.number)}
-                                                    disabled={seat.booked || seat.locked || seat.blocked}
-                                                >
-                                                    {(seat.booked || seat.locked || seat.blocked) ? (
-                                                        <Icon 
-                                                            name="close" 
-                                                            size={16} 
-                                                            color={seat.locked || seat.blocked ? '#000000' : '#FFFFFF'} 
-                                                        />
-                                                    ) : seat.selected ? (
-                                                        <View style={styles.seatContent}>
-                                                            <Text style={[styles.seatNumber, { color: getSeatTextColor(seat) }]}>
-                                                                {seat.number}
-                                                            </Text>
-                                                            <Text style={[styles.passengerNumber, { color: getSeatTextColor(seat) }]}>
-                                                                P{seat.passengerIndex !== undefined ? seat.passengerIndex + 1 : ''}
-                                                            </Text>
-                                                        </View>
-                                                    ) : (
-                                                        <Text style={[styles.seatNumber, { color: getSeatTextColor(seat) }]}>
-                                                            {seat.number}
-                                                        </Text>
-                                                    )}
-                                                </Pressable>
-                                            ))}
+                                            {row.leftSeats.map(renderSeat)}
                                         </View>
 
-                                        {/* Allée - Vide, juste pour l'espacement */}
-                                        <View style={styles.aisle} />
+                                        <View style={styles.aisle}>
+                                            <View
+                                                style={[
+                                                    styles.aisleLine,
+                                                    {
+                                                        backgroundColor: aisleColor,
+                                                        height: Math.max(28, seatDimensions.height - 8),
+                                                    },
+                                                ]}
+                                            />
+                                        </View>
 
-                                        {/* Sièges droite */}
                                         <View style={styles.seatsGroup}>
-                                            {row.rightSeats.map((seat) => (
-                                                <Pressable
-                                                    key={seat.number}
-                                                    style={[
-                                                        styles.seat,
-                                                        {
-                                                            backgroundColor: getSeatColor(seat),
-                                                            borderColor: seat.selected ? primaryBlue : 'transparent',
-                                                            borderWidth: seat.selected ? 2 : 0,
-                                                            width: seatDimensions.width,
-                                                            height: seatDimensions.height,
-                                                        }
-                                                    ]}
-                                                    onPress={() => handleSeatSelect(seat.number)}
-                                                    disabled={seat.booked || seat.locked || seat.blocked}
-                                                >
-                                                    {(seat.booked || seat.locked || seat.blocked) ? (
-                                                        <Icon 
-                                                            name="close" 
-                                                            size={16} 
-                                                            color={seat.locked || seat.blocked ? '#000000' : '#FFFFFF'} 
-                                                        />
-                                                    ) : seat.selected ? (
-                                                        <View style={styles.seatContent}>
-                                                            <Text style={[styles.seatNumber, { color: getSeatTextColor(seat) }]}>
-                                                                {seat.number}
-                                                            </Text>
-                                                            <Text style={[styles.passengerNumber, { color: getSeatTextColor(seat) }]}>
-                                                                P{seat.passengerIndex !== undefined ? seat.passengerIndex + 1 : ''}
-                                                            </Text>
-                                                        </View>
-                                                    ) : (
-                                                        <Text style={[styles.seatNumber, { color: getSeatTextColor(seat) }]}>
-                                                            {seat.number}
-                                                        </Text>
-                                                    )}
-                                                </Pressable>
-                                            ))}
+                                            {row.rightSeats.map(renderSeat)}
                                         </View>
 
-                                        {/* Numéro de rangée droite */}
-                                        <View style={styles.rowNumberContainer}>
-                                            <Text style={[styles.rowNumber, { color: primaryBlue }]}>
-                                                {row.rowNumber}
-                                            </Text>
-                                        </View>
+                                        <Text style={[styles.rowIndex, { color: secondaryTextColor }]}>
+                                            {row.rowNumber}
+                                        </Text>
                                     </View>
                                 ))}
                             </View>
 
-                            {/* Arrière du bus arrondi */}
-                            <View style={styles.busBackRounded} />
+                            <Text style={[styles.orientationLabelBottom, { color: secondaryTextColor }]}>
+                                Arrière
+                            </Text>
                         </View>
                     </ScrollView>
 
-                    {/* Bouton de confirmation */}
-                    <View style={[
-                        styles.fixedButtonContainer,
-                        {
-                            paddingBottom: insets.bottom + 8,
-                            backgroundColor: headerBackgroundColor,
-                            borderTopColor: headerBorderColor
-                        }
-                    ]}>
+                    {/* Sticky : chips passagers + CTA */}
+                    <View
+                        style={[
+                            styles.footer,
+                            {
+                                paddingBottom: insets.bottom + 10,
+                                backgroundColor: headerBackgroundColor,
+                                borderTopColor: headerBorderColor,
+                            },
+                        ]}
+                    >
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={styles.passengerChips}
+                        >
+                            {Array.from({ length: totalPassengers }, (_, index) => {
+                                const passenger = passengers?.[index];
+                                const seatNumber = Array.from(selectedSeats.entries()).find(
+                                    ([, passengerIdx]) => passengerIdx === index
+                                )?.[0];
+                                const hasSeat = seatNumber !== undefined;
+                                const name =
+                                    [passenger?.firstName, passenger?.lastName]
+                                        .filter(Boolean)
+                                        .join(' ') || `Passager ${index + 1}`;
+
+                                return (
+                                    <View
+                                        key={index}
+                                        style={[
+                                            styles.passengerChip,
+                                            {
+                                                backgroundColor: hasSeat
+                                                    ? colorScheme === 'dark'
+                                                        ? 'rgba(23,118,186,0.2)'
+                                                        : 'rgba(23,118,186,0.1)'
+                                                    : scrollBackgroundColor,
+                                                borderColor: hasSeat ? primaryBlue : borderColor,
+                                            },
+                                        ]}
+                                    >
+                                        <View
+                                            style={[
+                                                styles.passengerChipBadge,
+                                                {
+                                                    backgroundColor: hasSeat
+                                                        ? primaryBlue
+                                                        : availableBorder,
+                                                },
+                                            ]}
+                                        >
+                                            <Text style={styles.passengerChipBadgeText}>
+                                                P{index + 1}
+                                            </Text>
+                                        </View>
+                                        <View style={styles.passengerChipTextWrap}>
+                                            <Text
+                                                style={[styles.passengerChipName, { color: textColor }]}
+                                                numberOfLines={1}
+                                            >
+                                                {name}
+                                            </Text>
+                                            <Text
+                                                style={[
+                                                    styles.passengerChipSeat,
+                                                    {
+                                                        color: hasSeat
+                                                            ? primaryBlue
+                                                            : secondaryTextColor,
+                                                    },
+                                                ]}
+                                            >
+                                                {hasSeat ? `Siège ${seatNumber}` : 'À choisir'}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                );
+                            })}
+                        </ScrollView>
+
                         <AppButton
-                            title={
-                                isRoundTrip && !isReturnLeg
-                                    ? 'Continuer vers le retour'
-                                    : 'Confirmer la sélection'
-                            }
+                            title={confirmTitle}
                             onPress={handleConfirm}
+                            disabled={!allSelected}
                         />
                     </View>
                 </>
@@ -622,15 +613,15 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 16,
-        paddingBottom: 12,
-        borderBottomWidth: 1,
+        paddingBottom: 10,
+        borderBottomWidth: StyleSheet.hairlineWidth,
     },
     headerTitleContainer: {
         flex: 1,
         alignItems: 'center',
     },
     headerTitle: {
-        fontSize: 18,
+        fontSize: 17,
         fontFamily: 'Ubuntu_Bold',
     },
     headerSubtitle: {
@@ -642,216 +633,195 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        gap: 16,
+        gap: 12,
     },
     loadingText: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
     },
-    legendContainer: {
+    legendRow: {
         flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'flex-start',
-        padding: 16,
-        marginHorizontal: 16,
-        marginTop: 16,
-        borderRadius: 8,
-        borderWidth: 1,
-        gap: 10,
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        gap: 14,
     },
     legendItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
+        gap: 6,
     },
-    legendColor: {
-        width: 20,
-        height: 20,
-        borderRadius: 4,
-        justifyContent: 'center',
+    legendDot: {
+        width: 16,
+        height: 16,
+        borderRadius: 5,
         alignItems: 'center',
+        justifyContent: 'center',
     },
-    legendText: {
+    legendLabel: {
         fontSize: 12,
         fontFamily: 'Ubuntu_Regular',
     },
-    infoNoteContainer: {
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        padding: 12,
-        marginHorizontal: 16,
-        marginTop: 12,
-        borderRadius: 8,
-        borderWidth: 1,
-        gap: 8,
-    },
-    infoNoteText: {
-        flex: 1,
-        fontSize: 11,
-        fontFamily: 'Ubuntu_Regular',
-        lineHeight: 16,
-    },
-    passengersInfoContainer: {
-        padding: 16,
-        marginHorizontal: 16,
-        marginTop: 16,
-        borderRadius: 8,
-        borderWidth: 1,
-    },
-    passengersInfoTitle: {
-        fontSize: 14,
-        fontFamily: 'Ubuntu_Bold',
-        marginBottom: 8,
-    },
-    passengerSeatInfo: {
-        marginTop: 4,
-    },
-    passengerSeatText: {
-        fontSize: 12,
-        fontFamily: 'Ubuntu_Regular',
-    },
-    passengerSeatStatus: {
+    layoutHint: {
+        marginLeft: 'auto',
         fontSize: 11,
         fontFamily: 'Ubuntu_Medium',
-        marginTop: 2,
+    },
+    passengerLogicHint: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 8,
+        marginHorizontal: 16,
+        marginBottom: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        borderRadius: 10,
+    },
+    passengerLogicHintText: {
+        flex: 1,
+        fontSize: 12,
+        fontFamily: 'Ubuntu_Regular',
+        lineHeight: 17,
     },
     scrollView: {
         flex: 1,
     },
     scrollContent: {
-        padding: 16,
-        paddingBottom: 100,
+        paddingHorizontal: 16,
+        paddingTop: 4,
     },
-    busHeaderInfo: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: 16,
-        borderRadius: 8,
-        borderWidth: 1,
-        marginBottom: 16,
-    },
-    busHeaderTitle: {
-        fontSize: 18,
-        fontFamily: 'Ubuntu_Bold',
-    },
-    busHeaderDetails: {
-        flexDirection: 'row',
-        gap: 16,
-    },
-    busHeaderDetailText: {
-        fontSize: 12,
-        fontFamily: 'Ubuntu_Regular',
-    },
-    busVisualContainer: {
+    mapCard: {
         borderRadius: 16,
-        overflow: 'hidden',
+        borderWidth: 1,
+        paddingTop: 14,
+        paddingBottom: 12,
+        paddingHorizontal: 8,
     },
-    busFrontRounded: {
-        height: 80,
-        borderTopLeftRadius: 16,
-        borderTopRightRadius: 16,
-        justifyContent: 'center',
+    mapOrientation: {
         alignItems: 'center',
-        paddingTop: 20,
+        marginBottom: 10,
+        gap: 6,
     },
-    busFrontWindow: {
-        width: 40,
-        height: 40,
+    driverBadge: {
+        width: 28,
+        height: 28,
         borderRadius: 8,
-        borderWidth: 2,
-        marginBottom: 8,
-    },
-    busWindshield: {
-        width: '80%',
-        height: 30,
-        borderTopLeftRadius: 60,
-        borderTopRightRadius: 60,
-        borderWidth: 2,
-        borderBottomWidth: 0,
-    },
-    busSeatsArea: {
-        padding: 16,
-    },
-    aisleIndicatorContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 12,
-        paddingBottom: 8,
-        borderBottomWidth: 1,
-        borderBottomColor: '#E0E0E0',
-    },
-    aisleIndicatorSpacer: {
-        width: 30,
-    },
-    aisleIndicator: {
-        width: 50,
         alignItems: 'center',
         justifyContent: 'center',
     },
-    aisleIndicatorText: {
-        fontSize: 10,
-        fontFamily: 'Ubuntu_Bold',
-        letterSpacing: 1,
+    orientationLabel: {
+        fontSize: 11,
+        fontFamily: 'Ubuntu_Medium',
+        letterSpacing: 0.4,
+        textTransform: 'uppercase',
     },
-    seatRowWithNumbers: {
+    orientationLabelBottom: {
+        fontSize: 11,
+        fontFamily: 'Ubuntu_Medium',
+        letterSpacing: 0.4,
+        textTransform: 'uppercase',
+        textAlign: 'center',
+        marginTop: 10,
+    },
+    mapSurface: {
+        borderRadius: 12,
+        paddingVertical: 12,
+        paddingHorizontal: 4,
+    },
+    seatRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 8,
+        minHeight: 52,
+        marginVertical: 4,
     },
-    rowNumberContainer: {
-        width: 30,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    rowNumber: {
-        fontSize: 14,
-        fontFamily: 'Ubuntu_Bold',
+    rowIndex: {
+        width: 24,
+        textAlign: 'center',
+        fontSize: 11,
+        fontFamily: 'Ubuntu_Medium',
     },
     seatsGroup: {
         flexDirection: 'row',
-        gap: 6,
-        justifyContent: 'center',
         alignItems: 'center',
-        // flex: 1, // Permet aux groupes de prendre la même largeur pour un meilleur centrage
+        justifyContent: 'center',
     },
     aisle: {
-        width: 50,
+        width: 36,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    aisleLine: {
+        width: 2,
+        borderRadius: 1,
+        opacity: 0.9,
     },
     seat: {
-        // Les dimensions sont maintenant calculées dynamiquement selon la disposition
-        // width et height sont définis inline dans le style du composant
-        borderRadius: 8,
+        borderRadius: 10,
         justifyContent: 'center',
         alignItems: 'center',
+        overflow: 'hidden',
     },
     seatContent: {
         alignItems: 'center',
         justifyContent: 'center',
+        gap: 1,
     },
     seatNumber: {
+        fontSize: 13,
+        fontFamily: 'Ubuntu_Medium',
+    },
+    seatNumberSelected: {
+        fontSize: 10,
+        fontFamily: 'Ubuntu_Regular',
+    },
+    seatPassenger: {
+        fontSize: 13,
+        fontFamily: 'Ubuntu_Bold',
+    },
+    footer: {
+        borderTopWidth: StyleSheet.hairlineWidth,
+        paddingHorizontal: 16,
+        paddingTop: 10,
+        gap: 10,
+    },
+    passengerChips: {
+        gap: 8,
+        paddingBottom: 2,
+    },
+    passengerChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingVertical: 8,
+        paddingHorizontal: 10,
+        borderRadius: 12,
+        borderWidth: 1,
+        maxWidth: 200,
+    },
+    passengerChipBadge: {
+        width: 28,
+        height: 28,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    passengerChipBadgeText: {
+        color: '#FFFFFF',
         fontSize: 11,
         fontFamily: 'Ubuntu_Bold',
     },
-    passengerNumber: {
-        fontSize: 8,
+    passengerChipTextWrap: {
+        flexShrink: 1,
+    },
+    passengerChipName: {
+        fontSize: 13,
         fontFamily: 'Ubuntu_Medium',
+    },
+    passengerChipSeat: {
+        fontSize: 11,
+        fontFamily: 'Ubuntu_Regular',
         marginTop: 1,
-    },
-    busBackRounded: {
-        height: 40,
-        borderBottomLeftRadius: 16,
-        borderBottomRightRadius: 16,
-    },
-    fixedButtonContainer: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        paddingHorizontal: 16,
-        paddingTop: 12,
-        borderTopWidth: 1,
     },
 });
 

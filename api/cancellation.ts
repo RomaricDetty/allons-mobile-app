@@ -1,5 +1,5 @@
 import { baseUrl } from '@/api/config';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getAuthToken } from '@/utils/storage';
 import axios from 'axios';
 
 export type RefundOption = 'rebooking' | 'payment';
@@ -57,7 +57,7 @@ export const cancelFullBooking = async (
     refundOption: RefundOption
 ): Promise<CancellationResponse> => {
     try {
-        const token = await AsyncStorage.getItem('userToken');
+        const token = await getAuthToken();
         const url = `${baseUrl}/customers/bookings/${bookingId}/cancel`;
         const payload = {
             reason,
@@ -89,7 +89,7 @@ export const cancelPartialBooking = async (
     refundOption: RefundOption
 ): Promise<CancellationResponse> => {
     try {
-        const token = await AsyncStorage.getItem('userToken');
+        const token = await getAuthToken();
         const url = `${baseUrl}/customers/bookings/items/cancel`;
         const payload = {
             bookingItemIds: passengerIds,

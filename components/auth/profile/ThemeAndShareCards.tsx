@@ -1,10 +1,11 @@
-import {
-    useTheme } from '@/contexts/ThemeContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { useAppColors } from '@/hooks/use-app-colors';
+import { showAlert } from '@/utils/alert';
 import * as Haptics from 'expo-haptics';
-import React,
-    { useCallback } from 'react';
-import { Platform,
+import * as StoreReview from 'expo-store-review';
+import React, { useCallback } from 'react';
+import {
+    Platform,
     Pressable,
     Share,
     StyleSheet,
@@ -15,23 +16,17 @@ import { Platform,
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 /**
- * Composant regroupant les cartes de toggle de thème et de partage
+ * Cartes profil : thème, partage, notation
  */
 export const ThemeAndShareCards: React.FC = () => {
     const { isDarkMode, toggleTheme } = useTheme();
     const colors = useAppColors();
 
-    /**
-     * Gère le changement de thème avec retour haptique
-     */
     const handleThemeToggle = useCallback(() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         toggleTheme();
     }, [toggleTheme]);
 
-    /**
-     * Partage l'application avec retour haptique
-     */
     const handleShareApp = useCallback(() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         if (Platform.OS === 'ios') {
@@ -47,9 +42,25 @@ export const ThemeAndShareCards: React.FC = () => {
         }
     }, []);
 
+    const handleRateApp = useCallback(async () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        try {
+            const available = await StoreReview.isAvailableAsync();
+            if (available) {
+                await StoreReview.requestReview();
+                return;
+            }
+            showAlert(
+                'Notation',
+                'La notation n’est pas disponible sur cet appareil. Merci de nous laisser un avis sur le store dès que possible.'
+            );
+        } catch {
+            showAlert('Erreur', 'Impossible d’ouvrir la notation pour le moment.');
+        }
+    }, []);
+
     return (
         <>
-            {/* Toggle Mode Dark */}
             <View style={[styles.card, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
                 <View style={styles.cardContent}>
                     <View style={styles.iconContainer}>
@@ -75,7 +86,6 @@ export const ThemeAndShareCards: React.FC = () => {
                 />
             </View>
 
-            {/* Partage de l'application */}
             <View style={[styles.card, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
                 <Pressable onPress={handleShareApp} style={styles.cardContent}>
                     <View style={styles.iconContainer}>
@@ -89,6 +99,24 @@ export const ThemeAndShareCards: React.FC = () => {
                         <Text style={[styles.label, { color: colors.text }]}>Partager l'application</Text>
                         <Text style={[styles.description, { color: colors.secondaryText }]}>
                             Partagez l'application avec vos amis et vos proches.
+                        </Text>
+                    </View>
+                </Pressable>
+            </View>
+
+            <View style={[styles.card, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
+                <Pressable onPress={handleRateApp} style={styles.cardContent}>
+                    <View style={styles.iconContainer}>
+                        <MaterialCommunityIcons
+                            name="star-outline"
+                            size={22}
+                            color={colors.activeTabColor}
+                        />
+                    </View>
+                    <View style={styles.textContainer}>
+                        <Text style={[styles.label, { color: colors.text }]}>Noter l'application</Text>
+                        <Text style={[styles.description, { color: colors.secondaryText }]}>
+                            Votre avis nous aide à améliorer AllOn.
                         </Text>
                     </View>
                 </Pressable>

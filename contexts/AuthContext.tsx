@@ -4,6 +4,7 @@
  */
 import { authGetUserInfo } from '@/api/auth_register';
 import { User } from '@/interfaces';
+import { ensureValidAccessToken } from '@/utils/authSession';
 import { clearAuthData, getAuthToken, getUserId } from '@/utils/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, {
@@ -15,6 +16,7 @@ import React, {
     useMemo,
     useState,
 } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 
 const USER_CACHE_KEY = 'user_profile';
 
@@ -28,6 +30,8 @@ type AuthContextType = {
     refreshUser: () => Promise<void>;
     /** Déconnexion : efface tout de suite le nom + tokens */
     signOut: () => Promise<void>;
+    /** Garantit un access token valide (refresh si besoin). null → session morte */
+    ensureSession: () => Promise<string | null>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -77,13 +81,28 @@ export function AuthProvider({ children }: AuthProviderProps) {
         await clearAuthData();
     }, []);
 
+    const ensureSession = useCallback(async () => {
+        const token = await ensureValidAccessToken();
+        if (!token) {
+            setUser(null);
+            await writeCachedUser(null);
+            await clearAuthData();
+            return null;
+        }
+        return token;
+    }, []);
+
     const refreshUser = useCallback(async () => {
         try {
-            const [token, userId] = await Promise.all([getAuthToken(), getUserId()]);
+            const token = await ensureValidAccessToken();
+            const userId = await getUserId();
 
-            if (!token?.trim() || !userId?.trim()) {
+            if (!token?.trim() || !userId?.trim() || userId === 'unknown') {
                 setUser(null);
                 await writeCachedUser(null);
+                if (!token?.trim()) {
+                    await clearAuthData();
+                }
                 return;
             }
 
@@ -103,15 +122,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
             if (response?.status === 401 || response?.status === 403) {
                 setUser(null);
                 await writeCachedUser(null);
+                await clearAuthData();
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Erreur refresh utilisateur:', error);
+            const status = error?.response?.status;
+            if (status === 401 || status === 403) {
+                setUser(null);
+                await writeCachedUser(null);
+                await clearAuthData();
+                return;
+            }
             const token = await getAuthToken();
             if (!token?.trim()) {
                 setUser(null);
                 await writeCachedUser(null);
+                await clearAuthData();
             }
-            // En cas d'erreur réseau, on conserve le user en cache déjà affiché
+            // Erreur réseau : on conserve le user en cache déjà affiché
         }
     }, []);
 
@@ -120,17 +148,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         (async () => {
             try {
-                const [token, cached] = await Promise.all([getAuthToken(), readCachedUser()]);
+                const token = await ensureValidAccessToken();
                 if (cancelled) return;
 
-                if (token?.trim() && cached) {
-                    setUser(cached);
-                } else if (!token?.trim()) {
+                if (!token) {
                     setUser(null);
                     await writeCachedUser(null);
+                    await clearAuthData();
+                } else {
+                    const cached = await readCachedUser();
+                    if (cached) {
+                        setUser(cached);
+                    }
+                    await refreshUser();
                 }
-
-                await refreshUser();
             } finally {
                 if (!cancelled) {
                     setIsAuthReady(true);
@@ -143,6 +174,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
         };
     }, [refreshUser]);
 
+    // Au retour au premier plan : prolonger la session via refresh_token si besoin
+    useEffect(() => {
+        const onAppState = (state: AppStateStatus) => {
+            if (state !== 'active') return;
+            void (async () => {
+                const token = await ensureValidAccessToken();
+                if (!token) {
+                    setUser(null);
+                    await writeCachedUser(null);
+                    await clearAuthData();
+                    return;
+                }
+                await refreshUser();
+            })();
+        };
+        const sub = AppState.addEventListener('change', onAppState);
+        return () => sub.remove();
+    }, [refreshUser]);
+
     const value = useMemo<AuthContextType>(
         () => ({
             user,
@@ -151,8 +201,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
             setSessionUser,
             refreshUser,
             signOut,
+            ensureSession,
         }),
-        [user, isAuthReady, setSessionUser, refreshUser, signOut],
+        [user, isAuthReady, setSessionUser, refreshUser, signOut, ensureSession],
     );
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

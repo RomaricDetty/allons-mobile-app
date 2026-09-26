@@ -2,11 +2,16 @@
 import { FormField } from '@/components/passengers/FormField';
 import { PhoneField } from '@/components/passengers/PhoneField';
 import { AppButton } from '@/components/ui/AppButton';
+import {
+    FORM_FIELD_HEIGHT,
+    FORM_FIELD_RADIUS,
+    getFormFieldColors,
+} from '@/constants/formField';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { User } from '@/interfaces';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
     Dimensions,
     KeyboardAvoidingView,
     Modal,
@@ -50,6 +55,8 @@ export const EditProfileBottomSheet = ({
     onSave,
 }: EditProfileBottomSheetProps) => {
     const insets = useSafeAreaInsets();
+    const colorScheme = useColorScheme() ?? 'light';
+    const fieldColors = getFormFieldColors(colorScheme);
     const translateY = useSharedValue(SCREEN_HEIGHT);
     const context = useSharedValue({ y: 0 });
     const opacity = useSharedValue(0);
@@ -416,15 +423,24 @@ export const EditProfileBottomSheet = ({
                                 />
 
                                 <View style={styles.formField}>
-                                    <Text style={styles.formLabel}>Date de naissance</Text>
+                                    <Text style={[styles.formLabel, { color: fieldColors.text }]}>
+                                        Date de naissance
+                                    </Text>
                                     <Pressable
-                                        style={styles.dateInput}
+                                        style={[
+                                            styles.dateInput,
+                                            { backgroundColor: fieldColors.background },
+                                        ]}
                                         onPress={() => setShowDatePicker(true)}
                                     >
                                         <Text
                                             style={[
                                                 styles.dateInputText,
-                                                !formData.dateOfBirth && styles.placeholder,
+                                                {
+                                                    color: formData.dateOfBirth
+                                                        ? fieldColors.text
+                                                        : fieldColors.placeholder,
+                                                },
                                             ]}
                                         >
                                             {formData.dateOfBirth || 'jj/mm/aaaa'}
@@ -432,15 +448,27 @@ export const EditProfileBottomSheet = ({
                                         <MaterialCommunityIcons
                                             name="calendar"
                                             size={20}
-                                            color="#A6A6AA"
+                                            color={fieldColors.placeholder}
                                         />
                                     </Pressable>
                                 </View>
 
                                 <View style={styles.formField}>
-                                    <Text style={styles.formLabel}>Pays</Text>
-                                    <View style={styles.disabledInput}>
-                                        <Text style={styles.disabledInputText}>Côte d'Ivoire</Text>
+                                    <Text style={[styles.formLabel, { color: fieldColors.text }]}>Pays</Text>
+                                    <View
+                                        style={[
+                                            styles.disabledInput,
+                                            { backgroundColor: fieldColors.disabledBackground },
+                                        ]}
+                                    >
+                                        <Text
+                                            style={[
+                                                styles.disabledInputText,
+                                                { color: fieldColors.disabledText },
+                                            ]}
+                                        >
+                                            Côte d'Ivoire
+                                        </Text>
                                     </View>
                                 </View>
 
@@ -648,36 +676,30 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     dateInput: {
-        backgroundColor: '#F3F3F7',
-        borderRadius: 8,
+        borderRadius: FORM_FIELD_RADIUS,
         paddingHorizontal: 16,
         paddingVertical: 12,
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#E0E0E0',
+        borderWidth: 0,
+        height: FORM_FIELD_HEIGHT,
     },
     dateInputText: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        color: '#000',
-    },
-    placeholder: {
-        color: '#A6A6AA',
     },
     disabledInput: {
-        backgroundColor: '#F5F5F5',
-        borderRadius: 8,
+        borderRadius: FORM_FIELD_RADIUS,
         paddingHorizontal: 16,
         paddingVertical: 12,
-        borderWidth: 1,
-        borderColor: '#E0E0E0',
+        borderWidth: 0,
+        height: FORM_FIELD_HEIGHT,
+        justifyContent: 'center',
     },
     disabledInputText: {
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        color: '#666',
     },
     saveButton: {
         marginTop: 16,

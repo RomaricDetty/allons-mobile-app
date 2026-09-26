@@ -1,11 +1,12 @@
 import { getBookingQrCode } from '@/api/booking';
+import { QrSkeleton } from '@/components/skeletons';
+import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { getAuthToken } from '@/utils/storage';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
     Dimensions,
     ScrollView,
     StyleSheet,
@@ -17,7 +18,6 @@ import QRCode from 'react-native-qrcode-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // @ts-ignore - react-native-vector-icons n'a pas de types TypeScript
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { ScreenHeader } from '@/components/ui/ScreenHeader';
 
 /**
  * Paramètres de route pour l'écran TicketQR
@@ -204,7 +204,7 @@ const TicketQR = () => {
                         ]}
                     >
                         {isLoadingQrCode ? (
-                            <ActivityIndicator size="large" color={colors.primaryBlue} />
+                            <QrSkeleton size={280} />
                         ) : error ? (
                             <View style={styles.errorStateContainer}>
                                 <Icon name="alert-circle" size={48} color={colors.errorText} />

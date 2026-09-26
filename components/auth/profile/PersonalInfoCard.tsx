@@ -1,17 +1,10 @@
-import {
-    CIVILITY_MAP } from '@/constants/profile';
+import { formatEmergencyRelationLabel } from '@/constants/emergencyRelations';
+import { CIVILITY_MAP } from '@/constants/profile';
 import { useAppColors } from '@/hooks/use-app-colors';
-import { COUNTRY_CODES,
-    User } from '@/interfaces';
-import { formatUserAddress,
-    hasDisplayableAddress } from '@/utils/formatAddress';
-import React,
-    { useMemo } from 'react';
-import { Image,
-    StyleSheet,
-    Text,
-    View,
-} from 'react-native';
+import { COUNTRY_CODES, User } from '@/interfaces';
+import { formatUserAddress, hasDisplayableAddress } from '@/utils/formatAddress';
+import React, { useMemo } from 'react';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 interface PersonalInfoCardProps {
@@ -171,9 +164,7 @@ export const PersonalInfoCard: React.FC<PersonalInfoCardProps> = ({ user }) => {
                                 <View style={styles.emergencyDetailItem}>
                                     <MaterialCommunityIcons name="heart" size={18} color={colors.activeTabColor} />
                                     <Text style={[styles.emergencyRelation, { color: colors.text }]}>
-                                        {user?.contactUrgent?.relationship
-                                            ? user?.contactUrgent?.relationship.charAt(0).toUpperCase() + user?.contactUrgent?.relationship.slice(1).toLowerCase()
-                                            : 'Non renseigné'}
+                                        {formatEmergencyRelationLabel(user?.contactUrgent?.relationship)}
                                     </Text>
                                 </View>
                             </View>

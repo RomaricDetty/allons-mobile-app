@@ -1,5 +1,11 @@
+import {
+    EMERGENCY_RELATION_OPTIONS,
+    getEmergencyRelationCustomText,
+    getEmergencyRelationPickerValue,
+    normalizeEmergencyRelationForStorage,
+} from '@/constants/emergencyRelations';
 import { COUNTRY_CODES } from '@/interfaces';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { FormField } from './FormField';
 import { PhoneField } from './PhoneField';
@@ -35,6 +41,35 @@ export const EmergencyContactBlock = ({
     onUpdateEmergencyContact,
     onOpenBottomSheet
 }: EmergencyContactBlockProps) => {
+    const pickerValue = getEmergencyRelationPickerValue(emergencyContact.relationship);
+    const [customRelation, setCustomRelation] = useState(
+        getEmergencyRelationCustomText(emergencyContact.relationship)
+    );
+
+    useEffect(() => {
+        setCustomRelation(getEmergencyRelationCustomText(emergencyContact.relationship));
+    }, [emergencyContact.relationship]);
+
+    const handleSelectRelation = (value: string) => {
+        if (value === 'autre') {
+            onUpdateEmergencyContact(
+                'relationship',
+                normalizeEmergencyRelationForStorage('autre', customRelation)
+            );
+            return;
+        }
+        setCustomRelation('');
+        onUpdateEmergencyContact('relationship', value);
+    };
+
+    const handleCustomChange = (text: string) => {
+        setCustomRelation(text);
+        onUpdateEmergencyContact(
+            'relationship',
+            normalizeEmergencyRelationForStorage('autre', text)
+        );
+    };
+
     return (
         <View style={styles.emergencyContactSection}>
             <SectionHeader number={2} title="Contact d'urgence" />
@@ -83,21 +118,24 @@ export const EmergencyContactBlock = ({
 
             <SelectField
                 label="Relation"
-                value={emergencyContact.relationship}
+                value={pickerValue}
                 placeholder="Sélectionner une relation"
                 required={false}
                 selectionType="relation"
-                options={[
-                    {value: 'parent', label: 'Parent'},
-                    {value: 'conjoint', label: 'Conjoint(e)'},
-                    {value: 'enfant', label: 'Enfant'},
-                    {value: 'frere-soeur', label: 'Frère/Sœur'},
-                    {value: 'ami', label: 'Ami(e)'},
-                    {value: 'autre', label: 'Autre'}
-                ]}
-                onSelect={(value) => onUpdateEmergencyContact('relationship', value)}
+                options={[...EMERGENCY_RELATION_OPTIONS]}
+                onSelect={handleSelectRelation}
                 onOpenBottomSheet={onOpenBottomSheet}
             />
+
+            {pickerValue === 'autre' && (
+                <FormField
+                    label="Précisez la relation"
+                    value={customRelation}
+                    onChangeText={handleCustomChange}
+                    placeholder="Ex: Cousin, Collègue…"
+                    required={false}
+                />
+            )}
         </View>
     );
 };

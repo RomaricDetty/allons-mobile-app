@@ -19,6 +19,20 @@ export const STATUS_OPTIONS = [
     { value: 'FAILED', label: 'Échoué' },
 ] as const;
 
+/** Courtes descriptions pour la légende des statuts (filtre réservations). */
+export const STATUS_LEGEND: Array<{ label: string; description: string }> = [
+    { label: 'Payé', description: 'Paiement reçu, billet valide.' },
+    { label: 'Confirmé', description: 'Réservation confirmée par la compagnie.' },
+    { label: 'En attente', description: 'Paiement non finalisé.' },
+    { label: 'En traitement', description: 'Paiement en cours de confirmation.' },
+    { label: 'Terminé', description: 'Trajet effectué.' },
+    { label: 'Utilisé', description: 'Billet déjà utilisé à l’embarquement.' },
+    { label: 'Annulé', description: 'Réservation annulée.' },
+    { label: 'Remboursé', description: 'Montant remboursé.' },
+    { label: 'Expiré', description: 'Délai de paiement dépassé.' },
+    { label: 'Échoué', description: 'Paiement refusé ou échoué.' },
+];
+
 /**
  * Map de civilité pour le formatage
  */

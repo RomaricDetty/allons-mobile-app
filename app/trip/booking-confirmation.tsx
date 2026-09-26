@@ -3,7 +3,9 @@ import { getBookingQrCode } from '@/api/booking';
 import { PassengerCardExtended } from '@/components/booking/PassengerCardExtended';
 import { PaymentDetailsSection } from '@/components/booking/PaymentDetailsSection';
 import { TripDetailsSection } from '@/components/booking/TripDetailsSection';
+import { QrSkeleton } from '@/components/skeletons';
 import { formatStatus, getStatusColor } from '@/constants/functions';
+import { formatPaymentMethodDisplay } from '@/constants/paymentMethods';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { transformBookingData } from '@/utils/bookingDataTransformer';
@@ -29,6 +31,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { showAlert } from '@/utils/alert';
 import { AppButton } from '@/components/ui/AppButton';
+import { SectionCardHeader } from '@/components/ui/SectionCardHeader';
 
 /**
  * Écran de confirmation de réservation (Étape 3 sur 3)
@@ -125,18 +128,8 @@ const BookingConfirmation = () => {
         return `${numAmount.toLocaleString('fr-FR')} ${bookingData.currency}`;
     }, [bookingData]);
 
-    /**
-     * Formate la méthode de paiement
-     */
     const formatPaymentMethod = useCallback((method: string): string => {
-        const methodMap: { [key: string]: string } = {
-            'MOBILE_MONEY': 'Mobile Money',
-            'CREDIT_CARD': 'Carte bancaire',
-            'WAVE': 'Wave',
-            'MTN_MONEY': 'MTN Mobile Money',
-            'ORANGE_MONEY': 'Orange Money',
-        };
-        return methodMap[method] || method;
+        return formatPaymentMethodDisplay(method);
     }, []);
 
     /**
@@ -335,13 +328,14 @@ const BookingConfirmation = () => {
 
                 {/* Section: QR Code */}
                 <View style={[styles.sectionCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
-                    <View style={styles.sectionHeader}>
-                        <Icon name="qrcode" size={20} color={primaryBlue} />
-                        <Text style={[styles.sectionTitle, { color: textColor }]}>Code QR de vérification</Text>
-                    </View>
+                    <SectionCardHeader
+                        title="Code QR de vérification"
+                        textColor={textColor}
+                        icon={<Icon name="qrcode" size={22} color={primaryBlue} />}
+                    />
                     <View style={styles.qrCodeContainer}>
                         {isLoadingQrCode || !qrCode ? (
-                            <ActivityIndicator size="large" color={primaryBlue} />
+                            <QrSkeleton size={150} />
                         ) : (
                             <QRCode
                                 getRef={(c: any) => { qrCodeRef.current = c; }}
@@ -401,12 +395,11 @@ const BookingConfirmation = () => {
                     <>
                         {/* Passagers - Voyage aller */}
                         <View style={[styles.sectionCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
-                            <View style={styles.sectionHeader}>
-                                <Icon name="account-group" size={20} color={primaryBlue} />
-                                <Text style={[styles.sectionTitle, { color: textColor }]}>
-                                    Passagers - Voyage aller ({bookingData.passengers.length})
-                                </Text>
-                            </View>
+                            <SectionCardHeader
+                                title={`Passagers - Voyage aller (${bookingData.passengers.length})`}
+                                textColor={textColor}
+                                icon={<Icon name="account-group" size={22} color={primaryBlue} />}
+                            />
                             {bookingData.passengers.map((passenger: any, index: number) => (
                                 <PassengerCardExtended
                                     key={`outbound-${index}`}
@@ -423,12 +416,11 @@ const BookingConfirmation = () => {
 
                         {/* Passagers - Voyage retour */}
                         <View style={[styles.sectionCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
-                            <View style={styles.sectionHeader}>
-                                <Icon name="account-group" size={20} color={primaryBlue} />
-                                <Text style={[styles.sectionTitle, { color: textColor }]}>
-                                    Passagers - Voyage retour ({bookingData.passengers.length})
-                                </Text>
-                            </View>
+                            <SectionCardHeader
+                                title={`Passagers - Voyage retour (${bookingData.passengers.length})`}
+                                textColor={textColor}
+                                icon={<Icon name="account-group" size={22} color={primaryBlue} />}
+                            />
                             {bookingData.passengers.map((passenger: any, index: number) => (
                                 <PassengerCardExtended
                                     key={`return-${index}`}
@@ -446,12 +438,11 @@ const BookingConfirmation = () => {
                 ) : (
                     /* Passagers - Voyage simple */
                     <View style={[styles.sectionCard, { backgroundColor: cardBackgroundColor, borderColor }]}>
-                        <View style={styles.sectionHeader}>
-                            <Icon name="account-group" size={20} color={primaryBlue} />
-                            <Text style={[styles.sectionTitle, { color: textColor }]}>
-                                {bookingData.passengers.length > 1 ? 'Passagers' : 'Passager'} ({bookingData.passengers.length})
-                            </Text>
-                        </View>
+                        <SectionCardHeader
+                            title={`${bookingData.passengers.length > 1 ? 'Passagers' : 'Passager'} (${bookingData.passengers.length})`}
+                            textColor={textColor}
+                            icon={<Icon name="account-group" size={22} color={primaryBlue} />}
+                        />
                         {bookingData.passengers.map((passenger: any, index: number) => (
                             <PassengerCardExtended
                                 key={index}
@@ -473,7 +464,7 @@ const BookingConfirmation = () => {
                         prices: bookingData.prices,
                         totalAmount: bookingData.totalAmount,
                         currency: bookingData.currency,
-                        provider: bookingData.provider,
+                        provider: bookingData.provider || bookingData.paymentProvider || bookingData.method || '',
                         createdAt: bookingData.createdAt,
                     }}
                     isRoundTrip={!!bookingData.returnTrip}
@@ -644,18 +635,8 @@ const styles = StyleSheet.create({
     sectionCard: {
         borderRadius: 12,
         padding: 16,
-        marginBottom: 16,
+        marginBottom: 14,
         borderWidth: 1,
-    },
-    sectionHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 16,
-        gap: 8,
-    },
-    sectionTitle: {
-        fontSize: 18,
-        fontFamily: 'Ubuntu_Bold',
     },
     qrCodeContainer: {
         width: 150,
@@ -666,14 +647,14 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 12,
+        paddingVertical: 14,
         paddingHorizontal: 16,
-        borderRadius: 8,
+        borderRadius: 12,
         borderWidth: 1,
         gap: 8,
     },
     actionButtonText: {
-        fontSize: 14,
+        fontSize: 15,
         fontFamily: 'Ubuntu_Medium',
     },
 });

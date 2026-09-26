@@ -131,6 +131,7 @@ export interface SignUpFormData {
     emergencyContactPhone: string;
     emergencyContactCountryCode?: string;
     emergencyContactRelation: string;
+    emergencyContactRelationOther?: string;
     agreeToTerms: boolean;
 }
 
@@ -182,8 +183,19 @@ export interface CountryCode {
 }
 
 export const COUNTRY_CODES: CountryCode[] = [
-    { code: '+225', label: '🇨🇮 + 225' },
-    { code: '+226', label: '🇧🇫 + 226' },
-    { code: '+223', label: '🇲🇱 + 223' },
-    { code: '+227', label: '🇳🇪 + 227' },
+    { code: '+225', label: '🇨🇮 +225' },
+    { code: '+226', label: '🇧🇫 +226' },
+    { code: '+223', label: '🇲🇱 +223' },
+    { code: '+227', label: '🇳🇪 +227' },
+    { code: '+221', label: '🇸🇳 +221' },
+    { code: '+224', label: '🇬🇳 +224' },
+    { code: '+245', label: '🇬🇼 +245' },
+    { code: '+228', label: '🇹🇬 +228' },
+    { code: '+229', label: '🇧🇯 +229' },
+    { code: '+233', label: '🇬🇭 +233' },
+    { code: '+234', label: '🇳🇬 +234' },
+    { code: '+232', label: '🇸🇱 +232' },
+    { code: '+231', label: '🇱🇷 +231' },
+    { code: '+220', label: '🇬🇲 +220' },
+    { code: '+238', label: '🇨🇻 +238' },
 ];

@@ -3,6 +3,7 @@ import { ControlButtons } from "@/components/trip-route-viewer-mapbox/ControlBut
 import { InfoPanel } from "@/components/trip-route-viewer-mapbox/InfoPanel";
 import { MapScene } from "@/components/trip-route-viewer-mapbox/MapScene";
 import { RecenterRouteButton } from "@/components/trip-route-viewer-mapbox/RecenterRouteButton";
+import { MapScreenSkeleton } from "@/components/skeletons";
 import { resolveMapboxAccessToken } from "@/constants/mapbox";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useThemeColor } from "@/hooks/use-theme-color";
@@ -22,7 +23,6 @@ import * as Location from "expo-location";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type ElementRef } from "react";
 import {
-    ActivityIndicator,
     Animated,
     InteractionManager,
     PanResponder,
@@ -1287,14 +1287,7 @@ export default function TripRouteViewerMapbox({
      * Retourne le composant de chargement
      */
     if (isLoading) {
-        return (
-            <View style={[styles.loadingContainer, { backgroundColor }]}>
-                <ActivityIndicator size="large" color={COLORS.ACCENT} />
-                <Text style={[styles.loadingText, { color: secondaryTextColor }]}>
-                    {"Calcul de l'itinéraire..."}
-                </Text>
-            </View>
-        );
+        return <MapScreenSkeleton />;
     }
 
     /**
@@ -1322,14 +1315,7 @@ export default function TripRouteViewerMapbox({
      * Retourne le composant de chargement si pas de localisation
      */
     if (!passengerLocation) {
-        return (
-            <View style={[styles.loadingContainer, { backgroundColor }]}>
-                <ActivityIndicator size="large" color={COLORS.ACCENT} />
-                <Text style={[styles.loadingText, { color: secondaryTextColor }]}>
-                    Obtention de votre position...
-                </Text>
-            </View>
-        );
+        return <MapScreenSkeleton />;
     }
 
     return (

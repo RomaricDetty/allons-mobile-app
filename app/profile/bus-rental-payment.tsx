@@ -5,7 +5,7 @@ import { SectionHeader } from '@/components/passengers/SectionHeader';
 import { SelectionBottomSheet } from '@/components/passengers/SelectionBottomSheet';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { usePaymentManagement } from '@/hooks/usePaymentManagement';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getAuthToken } from '@/utils/storage';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
@@ -32,6 +32,8 @@ function mapToPayMethodAndProvider(uiMethod: string | null): { method: string; p
             return { method: 'MOBILE_MONEY', provider: 'ORANGE_MONEY' };
         case 'mtn-money':
             return { method: 'MOBILE_MONEY', provider: 'MTN_MONEY' };
+        case 'moov-money':
+            return { method: 'MOBILE_MONEY', provider: 'MOOV_MONEY' };
         default:
             return { method: 'OTHER', provider: undefined };
     }
@@ -147,16 +149,17 @@ export default function BusRentalPaymentScreen() {
             return;
         }
         const { method, provider } = mapToPayMethodAndProvider(selectedPaymentMethod);
-        const rawPayload: Record<string, unknown> = {};
         if (selectedPaymentMethod === 'credit-card') {
-            rawPayload.cardName = cardName;
-            rawPayload.cardNumber = cardNumber?.replace(/\s/g, '');
-            rawPayload.expirationDate = expirationDate;
-            rawPayload.cvv = cardCvv;
-        } else {
-            rawPayload.phoneNumber = paymentNumber;
-            rawPayload.countryCode = paymentCountryCode;
+            showAlert(
+                'Carte non disponible',
+                'Le paiement par carte n’est pas proposé dans l’app. Utilisez Wave, Orange Money, MTN Money ou Moov Money.'
+            );
+            return;
         }
+        const rawPayload: Record<string, unknown> = {
+            phoneNumber: paymentNumber,
+            countryCode: paymentCountryCode,
+        };
         const payData: PayDto = {
             referenceId,
             method,
@@ -164,11 +167,11 @@ export default function BusRentalPaymentScreen() {
             channel: 'MOBILE_APP',
             currency: 'XOF',
             provider: provider ?? undefined,
-            rawPayload: Object.keys(rawPayload).length > 0 ? rawPayload : undefined,
+            rawPayload,
         };
         setIsSubmitting(true);
         try {
-            const token = await AsyncStorage.getItem('token');
+            const token = await getAuthToken();
             if (!token) {
                 showAlert('Erreur', 'Session expirée. Veuillez vous reconnecter.');
                 return;
@@ -188,10 +191,6 @@ export default function BusRentalPaymentScreen() {
     }, [
         selectedPaymentMethod,
         requestItem,
-        cardName,
-        cardNumber,
-        expirationDate,
-        cardCvv,
         paymentNumber,
         paymentCountryCode,
     ]);

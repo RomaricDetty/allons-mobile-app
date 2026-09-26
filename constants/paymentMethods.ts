@@ -25,6 +25,8 @@ export const PAYMENT_METHODS: { [key: string]: string } = {
     'ORANGE': 'Orange Money',
     'ORANGE_MONEY': 'Orange Money',
     'MOOV_MONEY': 'Moov Money',
+    'FLOOZ': 'Moov Money',
+    'MOOV': 'Moov Money',
     'CREDIT_CARD': 'Carte bancaire',
     'VISA': 'Visa',
     'MASTERCARD': 'Mastercard',
@@ -55,6 +57,7 @@ export const mapUiPaymentMethod = (
         case 'mtn-money':
             return { method: 'MOBILE_MONEY', provider: PAYMENT_PROVIDER.MTN_MONEY };
         case 'moov-money':
+        case 'flooz':
             return { method: 'MOBILE_MONEY', provider: PAYMENT_PROVIDER.MOOV_MONEY };
         case 'allon-coin':
             return { method: 'ALLON_COIN', provider: PAYMENT_PROVIDER.ALLON_COIN };
@@ -69,12 +72,19 @@ export const mapUiPaymentMethod = (
  * @returns Le libellé formaté
  */
 export const formatPaymentMethod = (method: string): string => {
-    if (!method) return 'N/A';
-    
-    // Nettoyer la méthode (enlever les underscores)
-    const cleanedMethod = method.split('_').join(' ');
-    
-    // Chercher dans le mapping
-    return PAYMENT_METHODS[cleanedMethod] || PAYMENT_METHODS[method] || method;
+    if (!method || !String(method).trim()) return 'N/A';
+
+    const key = String(method).trim().toUpperCase().replace(/\s+/g, '_');
+
+    return PAYMENT_METHODS[key] || PAYMENT_METHODS[method] || method.split('_').join(' ');
+};
+
+/**
+ * Libellé UI pour méthode / wallet (jamais N/A vide — tiret).
+ */
+export const formatPaymentMethodDisplay = (method?: string | null): string => {
+    const label = formatPaymentMethod(String(method ?? '').trim());
+    if (!label || /^n\/?a$/i.test(label)) return '—';
+    return label;
 };
 

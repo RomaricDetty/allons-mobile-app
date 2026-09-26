@@ -1,15 +1,13 @@
 // @ts-nocheck
-import {
-    useAppColors } from '@/hooks/use-app-colors';
+import { AppButton } from '@/components/ui/AppButton';
+import { ScreenHeader } from '@/components/ui/ScreenHeader';
+import { useAppColors } from '@/hooks/use-app-colors';
 import { PaymentNotificationStatus } from '@/interfaces/paymentNotification';
+import { formatPaymentMethodDisplay } from '@/constants/paymentMethods';
 import { consumePaymentNotificationScreenAccess } from '@/utils/paymentNotificationGate';
-import { router,
-    useLocalSearchParams } from 'expo-router';
-import React,
-    { useEffect,
-    useMemo,
-    useState } from 'react';
-import { Pressable,
+import { router, useLocalSearchParams } from 'expo-router';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
     ScrollView,
     StyleSheet,
     Text,
@@ -17,12 +15,10 @@ import { Pressable,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { AppButton } from '@/components/ui/AppButton';
 
 /**
- * Écran détail notification paiement.
+ * Écran détail notification paiement (échec / expiré).
  * Accessible uniquement via un tap push (gate mémoire éphémère).
- * Aucune persistance : les données viennent uniquement des params de la notif.
  */
 export default function PaymentNotificationStatusScreen() {
     const insets = useSafeAreaInsets();
@@ -59,7 +55,7 @@ export default function PaymentNotificationStatusScreen() {
         return 'Paiement échoué';
     }, [status]);
 
-    const iconName = status === 'success' ? 'check' : status === 'expired' ? 'timer-off' : 'close';
+    const iconName = status === 'success' ? 'check-circle' : status === 'expired' ? 'timer-off' : 'close-circle';
     const iconColor = status === 'success' ? colors.success : colors.danger;
 
     const rows = [
@@ -73,46 +69,50 @@ export default function PaymentNotificationStatusScreen() {
                     ? `${params.amount} ${params.currency || 'XOF'}`
                     : params.currency || '—',
         },
-        { label: 'Moyen de paiement', value: params.provider || '—' },
+        { label: 'Moyen de paiement', value: formatPaymentMethodDisplay(params.provider) },
         { label: 'Passagers', value: params.passengerCount || '—' },
     ];
 
+    const goHome = () => router.replace('/(tabs)');
+
     if (!allowed) {
-        return <View style={[styles.container, { backgroundColor: colors.background }]} />;
+        return <View style={[styles.container, { backgroundColor: colors.scrollBackground }]} />;
     }
 
     return (
-        <View
-            style={[
-                styles.container,
-                {
-                    paddingTop: insets.top + 16,
-                    paddingBottom: insets.bottom + 16,
-                    backgroundColor: colors.background,
-                },
-            ]}
-        >
-            <View style={styles.header}>
-                <Pressable
-                    onPress={() => router.replace('/(tabs)')}
-                    hitSlop={12}
-                    style={styles.closeHit}
-                >
-                    <Icon name="close" size={22} color={colors.text} />
-                </Pressable>
-            </View>
+        <View style={[styles.container, { backgroundColor: colors.scrollBackground }]}>
+            <ScreenHeader
+                title="Statut du paiement"
+                onBack={goHome}
+                iconColor={colors.icon}
+                textColor={colors.text}
+                backgroundColor={colors.headerBackground}
+                borderColor={colors.border}
+                paddingTop={insets.top}
+            />
 
             <ScrollView
-                contentContainerStyle={styles.content}
+                contentContainerStyle={[
+                    styles.content,
+                    { paddingBottom: Math.max(insets.bottom, 16) + 16 },
+                ]}
                 showsVerticalScrollIndicator={false}
             >
-                <View style={styles.iconSlot}>
-                    <Icon name={iconName} size={28} color={iconColor} />
+                <View
+                    style={[
+                        styles.statusCard,
+                        {
+                            backgroundColor: colors.cardBackground,
+                            borderColor: colors.border,
+                        },
+                    ]}
+                >
+                    <Icon name={iconName} size={36} color={iconColor} />
+                    <Text style={[styles.title, { color: colors.text }]}>{headline}</Text>
+                    <Text style={[styles.subtitle, { color: colors.secondaryText }]}>
+                        Détails issus de la notification.
+                    </Text>
                 </View>
-                <Text style={[styles.title, { color: colors.text }]}>{headline}</Text>
-                <Text style={[styles.subtitle, { color: colors.secondaryText }]}>
-                    Détails issus de la notification — non enregistrés dans l’application.
-                </Text>
 
                 <View
                     style={[
@@ -123,24 +123,27 @@ export default function PaymentNotificationStatusScreen() {
                         },
                     ]}
                 >
-                    {rows.map((row) => (
-                        <View key={row.label} style={[styles.row, { borderBottomColor: colors.border }]}>
+                    {rows.map((row, index) => (
+                        <View
+                            key={row.label}
+                            style={[
+                                styles.row,
+                                {
+                                    borderBottomColor: colors.border,
+                                    borderBottomWidth: index === rows.length - 1 ? 0 : StyleSheet.hairlineWidth,
+                                },
+                            ]}
+                        >
                             <Text style={[styles.rowLabel, { color: colors.secondaryText }]}>
                                 {row.label}
                             </Text>
-                            <Text style={[styles.rowValue, { color: colors.text }]}>
-                                {row.value}
-                            </Text>
+                            <Text style={[styles.rowValue, { color: colors.text }]}>{row.value}</Text>
                         </View>
                     ))}
                 </View>
-            </ScrollView>
 
-            <AppButton
-                title="Fermer"
-                onPress={() => router.replace('/(tabs)')}
-                style={{ backgroundColor: primaryBlue }}
-            />
+                <AppButton title="Retour à l'accueil" onPress={goHome} style={{ backgroundColor: primaryBlue }} />
+            </ScrollView>
         </View>
     );
 }
@@ -148,40 +151,28 @@ export default function PaymentNotificationStatusScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        paddingHorizontal: 20,
-    },
-    header: {
-        alignItems: 'flex-end',
-        marginBottom: 8,
-    },
-    closeHit: {
-        width: 40,
-        height: 40,
-        borderRadius: 10,
-        alignItems: 'center',
-        justifyContent: 'center',
     },
     content: {
-        paddingBottom: 24,
-        gap: 12,
+        padding: 16,
+        gap: 14,
     },
-    iconSlot: {
-        width: 40,
-        height: 40,
-        borderRadius: 10,
+    statusCard: {
+        borderRadius: 12,
+        borderWidth: 1,
+        padding: 20,
         alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 4,
+        gap: 8,
     },
     title: {
         fontFamily: 'Ubuntu_Bold',
-        fontSize: 22,
+        fontSize: 20,
+        textAlign: 'center',
     },
     subtitle: {
         fontFamily: 'Ubuntu_Regular',
-        fontSize: 14,
-        lineHeight: 20,
-        marginBottom: 8,
+        fontSize: 13,
+        lineHeight: 19,
+        textAlign: 'center',
     },
     card: {
         borderRadius: 12,
@@ -191,7 +182,6 @@ const styles = StyleSheet.create({
     row: {
         paddingHorizontal: 16,
         paddingVertical: 14,
-        borderBottomWidth: StyleSheet.hairlineWidth,
         gap: 4,
     },
     rowLabel: {

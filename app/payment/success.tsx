@@ -1,11 +1,17 @@
 // @ts-nocheck
 import { getBookingDetails } from '@/api/booking';
+import { TicketDetailsSkeleton } from '@/components/skeletons';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { AppButton } from '@/components/ui/AppButton';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
+import { SeatBadge } from '@/components/ui/SeatBadge';
 import { formatFullDate, formatStatus, getStatusColor } from '@/constants/functions';
-import { formatPaymentMethod } from '@/constants/paymentMethods';
+import { formatPaymentMethod, formatPaymentMethodDisplay } from '@/constants/paymentMethods';
 import { useAppColors } from '@/hooks/use-app-colors';
-import { dismissPendingPaymentVerification } from '@/hooks/usePendingPaymentRecovery';
+import {
+    dismissPendingPaymentVerification,
+    markPendingPaymentSucceeded,
+} from '@/hooks/usePendingPaymentRecovery';
 import { transformBookingData } from '@/utils/bookingDataTransformer';
 import { notifyPaymentStatusLocally } from '@/utils/notifyPaymentStatus';
 import {
@@ -18,12 +24,12 @@ import {
     pollBookingPaymentStatus,
 } from '@/utils/paymentPolling';
 import { getAuthToken } from '@/utils/storage';
+import { isAllowedPaymentRedirectUrl } from '@/utils/paymentRedirectUrl';
 import { CommonActions, useNavigation } from '@react-navigation/native';
+import * as Linking from 'expo-linking';
 import { router, useLocalSearchParams } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
     AppState,
     AppStateStatus,
     ScrollView,
@@ -35,8 +41,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 type Phase = 'checking' | 'success' | 'awaiting_confirmation';
-
-WebBrowser.maybeCompleteAuthSession();
 
 const PENDING_ACCENT = '#B86E00';
 
@@ -65,8 +69,14 @@ export default function PaymentSuccessScreen() {
     const generationRef = useRef(0);
     const bookingIdRef = useRef<string | null>(null);
     const notifiedRef = useRef(false);
+    const succeededRef = useRef(false);
+    const phaseRef = useRef<Phase>('checking');
 
     const primaryBlue = colors.activeTabColor;
+
+    useEffect(() => {
+        phaseRef.current = phase;
+    }, [phase]);
 
     const notifyOnce = useCallback(async (status: 'success' | 'failed' | 'expired', bookingId: string) => {
         if (notifiedRef.current) return;
@@ -74,9 +84,25 @@ export default function PaymentSuccessScreen() {
         await notifyPaymentStatusLocally(status, bookingId);
     }, []);
 
+    const lockSuccess = useCallback(async (bookingId: string) => {
+        if (succeededRef.current) {
+            setPhase('success');
+            return;
+        }
+        succeededRef.current = true;
+        phaseRef.current = 'success';
+        setPhase('success');
+        await notifyOnce('success', bookingId);
+        // Bloque la recovery avant le clear (évite une réouverture en boucle)
+        await markPendingPaymentSucceeded();
+        await clearPendingPayment();
+    }, [notifyOnce]);
+
     const resolveBookingId = useCallback(async () => {
         const pending = await getPendingPayment();
-        setSessionBundle(pending);
+        if (pending) {
+            setSessionBundle(pending);
+        }
         const bookingId = (params.bookingId as string) || pending?.bookingId || null;
         bookingIdRef.current = bookingId;
         return { bookingId, pending };
@@ -148,11 +174,15 @@ export default function PaymentSuccessScreen() {
     }, [sessionBundle?.expiresAt]);
 
     const runVerification = useCallback(async (options?: { continuous?: boolean }) => {
+        // Jamais relancer une vérif une fois le paiement confirmé
+        if (succeededRef.current || phaseRef.current === 'success') return;
         if (pollingRef.current) return;
+
         const generation = ++generationRef.current;
         pollingRef.current = true;
         cancelRef.current = { cancelled: false };
         setPhase('checking');
+        phaseRef.current = 'checking';
 
         try {
             const { bookingId, pending } = await resolveBookingId();
@@ -165,20 +195,29 @@ export default function PaymentSuccessScreen() {
                 return;
             }
 
-            await updatePendingPayment({ phase: 'verifying', dismissedAt: null });
+            // Ne pas écraser une session déjà réussie / quittée
+            if (pending?.phase !== 'succeeded' && pending?.phase !== 'dismissed') {
+                await updatePendingPayment({ phase: 'verifying', dismissedAt: null });
+            }
             const token = (await getAuthToken()) || undefined;
 
             if (options?.continuous === false) {
                 const outcome = await fetchBookingPaymentOutcome(bookingId, token);
-                if (cancelRef.current.cancelled || generation !== generationRef.current) return;
+                if (
+                    succeededRef.current ||
+                    cancelRef.current.cancelled ||
+                    generation !== generationRef.current
+                ) {
+                    return;
+                }
 
                 if (outcome.kind === 'succeeded') {
-                    await notifyOnce('success', bookingId);
-                    setPhase('success');
+                    await lockSuccess(bookingId);
                     return;
                 }
                 if (outcome.kind === 'failed' || outcome.kind === 'expired') {
                     await notifyOnce(outcome.kind, bookingId);
+                    // Garde la session pour l’écran erreur (retour réservation + récap)
                     router.replace({
                         pathname: '/payment/error',
                         params: { bookingId, reason: outcome.kind },
@@ -186,6 +225,7 @@ export default function PaymentSuccessScreen() {
                     return;
                 }
                 setPhase('awaiting_confirmation');
+                phaseRef.current = 'awaiting_confirmation';
                 return;
             }
 
@@ -196,6 +236,7 @@ export default function PaymentSuccessScreen() {
             });
 
             if (
+                succeededRef.current ||
                 cancelRef.current.cancelled ||
                 outcome.kind === 'cancelled' ||
                 generation !== generationRef.current
@@ -204,13 +245,13 @@ export default function PaymentSuccessScreen() {
             }
 
             if (outcome.kind === 'succeeded') {
-                await notifyOnce('success', bookingId);
-                setPhase('success');
+                await lockSuccess(bookingId);
                 return;
             }
 
             if (outcome.kind === 'failed' || outcome.kind === 'expired') {
                 await notifyOnce(outcome.kind, bookingId);
+                // Garde la session pour l’écran erreur (retour réservation + récap)
                 router.replace({
                     pathname: '/payment/error',
                     params: { bookingId, reason: outcome.kind },
@@ -219,13 +260,15 @@ export default function PaymentSuccessScreen() {
             }
 
             setPhase('awaiting_confirmation');
+            phaseRef.current = 'awaiting_confirmation';
         } finally {
             if (generation === generationRef.current) {
                 pollingRef.current = false;
             }
         }
-    }, [resolveBookingId, notifyOnce]);
+    }, [resolveBookingId, notifyOnce, lockSuccess]);
 
+    // Montage unique : ne pas relancer à chaque redéfinition de runVerification
     useEffect(() => {
         runVerification({ continuous: true });
         return () => {
@@ -233,26 +276,28 @@ export default function PaymentSuccessScreen() {
             generationRef.current += 1;
             pollingRef.current = false;
         };
-    }, [runVerification]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- démarrage unique
+    }, []);
 
     useEffect(() => {
         const onChange = (next: AppStateStatus) => {
             if (next !== 'active') return;
-            if (phase === 'success') return;
+            // Refs : évite la course AppState vs setPhase('success')
+            if (succeededRef.current || phaseRef.current === 'success') return;
+            // Déjà en train de poller : ne pas annuler / relancer (flash « patienter »)
+            if (pollingRef.current && phaseRef.current === 'checking') return;
 
-            cancelRef.current.cancelled = true;
-            generationRef.current += 1;
-            pollingRef.current = false;
-
-            if (phase === 'awaiting_confirmation') {
+            if (phaseRef.current === 'awaiting_confirmation') {
                 runVerification({ continuous: false });
-            } else {
-                runVerification({ continuous: true });
+                return;
             }
+
+            // Retour au premier plan hors polling : un check ponctuel suffit
+            runVerification({ continuous: false });
         };
         const sub = AppState.addEventListener('change', onChange);
         return () => sub.remove();
-    }, [phase, runVerification]);
+    }, [runVerification]);
 
     const handleRetryCheck = useCallback(async () => {
         setIsRetrying(true);
@@ -265,8 +310,12 @@ export default function PaymentSuccessScreen() {
 
     const handleReopenPayment = useCallback(async () => {
         if (!checkoutUrl) return;
+        if (!isAllowedPaymentRedirectUrl(String(checkoutUrl))) {
+            console.warn('URL checkout invalide, réouverture bloquée');
+            return;
+        }
         try {
-            await WebBrowser.openBrowserAsync(String(checkoutUrl));
+            await Linking.openURL(String(checkoutUrl));
         } catch (error) {
             console.warn('Impossible de rouvrir le paiement', error);
         }
@@ -277,6 +326,7 @@ export default function PaymentSuccessScreen() {
         const bookingId =
             bookingIdRef.current || (params.bookingId as string) || pending?.bookingId;
         if (!bookingId || !pending) {
+            await clearPendingPayment();
             navigation.dispatch(
                 CommonActions.reset({
                     index: 0,
@@ -288,13 +338,17 @@ export default function PaymentSuccessScreen() {
 
         const token = await getAuthToken();
         let bookingResponse = { data: pending.bookingResponse, status: 200 };
+        const initPay = pending.paymentInitResponse || {};
         let paymentResponse = {
             data: {
-                ...pending.paymentInitResponse,
+                ...initPay,
                 status: 'PAID',
                 paymentStatus: 'SUCCEEDED',
                 bookingStatus: 'PAID',
                 bookingId,
+                provider: initPay.provider || initPay.paymentProvider,
+                paymentProvider: initPay.paymentProvider || initPay.provider,
+                method: initPay.method,
             },
             status: 200,
         };
@@ -302,11 +356,28 @@ export default function PaymentSuccessScreen() {
         if (token) {
             try {
                 bookingResponse = await getBookingDetails(bookingId, token);
+                const bookingPayload = bookingResponse?.data?.newBooking || bookingResponse?.data || {};
+                const fromBooking =
+                    bookingPayload.paymentProvider ||
+                    bookingPayload.provider ||
+                    bookingPayload.payment?.provider ||
+                    bookingPayload.payment?.paymentProvider;
+                if (fromBooking) {
+                    paymentResponse = {
+                        ...paymentResponse,
+                        data: {
+                            ...paymentResponse.data,
+                            provider: paymentResponse.data.provider || fromBooking,
+                            paymentProvider: paymentResponse.data.paymentProvider || fromBooking,
+                        },
+                    };
+                }
             } catch (error) {
                 console.warn('Impossible de rafraîchir le booking, session locale utilisée', error);
             }
         }
 
+        succeededRef.current = true;
         await clearPendingPayment();
 
         navigation.dispatch(
@@ -331,10 +402,19 @@ export default function PaymentSuccessScreen() {
     }, [params.bookingId, sessionBundle, navigation]);
 
     const goHomeKeepPending = useCallback(async () => {
+        // Stoppe le poll immédiatement (checking en cours inclus)
         cancelRef.current.cancelled = true;
         generationRef.current += 1;
         pollingRef.current = false;
-        await dismissPendingPaymentVerification();
+
+        // Paiement déjà OK : accueil propre, sans session récupérable
+        if (succeededRef.current || phaseRef.current === 'success') {
+            await clearPendingPayment();
+        } else {
+            // Checking / attente : on quitte librement, vérif silencieuse + push plus tard
+            await dismissPendingPaymentVerification();
+        }
+
         navigation.dispatch(
             CommonActions.reset({
                 index: 0,
@@ -416,7 +496,7 @@ export default function PaymentSuccessScreen() {
 
                     {phase === 'checking' ? (
                         <View style={styles.loaderWrap}>
-                            <ActivityIndicator size="small" color={primaryBlue} />
+                            <Skeleton width={120} height={10} borderRadius={5} />
                         </View>
                     ) : null}
 
@@ -586,45 +666,46 @@ export default function PaymentSuccessScreen() {
                                         },
                                     ]}
                                 >
-                                    <Text style={[styles.passengerName, { color: colors.text }]}>
-                                        {p.firstName} {p.lastName}
-                                    </Text>
-                                    {p.email ? (
-                                        <Text
-                                            style={{
-                                                color: colors.secondaryText,
-                                                fontSize: 13,
-                                                fontFamily: 'Ubuntu_Regular',
-                                            }}
-                                        >
-                                            {p.email}
-                                        </Text>
-                                    ) : null}
-                                    {p.phone ? (
-                                        <Text
-                                            style={{
-                                                color: colors.secondaryText,
-                                                fontSize: 13,
-                                                fontFamily: 'Ubuntu_Regular',
-                                            }}
-                                        >
-                                            {p.phone}
-                                        </Text>
-                                    ) : null}
-                                    {p.seatNumber ? (
-                                        <View style={styles.seatRow}>
-                                            <Icon name="seat-passenger" size={16} color={primaryBlue} />
+                                    <View style={styles.passengerTopRow}>
+                                        <View style={styles.passengerInfo}>
                                             <Text
-                                                style={{
-                                                    color: colors.text,
-                                                    fontFamily: 'Ubuntu_Medium',
-                                                    fontSize: 13,
-                                                }}
+                                                style={[styles.passengerName, { color: colors.text }]}
+                                                numberOfLines={1}
                                             >
-                                                Siège {p.seatNumber}
+                                                {p.firstName} {p.lastName}
                                             </Text>
+                                            {p.email ? (
+                                                <Text
+                                                    style={[
+                                                        styles.passengerDetail,
+                                                        { color: colors.secondaryText },
+                                                    ]}
+                                                    numberOfLines={1}
+                                                >
+                                                    {p.email}
+                                                </Text>
+                                            ) : null}
+                                            {p.phone ? (
+                                                <Text
+                                                    style={[
+                                                        styles.passengerDetail,
+                                                        { color: colors.secondaryText },
+                                                    ]}
+                                                >
+                                                    {p.phone}
+                                                </Text>
+                                            ) : null}
                                         </View>
-                                    ) : null}
+
+                                        {p.seatNumber ? (
+                                            <SeatBadge
+                                                seatNumber={p.seatNumber}
+                                                primaryBlue={primaryBlue}
+                                                secondaryTextColor={colors.secondaryText}
+                                                borderColor={colors.border}
+                                            />
+                                        ) : null}
+                                    </View>
                                 </View>
                             ))}
                         </View>
@@ -672,7 +753,14 @@ export default function PaymentSuccessScreen() {
                             />
                             <RecapRow
                                 label="Méthode"
-                                value={providerLabel || 'Mobile Money'}
+                                value={
+                                    formatPaymentMethodDisplay(
+                                        recap?.provider ||
+                                            recap?.paymentProvider ||
+                                            recap?.method ||
+                                            providerLabel
+                                    )
+                                }
                                 textColor={colors.text}
                                 secondaryColor={colors.secondaryText}
                             />
@@ -686,10 +774,7 @@ export default function PaymentSuccessScreen() {
                     </>
                 ) : (
                     <View style={styles.loadingRecap}>
-                        <ActivityIndicator color={primaryBlue} />
-                        <Text style={[styles.loadingText, { color: colors.secondaryText }]}>
-                            Chargement du récapitulatif…
-                        </Text>
+                        <TicketDetailsSkeleton />
                     </View>
                 )}
 
@@ -918,19 +1003,27 @@ const styles = StyleSheet.create({
     passengerCard: {
         borderWidth: 1,
         borderRadius: 10,
-        padding: 12,
+        padding: 14,
         marginBottom: 8,
-        gap: 4,
+    },
+    passengerTopRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 12,
+    },
+    passengerInfo: {
+        flex: 1,
+        minWidth: 0,
     },
     passengerName: {
         fontFamily: 'Ubuntu_Bold',
-        fontSize: 15,
+        fontSize: 16,
+        marginBottom: 6,
     },
-    seatRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        marginTop: 4,
+    passengerDetail: {
+        fontSize: 13,
+        fontFamily: 'Ubuntu_Regular',
+        marginBottom: 2,
     },
     loadingRecap: {
         paddingVertical: 48,

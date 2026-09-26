@@ -6,11 +6,12 @@ import { useBusTracking } from '@/hooks/useBusTracking';
 import { routingService } from '@/services/routingService';
 import { BusStop, PassengerLocation } from '@/types/tracking';
 import { Ionicons } from '@expo/vector-icons';
+import { MapScreenSkeleton } from '@/components/skeletons';
+import { BackButton } from '@/components/ui/BackButton';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
     Animated,
     Dimensions,
     PanResponder,
@@ -24,7 +25,6 @@ import {
 import MapView, { Circle, Marker, Polyline, PROVIDER_DEFAULT } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { showAlert } from '@/utils/alert';
-import { BackButton } from '@/components/ui/BackButton';
 
 interface OSMBusTrackerProps {
     tripId: string;
@@ -582,14 +582,7 @@ export default function OSMBusTracker({ tripId, bookingDetails }: OSMBusTrackerP
      */
 
     if (isLoading) {
-        return (
-            <View style={[styles.loadingContainer, { backgroundColor: themeColors.background }]}>
-                <ActivityIndicator size="large" color={themeColors.accent} />
-                <Text style={[styles.loadingText, { color: themeColors.secondaryText }]}>
-                    Chargement du voyage...
-                </Text>
-            </View>
-        );
+        return <MapScreenSkeleton />;
     }
 
     if (error) {
@@ -609,14 +602,7 @@ export default function OSMBusTracker({ tripId, bookingDetails }: OSMBusTrackerP
     }
 
     if (!passengerLocation) {
-        return (
-            <View style={[styles.loadingContainer, { backgroundColor: themeColors.background }]}>
-                <ActivityIndicator size="large" color={themeColors.accent} />
-                <Text style={[styles.loadingText, { color: themeColors.secondaryText }]}>
-                    Obtention de votre position...
-                </Text>
-            </View>
-        );
+        return <MapScreenSkeleton />;
     }
 
     /**

@@ -1,9 +1,7 @@
+import { SeatBadge } from '@/components/ui/SeatBadge';
 import React, { memo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-/**
- * Interface pour les données d'un passager
- */
 interface Passenger {
     firstName: string;
     lastName: string;
@@ -13,9 +11,6 @@ interface Passenger {
     seatNumberReturn?: number | null;
 }
 
-/**
- * Interface pour les props du composant
- */
 interface PassengerCardExtendedProps {
     passenger: Passenger;
     textColor: string;
@@ -27,7 +22,7 @@ interface PassengerCardExtendedProps {
 }
 
 /**
- * Composant pour afficher les informations d'un passager avec siège optionnel
+ * Carte passager confirmation — même layout siège que le billet.
  */
 export const PassengerCardExtended = memo<PassengerCardExtendedProps>(({
     passenger,
@@ -42,33 +37,31 @@ export const PassengerCardExtended = memo<PassengerCardExtendedProps>(({
 
     return (
         <View style={[styles.passengerCard, { backgroundColor, borderColor }]}>
-            <View style={styles.passengerInfo}>
-                <Text style={[styles.passengerName, { color: textColor }]}>
-                    {passenger.firstName} {passenger.lastName}
-                </Text>
-                {passenger.email && (
-                    <Text style={[styles.passengerDetail, { color: secondaryTextColor }]}>
-                        {passenger.email}
+            <View style={styles.topRow}>
+                <View style={styles.passengerInfo}>
+                    <Text style={[styles.passengerName, { color: textColor }]} numberOfLines={1}>
+                        {passenger.firstName} {passenger.lastName}
                     </Text>
-                )}
-                {passenger.phone && (
-                    <Text style={[styles.passengerDetail, { color: secondaryTextColor }]}>
-                        {passenger.phone}
-                    </Text>
-                )}
-            </View>
-            {hasSeat && (
-                <View style={styles.seatInfo}>
-                    <View style={styles.seatInfoItem}>
-                        <Text style={[styles.seatLabel, { color: secondaryTextColor }]}>
-                            Siège
+                    {passenger.email ? (
+                        <Text style={[styles.passengerDetail, { color: secondaryTextColor }]} numberOfLines={1}>
+                            {passenger.email}
                         </Text>
-                        <Text style={[styles.seatNumber, { color: primaryBlue }]}>
-                            {seatNumber}
+                    ) : null}
+                    {passenger.phone ? (
+                        <Text style={[styles.passengerDetail, { color: secondaryTextColor }]}>
+                            {passenger.phone}
                         </Text>
-                    </View>
+                    ) : null}
                 </View>
-            )}
+                {hasSeat ? (
+                    <SeatBadge
+                        seatNumber={seatNumber!}
+                        primaryBlue={primaryBlue}
+                        secondaryTextColor={secondaryTextColor}
+                        borderColor={borderColor}
+                    />
+                ) : null}
+            </View>
         </View>
     );
 });
@@ -77,45 +70,28 @@ PassengerCardExtended.displayName = 'PassengerCardExtended';
 
 const styles = StyleSheet.create({
     passengerCard: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: 12,
-        borderRadius: 8,
-        marginBottom: 12,
+        borderRadius: 10,
         borderWidth: 1,
+        padding: 14,
+        marginBottom: 12,
+    },
+    topRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 12,
     },
     passengerInfo: {
         flex: 1,
+        minWidth: 0,
     },
     passengerName: {
         fontSize: 16,
         fontFamily: 'Ubuntu_Bold',
-        marginBottom: 4,
+        marginBottom: 6,
     },
     passengerDetail: {
-        fontSize: 12,
+        fontSize: 13,
         fontFamily: 'Ubuntu_Regular',
         marginBottom: 2,
     },
-    seatInfo: {
-        alignItems: 'flex-end',
-    },
-    seatInfoItem: {
-        alignItems: 'flex-end',
-    },
-    seatLabel: {
-        fontSize: 12,
-        fontFamily: 'Ubuntu_Regular',
-        marginBottom: 4,
-    },
-    seatNumber: {
-        fontSize: 18,
-        fontFamily: 'Ubuntu_Bold',
-    },
 });
-
-
-
-
-

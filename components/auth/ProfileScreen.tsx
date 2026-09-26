@@ -7,14 +7,17 @@ import { showAlert, showConfirm } from '@/utils/alert';
 import { useAuth } from '@/contexts/AuthContext';
 import { AppButton } from '@/components/ui/AppButton';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getAuthToken, getUserId } from '@/utils/storage';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ProfileInfoSkeleton } from '@/components/skeletons';
 import {
-    ActivityIndicator,
     Animated,
     Dimensions,
+    NativeScrollEvent,
+    NativeSyntheticEvent,
     Platform,
     RefreshControl,
     ScrollView,
@@ -53,6 +56,8 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
     const [locationList, setLocationList] = useState<any[]>([]);
     const [locationsRefreshing, setLocationsRefreshing] = useState(false);
     const [selectedBusRequest, setSelectedBusRequest] = useState<any | null>(null);
+    const [filtersCollapsed, setFiltersCollapsed] = useState(false);
+    const ticketsScrollYRef = useRef(0);
 
     const scrollViewRef = useRef<ScrollView>(null);
     const screenWidth = Dimensions.get('window').width;
@@ -107,12 +112,11 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
      * Charge la liste des demandes de location de bus (onglet Locations bus)
      */
     const fetchLocationList = useCallback(async () => {
-        const token = await AsyncStorage.getItem('token');
-        const userId = await AsyncStorage.getItem('user_id');
+        const token = await getAuthToken();
+        const userId = await getUserId();
         if (!token || !userId) return;
         const queryParams = `customerId=${userId}&pageSize=50`;
         const res = await getLocationList(token, queryParams);
-        console.log("getLocationList response ==>, ", res.data.items);
         if (res?.data?.items) setLocationList(res.data.items);
     }, []);
 
@@ -186,7 +190,34 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
     );
 
     /**
-     * Rendu de l'onglet des tickets/réservations
+     * Réduit les filtres au scroll bas ; rouvre uniquement via le bouton compact
+     * (évite les allers-retours chaotiques en haut de liste)
+     */
+    const handleTicketsScroll = useCallback(
+        (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+            const y = event.nativeEvent.contentOffset.y;
+            const prevY = ticketsScrollYRef.current;
+            ticketsScrollYRef.current = y;
+
+            if (!filtersCollapsed && y > 28 && y > prevY + 4) {
+                setFiltersCollapsed(true);
+            }
+        },
+        [filtersCollapsed],
+    );
+
+    const expandBookingFilters = useCallback(() => {
+        setFiltersCollapsed(false);
+    }, []);
+
+    const collapseBookingFilters = useCallback(() => {
+        setFiltersCollapsed(true);
+    }, []);
+
+    /**
+     * Rendu onglet réservations :
+     * - filtres fixes en haut (animés)
+     * - liste scrollable en dessous
      */
     const renderTicketsTab = () => (
         <View style={[styles.ticketsContainer, { backgroundColor: colors.scrollBackground }]}>
@@ -195,37 +226,49 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                 selectedStatus={selectedStatus}
                 onSearchChange={setSearchQuery}
                 onStatusPress={() => setShowStatusModal(true)}
+                collapsed={filtersCollapsed}
+                onExpand={expandBookingFilters}
+                onCollapse={collapseBookingFilters}
             />
 
-            {filteredBookings.length === 0 ? (
-                <View style={styles.emptyStateContainer}>
-                    <View style={[styles.emptyIconBlock, { borderColor: colors.border }]}>
-                        <MaterialCommunityIcons name="ticket-confirmation" size={28} color={colors.activeTabColor} />
+            <ScrollView
+                style={styles.scrollView}
+                contentContainerStyle={[styles.bookingsList, { paddingBottom: 100, flexGrow: 1 }]}
+                showsVerticalScrollIndicator={false}
+                scrollEventThrottle={16}
+                onScroll={handleTicketsScroll}
+                keyboardShouldPersistTaps="handled"
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={handleRefresh}
+                        tintColor={colors.activeTabColor}
+                        colors={[colors.activeTabColor]}
+                    />
+                }
+            >
+                {filteredBookings.length === 0 ? (
+                    <View style={styles.emptyStateContainer}>
+                        <View style={[styles.emptyIconBlock, { borderColor: colors.border }]}>
+                            <MaterialCommunityIcons
+                                name="ticket-confirmation"
+                                size={28}
+                                color={colors.activeTabColor}
+                            />
+                        </View>
+                        <Text style={[styles.emptyStateText, { color: colors.text }]}>
+                            Aucune réservation
+                        </Text>
+                        <Text style={[styles.emptyStateSubtext, { color: colors.secondaryText }]}>
+                            Vos billets de voyage apparaîtront ici
+                        </Text>
                     </View>
-                    <Text style={[styles.emptyStateText, { color: colors.text }]}>Aucune réservation</Text>
-                    <Text style={[styles.emptyStateSubtext, { color: colors.secondaryText }]}>
-                        Vos billets de voyage apparaîtront ici
-                    </Text>
-                </View>
-            ) : (
-                <ScrollView
-                    style={styles.scrollView}
-                    contentContainerStyle={[styles.ticketsScrollContent, { paddingBottom: 100 }]}
-                    showsVerticalScrollIndicator={false}
-                    refreshControl={
-                        <RefreshControl
-                            refreshing={refreshing}
-                            onRefresh={handleRefresh}
-                            tintColor={colors.activeTabColor}
-                            colors={[colors.activeTabColor]}
-                        />
-                    }
-                >
-                    {filteredBookings.map((booking: Booking) => (
+                ) : (
+                    filteredBookings.map((booking: Booking) => (
                         <BookingCard key={booking.id} booking={booking} />
-                    ))}
-                </ScrollView>
-            )}
+                    ))
+                )}
+            </ScrollView>
 
             <StatusModal
                 visible={showStatusModal}
@@ -299,19 +342,14 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
     );
 
     /**
-     * Rendu de l'indicateur de chargement
-     */
-    const renderLoading = useCallback(() => (
-        <View style={[styles.loadingContainer, { backgroundColor: colors.scrollBackground }]}>
-            <ActivityIndicator size="large" color={colors.activeTabColor} />
-        </View>
-    ), [colors.scrollBackground, colors.activeTabColor]);
-
-    /**
      * Gère le changement d'onglet
      */
     const handleTabPress = useCallback((tab: 'info' | 'tickets' | 'locations') => {
         setActiveTab(tab);
+        if (tab === 'tickets') {
+            setFiltersCollapsed(false);
+            ticketsScrollYRef.current = 0;
+        }
         const index = tab === 'info' ? 0 : tab === 'tickets' ? 1 : 2;
         const scrollPosition = index * screenWidth;
 
@@ -342,6 +380,10 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
         if (newTab !== activeTab) {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             setActiveTab(newTab);
+            if (newTab === 'tickets') {
+                setFiltersCollapsed(false);
+                ticketsScrollYRef.current = 0;
+            }
         }
 
         if (Math.abs(offsetX - (index * screenWidth)) > 1) {
@@ -355,7 +397,7 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
             <TabNavigation activeTab={activeTab} onTabPress={handleTabPress} />
 
             {isLoading ? (
-                renderLoading()
+                <ProfileInfoSkeleton />
             ) : (
                 <ScrollView
                     ref={scrollViewRef}
@@ -442,9 +484,9 @@ const styles = StyleSheet.create({
     ticketsContainer: {
         flex: 1,
     },
-    ticketsScrollContent: {
+    bookingsList: {
         paddingHorizontal: 16,
-        paddingTop: 8,
+        paddingTop: 4,
     },
     locationsBusContainer: {
         flex: 1,
@@ -453,11 +495,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingTop: 12,
         paddingBottom: 8,
-    },
-    loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
     },
     tabScrollView: {
         flex: 1,

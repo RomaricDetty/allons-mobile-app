@@ -2,6 +2,7 @@
 import { getNextTrip, getPopularTrips } from '@/api/trip';
 import { BottomSheet } from '@/components/bottom-sheet';
 import { ItineraryCard } from '@/components/itinerary-card';
+import { HomeSkeleton } from '@/components/skeletons';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatBookingDate, formatFullDate } from '@/constants/functions';
 import { useAppColors } from '@/hooks/use-app-colors';
@@ -265,12 +266,11 @@ const NextTripCard = memo(
 NextTripCard.displayName = 'NextTripCard';
 
 /**
- * État de chargement initial
+ * État de chargement initial — skeleton révélateur
  */
 const LoadingView = memo(({ backgroundColor }: { backgroundColor: string }) => (
     <View style={[styles.loadingContainer, { backgroundColor }]}>
-        <ActivityIndicator size="large" color={PRIMARY_COLOR} />
-        <Text style={styles.loadingText}>Chargement...</Text>
+        <HomeSkeleton />
     </View>
 ));
 
@@ -345,7 +345,32 @@ export default function HomeScreen() {
             const response = await getPopularTrips();
             const raw = response.data;
             const list = Array.isArray(raw) ? raw : (raw?.data ?? []);
-            setPopularTrips(list);
+            // Un seul trajet par couple origine → destination
+            const seen = new Set<string>();
+            const deduped = [];
+            for (const item of list) {
+                const from =
+                    item?.fromCity ||
+                    item?.departureCity ||
+                    item?.originCity ||
+                    item?.stationFrom?.city ||
+                    '';
+                const to =
+                    item?.toCity ||
+                    item?.arrivalCity ||
+                    item?.destinationCity ||
+                    item?.stationTo?.city ||
+                    '';
+                const key = `${String(from).trim().toLowerCase()}|${String(to).trim().toLowerCase()}`;
+                if (!from && !to) {
+                    deduped.push(item);
+                    continue;
+                }
+                if (seen.has(key)) continue;
+                seen.add(key);
+                deduped.push(item);
+            }
+            setPopularTrips(deduped);
         } catch (error) {
             console.error('Erreur récupération trajets populaires:', error);
             setPopularTrips([]);
@@ -618,14 +643,6 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
     loadingContainer: {
         flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        gap: 12,
-    },
-    loadingText: {
-        fontSize: 14,
-        fontFamily: 'Ubuntu_Regular',
-        color: '#666',
     },
     scrollView: {
         flex: 1,

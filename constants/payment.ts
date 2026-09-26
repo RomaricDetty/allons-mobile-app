@@ -2,7 +2,7 @@
 export const PAYMENT_SUCCESS_URL = 'https://customer.allon-apps.com/payment/success';
 export const PAYMENT_ERROR_URL = 'https://customer.allon-apps.com/payment/error';
 
-/** Préfixe utilisé par openAuthSessionAsync pour détecter le retour PSP. */
+/** Préfixe HTTPS des URLs de retour (Universal Links / App Links). */
 export const PAYMENT_RETURN_URL_PREFIX = 'https://customer.allon-apps.com/payment';
 
 /** Schemes custom supportés (doc API + scheme Expo existant). */

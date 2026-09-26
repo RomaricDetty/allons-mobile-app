@@ -1,23 +1,10 @@
 import { getBookingQrCode } from '@/api/booking';
 import { formatFullDate, formatStatus } from '@/constants/functions';
+import { formatPaymentMethodDisplay } from '@/constants/paymentMethods';
 import { getAuthToken } from '@/utils/storage';
 // Génération QR en SVG (sans canvas) pour affichage fiable dans le PDF
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const QRCode = require('qrcode') as { toString: (text: string, opts: { type: 'svg'; width?: number; margin?: number; color?: { dark: string; light: string } }) => Promise<string> };
-
-/**
- * Formate la méthode de paiement
- */
-const formatPaymentMethod = (method: string): string => {
-    const methodMap: { [key: string]: string } = {
-        'MOBILE_MONEY': 'Mobile Money',
-        'CREDIT_CARD': 'Carte bancaire',
-        'WAVE': 'Wave',
-        'MTN_MONEY': 'MTN Mobile Money',
-        'ORANGE_MONEY': 'Orange Money',
-    };
-    return methodMap[method] || method;
-};
 
 /**
  * Interface pour les données de réservation formatées
@@ -550,7 +537,11 @@ export const generateReceiptHTML = (bookingData: BookingData, qrCodeSvg?: string
                         </div>
                         <div class="detail-row">
                             <span class="detail-label">Méthode de paiement:</span>
-                            <span class="detail-value">${formatPaymentMethod(bookingData.provider)}</span>
+                            <span class="detail-value">${formatPaymentMethodDisplay(
+                                bookingData.provider ||
+                                (bookingData as any).paymentProvider ||
+                                (bookingData as any).method
+                            )}</span>
                         </div>
                     </div>
                 </div>

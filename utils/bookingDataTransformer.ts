@@ -97,6 +97,39 @@ const processPassengers = (bookingPassengers: Array<any> | undefined, fallbackPa
 };
 
 /**
+ * Résout le wallet / moyen de paiement depuis payment + booking (champs hétérogènes API).
+ */
+export const resolvePaymentProvider = (payment: any, booking: any): string => {
+    const nestedPayment = booking?.payment && typeof booking.payment === 'object'
+        ? booking.payment
+        : null;
+
+    const candidates = [
+        payment?.provider,
+        payment?.paymentProvider,
+        payment?.wallet,
+        payment?.gatewayProvider,
+        nestedPayment?.provider,
+        nestedPayment?.paymentProvider,
+        nestedPayment?.wallet,
+        booking?.paymentProvider,
+        booking?.provider,
+        booking?.paymentMethod,
+        // method type alone (MOBILE_MONEY) is a weak fallback — keep last
+        payment?.method,
+        nestedPayment?.method,
+        booking?.method,
+    ];
+
+    for (const raw of candidates) {
+        const value = String(raw ?? '').trim();
+        if (!value || /^n\/?a$/i.test(value)) continue;
+        return value;
+    }
+    return '';
+};
+
+/**
  * Formate les données de réservation pour l'affichage
  */
 export const transformBookingData = (rawData: RawBookingData) => {
@@ -106,13 +139,16 @@ export const transformBookingData = (rawData: RawBookingData) => {
         return null;
     }
 
-    console.log("bookingResponse.data.newBooking ==>, ", bookingResponse.data.newBooking)
-
-    const booking = bookingResponse.data ;
-    console.log("booking vaut maintenant ==>, ", booking)
+    const booking = bookingResponse.data?.newBooking
+        ? bookingResponse.data.newBooking
+        : bookingResponse.data;
     const payment = paymentResponse.data;
-    const bookingId = bookingResponse.data?.newBooking ? bookingResponse.data?.newBooking?.id : booking.bookingId || booking.id;
-    const bookingCode = bookingResponse.data?.newBooking ? bookingResponse.data?.newBooking?.code : booking.code || booking.bookingCode ;
+    const bookingId = bookingResponse.data?.newBooking
+        ? bookingResponse.data?.newBooking?.id
+        : booking.bookingId || booking.id;
+    const bookingCode = bookingResponse.data?.newBooking
+        ? bookingResponse.data?.newBooking?.code
+        : booking.code || booking.bookingCode;
     const creditRemaining = bookingResponse.data?.creditRemaining || 0;
     const remainingTokenCode = bookingResponse.data?.remainingTokenCode || '';
     
@@ -144,6 +180,8 @@ export const transformBookingData = (rawData: RawBookingData) => {
     const returnPricePerPerson = isRoundTrip ? (returnDepartureInfo?.price || returnTrip?.price || 0) : 0;
     const outboundTotalPrice = outboundPricePerPerson * numberOfPassengers;
     const returnTotalPrice = isRoundTrip ? returnPricePerPerson * numberOfPassengers : 0;
+
+    const resolvedProvider = resolvePaymentProvider(payment, booking);
     
     return {
         id: bookingId,
@@ -151,9 +189,9 @@ export const transformBookingData = (rawData: RawBookingData) => {
         status: payment.status || booking.status || 'PAID',
         totalAmount: payment.amount || booking.totalAmount || '0',
         currency: payment.currency || booking.currency || trip?.currency || 'XOF',
-        method: payment.method || 'MOBILE_MONEY',
-        provider: payment.provider || payment.paymentProvider || '',
-        paymentProvider: payment.provider || payment.paymentProvider || '',
+        method: payment.method || booking.method || 'MOBILE_MONEY',
+        provider: resolvedProvider,
+        paymentProvider: resolvedProvider,
         createdAt: booking.createdAt || new Date().toISOString(),
         // Informations du voyage aller
         departureDateTime: departureInfo?.departureDateTime || trip?.departureDateTime || '',

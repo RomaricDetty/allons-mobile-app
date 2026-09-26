@@ -6,8 +6,12 @@ import {
     verifyResetCodeApi,
 } from '@/api/auth_register';
 import { AuthFormField } from '@/components/auth/AuthFormField';
+import { PasswordField } from '@/components/auth/PasswordField';
+import { AppButton } from '@/components/ui/AppButton';
+import { formFieldBaseStyles, getFormFieldColors } from '@/constants/formField';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
+import { showAlert } from '@/utils/alert';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
@@ -24,8 +28,6 @@ import {
     TextInput,
     View,
 } from 'react-native';
-import { showAlert } from '@/utils/alert';
-import { AppButton } from '@/components/ui/AppButton';
 
 /**
  * Composant Stepper pour afficher la progression
@@ -94,11 +96,12 @@ const Stepper = ({ currentStep, totalSteps }: { currentStep: number; totalSteps:
 export default function ForgotPasswordScreen() {
     const colorScheme = useColorScheme() ?? 'light';
     const textColor = useThemeColor({}, 'text');
+    const fieldColors = getFormFieldColors(colorScheme);
     const secondaryTextColor = colorScheme === 'dark' ? '#9BA1A6' : '#666666';
     const cardBackgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
     const cardBorderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
     const scrollBackgroundColor = colorScheme === 'dark' ? '#000000' : '#F3F3F7';
-    const inputBackgroundColor = colorScheme === 'dark' ? '#2C2C2E' : '#F5F5F5';
+    const inputBackgroundColor = fieldColors.background;
 
     // États pour la navigation entre les étapes
     const [currentStep, setCurrentStep] = useState(1);
@@ -117,8 +120,6 @@ export default function ForgotPasswordScreen() {
     // Étape 4 : Nouveau mot de passe
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
-    const [showPassword, setShowPassword] = useState(false);
-    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [resetToken, setResetToken] = useState('');
     const [verificationToken, setVerificationToken] = useState('');
 
@@ -767,7 +768,7 @@ export default function ForgotPasswordScreen() {
                     <Text style={[styles.formLabel, { color: textColor }]}>Code de vérification</Text>
                     <TextInput
                         style={[
-                            styles.codeInput,
+                            formFieldBaseStyles.otp,
                             {
                                 backgroundColor: inputBackgroundColor,
                                 color: textColor,
@@ -780,7 +781,7 @@ export default function ForgotPasswordScreen() {
                             setVerificationCode(numericText);
                         }}
                         placeholder="123456"
-                        placeholderTextColor={secondaryTextColor}
+                        placeholderTextColor={fieldColors.placeholder}
                         keyboardType="number-pad"
                         maxLength={6}
                     />
@@ -829,61 +830,20 @@ export default function ForgotPasswordScreen() {
 
             <View style={[styles.sectionCard, { backgroundColor: cardBackgroundColor, borderColor: cardBorderColor }]}>
                 <View style={styles.form}>
-                    <Text style={[styles.formLabel, { color: textColor }]}>Nouveau mot de passe</Text>
-                    <View style={styles.passwordInputContainer}>
-                        <TextInput
-                            style={[
-                                styles.passwordInput,
-                                {
-                                    backgroundColor: inputBackgroundColor,
-                                    color: textColor,
-                                },
-                            ]}
-                            value={newPassword}
-                            onChangeText={setNewPassword}
-                            placeholder=""
-                            placeholderTextColor={secondaryTextColor}
-                            secureTextEntry={!showPassword}
-                        />
-                        <Pressable
-                            style={styles.eyeIcon}
-                            onPress={() => setShowPassword(!showPassword)}
-                        >
-                            <Ionicons
-                                name={showPassword ? 'eye-off' : 'eye'}
-                                size={20}
-                                color={secondaryTextColor}
-                            />
-                        </Pressable>
-                    </View>
-
-                    <Text style={[styles.formLabel, { color: textColor, marginTop: 16 }]}>Confirmer le mot de passe</Text>
-                    <View style={styles.passwordInputContainer}>
-                        <TextInput
-                            style={[
-                                styles.passwordInput,
-                                {
-                                    backgroundColor: inputBackgroundColor,
-                                    color: textColor,
-                                },
-                            ]}
-                            value={confirmPassword}
-                            onChangeText={setConfirmPassword}
-                            placeholder=""
-                            placeholderTextColor={secondaryTextColor}
-                            secureTextEntry={!showConfirmPassword}
-                        />
-                        <Pressable
-                            style={styles.eyeIcon}
-                            onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                        >
-                            <Ionicons
-                                name={showConfirmPassword ? 'eye-off' : 'eye'}
-                                size={20}
-                                color={secondaryTextColor}
-                            />
-                        </Pressable>
-                    </View>
+                    <PasswordField
+                        label="Nouveau mot de passe"
+                        value={newPassword}
+                        onChangeText={setNewPassword}
+                        placeholder="Minimum 6 caractères"
+                        required
+                    />
+                    <PasswordField
+                        label="Confirmer le mot de passe"
+                        value={confirmPassword}
+                        onChangeText={setConfirmPassword}
+                        placeholder="Retapez le mot de passe"
+                        required
+                    />
                 </View>
             </View>
 
@@ -1132,31 +1092,6 @@ const styles = StyleSheet.create({
         height: 12,
         borderRadius: 6,
         backgroundColor: '#1776BA',
-    },
-    codeInput: {
-        borderRadius: 16,
-        paddingHorizontal: 16,
-        paddingVertical: 14,
-        fontSize: 18,
-        fontFamily: 'Ubuntu_Bold',
-        textAlign: 'center',
-        letterSpacing: 8,
-    },
-    passwordInputContainer: {
-        position: 'relative',
-    },
-    passwordInput: {
-        borderRadius: 16,
-        paddingHorizontal: 16,
-        paddingVertical: 14,
-        paddingRight: 48,
-        fontSize: 16,
-        fontFamily: 'Ubuntu_Regular',
-    },
-    eyeIcon: {
-        position: 'absolute',
-        right: 16,
-        top: 14,
     },
     footer: {
         flexDirection: 'row',

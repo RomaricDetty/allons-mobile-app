@@ -1,4 +1,5 @@
 import { formatFullDate, formatStatus } from '@/constants/functions';
+import { formatPaymentMethodDisplay } from '@/constants/paymentMethods';
 
 interface BusRentalReceiptData {
     id?: string;
@@ -278,7 +279,7 @@ export const generateBusRentalReceiptHTML = (item: BusRentalReceiptData): string
                         <div class="section-title">Paiement</div>
                         ${renderRow('Compagnie', companyName)}
                         ${renderRow('Référence paiement', item.paymentReference ?? '—')}
-                        ${renderRow('Méthode', item.method ?? item.provider ?? item.paymentProvider ?? '—')}
+                        ${renderRow('Méthode', formatPaymentMethodDisplay(item.provider ?? item.paymentProvider ?? item.method))}
                         <div class="total-box">
                             <div class="total-row">
                                 <span class="total-label">TOTAL PAYÉ:</span>

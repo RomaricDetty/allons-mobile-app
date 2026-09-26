@@ -54,7 +54,7 @@ export interface FeesAndTaxesRequestPayload {
     companyId: string;
     channel: 'MOBILE_APP';
     paymentMethod?: 'MOBILE_MONEY' | 'ALLON_COIN' | 'CREDIT_CARD';
-    provider?: 'WAVE' | 'ORANGE_MONEY' | 'MTN_MONEY' | null;
+    provider?: 'WAVE' | 'ORANGE_MONEY' | 'MTN_MONEY' | 'MOOV_MONEY' | null;
     paymentChannel?: 'MOBILE_APP';
     passengers: FeesAndTaxesPassengerPayload[];
     outboundDepartureId: string;
@@ -198,14 +198,13 @@ export const getBookingByReference = async (referenceCode: string): Promise<Axio
  * @returns AxiosResponse<any>
  */
 export const getBookingQrCode = async (bookingId: string, token: string): Promise<AxiosResponse<any>> => {
-    
-    // console.log('bookingId: ', bookingId);
-    // console.log('token: ', token);
-    // console.log('baseUrl: ', `${baseUrl}/bookings/${bookingId}/qrcode`);
-    
+    if (!token?.trim()) {
+        throw new Error("Token d'authentification manquant pour le QR code");
+    }
+
     return await axios.get(`${baseUrl}/customers/${bookingId}/qrcode`, {
-        // headers: {
-        //     Authorization: `Bearer ${token}`,
-        // },
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
     });
 }

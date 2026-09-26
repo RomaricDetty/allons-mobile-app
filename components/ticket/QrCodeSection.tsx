@@ -1,6 +1,7 @@
 import { AppButton } from '@/components/ui/AppButton';
+import { QrSkeleton } from '@/components/skeletons';
 import React from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
@@ -15,6 +16,8 @@ interface QrCodeSectionProps {
     borderColor: string;
     onRetry: () => void;
     onViewQRCode: () => void;
+    /** Billet échoué / annulé : bouton agrandir inactif */
+    actionsDisabled?: boolean;
 }
 
 /**
@@ -31,7 +34,10 @@ export const QrCodeSection: React.FC<QrCodeSectionProps> = ({
     borderColor,
     onRetry,
     onViewQRCode,
+    actionsDisabled = false,
 }) => {
+    const enlargeIconColor = actionsDisabled ? secondaryTextColor : primaryBlue;
+
     return (
         <View style={styles.wrapper}>
             <View
@@ -40,11 +46,12 @@ export const QrCodeSection: React.FC<QrCodeSectionProps> = ({
                     {
                         backgroundColor: frameBackground,
                         borderColor,
+                        opacity: actionsDisabled ? 0.55 : 1,
                     },
                 ]}
             >
                 {isLoadingQrCode ? (
-                    <ActivityIndicator size="large" color={primaryBlue} />
+                    <QrSkeleton size={140} />
                 ) : error || !qrCode || qrCode.trim() === '' ? (
                     <View style={styles.errorBox}>
                         <View style={styles.iconBlock}>
@@ -53,19 +60,21 @@ export const QrCodeSection: React.FC<QrCodeSectionProps> = ({
                         <Text style={[styles.errorText, { color: secondaryTextColor }]}>
                             Impossible de charger le QR Code
                         </Text>
-                        <AppButton
-                            title="Réessayer"
-                            onPress={onRetry}
-                            variant="secondary"
-                            fullWidth={false}
-                            style={styles.retryButton}
-                        />
+                        {!actionsDisabled ? (
+                            <AppButton
+                                title="Réessayer"
+                                onPress={onRetry}
+                                variant="secondary"
+                                fullWidth={false}
+                                style={styles.retryButton}
+                            />
+                        ) : null}
                     </View>
                 ) : (
                     <QRCode
                         value={qrCode}
                         size={168}
-                        color={primaryBlue}
+                        color={actionsDisabled ? secondaryTextColor : primaryBlue}
                         backgroundColor="transparent"
                     />
                 )}
@@ -74,13 +83,16 @@ export const QrCodeSection: React.FC<QrCodeSectionProps> = ({
             {qrCode && !error && !isLoadingQrCode ? (
                 <>
                     <Text style={[styles.hint, { color: secondaryTextColor }]}>
-                        Présentez ce code à l’embarquement
+                        {actionsDisabled
+                            ? 'QR code indisponible pour ce statut'
+                            : 'Présentez ce code à l’embarquement'}
                     </Text>
                     <AppButton
                         title="Agrandir le QR code"
                         onPress={onViewQRCode}
                         variant="secondary"
-                        icon={<Icon name="fullscreen" size={20} color={primaryBlue} />}
+                        disabled={actionsDisabled}
+                        icon={<Icon name="fullscreen" size={20} color={enlargeIconColor} />}
                     />
                 </>
             ) : null}

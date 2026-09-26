@@ -1,14 +1,15 @@
 // @ts-nocheck
 import { getLuggageList } from '@/api/luggage';
+import { CardListSkeleton } from '@/components/skeletons';
+import { BackButton } from '@/components/ui/BackButton';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { getLuggageTypeLabel } from '@/utils/luggage';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getAuthToken } from '@/utils/storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
     Modal,
     Pressable,
     RefreshControl,
@@ -21,7 +22,6 @@ import QRCode from 'react-native-qrcode-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { showAlert } from '@/utils/alert';
-import { BackButton } from '@/components/ui/BackButton';
 
 /**
  * Mapping des couleurs pour les statuts de bagage
@@ -335,7 +335,7 @@ const LuggageListScreen = () => {
             } else {
                 setIsLoading(true);
             }
-            const token = await AsyncStorage.getItem('token');
+            const token = await getAuthToken();
             if (!token) {
                 throw new Error('Token non disponible');
             }
@@ -444,12 +444,7 @@ const LuggageListScreen = () => {
             </View>
 
             {isLoading ? (
-                <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={themeColors.primaryBlue} />
-                    <Text style={[styles.loadingText, { color: themeColors.secondaryTextColor }]}>
-                        Chargement des bagages...
-                    </Text>
-                </View>
+                <CardListSkeleton count={4} />
             ) : (
                 <ScrollView
                     style={styles.scrollView}

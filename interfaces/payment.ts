@@ -5,7 +5,7 @@ export type PaymentChannel = 'MOBILE_APP';
 export type AppPaymentMethod = 'MOBILE_MONEY' | 'ALLON_COIN';
 
 /** Wallets Mobile Money (provider Allon). */
-export type MobileMoneyProvider = 'WAVE' | 'ORANGE_MONEY' | 'MTN_MONEY';
+export type MobileMoneyProvider = 'WAVE' | 'ORANGE_MONEY' | 'MTN_MONEY' | 'MOOV_MONEY';
 
 export type BookingPaymentStatus =
     | 'PENDING'
@@ -80,7 +80,7 @@ export interface PendingPaymentSession {
     };
     createdAt: string;
     /** Phase locale pour reprise après kill / appel / reload. */
-    phase?: 'checkout' | 'verifying' | 'dismissed';
+    phase?: 'checkout' | 'verifying' | 'dismissed' | 'succeeded';
     /** L’utilisateur a quitté volontairement l’écran de vérification. */
     dismissedAt?: string | null;
     updatedAt?: string;

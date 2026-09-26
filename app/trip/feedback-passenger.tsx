@@ -1,7 +1,14 @@
 // @ts-nocheck
 import { createFeedback, FeedbackTag } from '@/api/feedback';
+import { AppButton } from '@/components/ui/AppButton';
+import { BackButton } from '@/components/ui/BackButton';
+import {
+    formFieldBaseStyles,
+} from '@/constants/formField';
 import { useAppColors } from '@/hooks/use-app-colors';
+import { showAlert } from '@/utils/alert';
 import { getAuthToken } from '@/utils/storage';
+import * as StoreReview from 'expo-store-review';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useRef, useState } from 'react';
 import {
@@ -16,9 +23,6 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { showAlert } from '@/utils/alert';
-import { AppButton } from '@/components/ui/AppButton';
-import { BackButton } from '@/components/ui/BackButton';
 
 /** Étiquettes rapides : libellé affiché + valeur API */
 const QUICK_TAGS: { label: string; tag: FeedbackTag }[] = [
@@ -99,6 +103,16 @@ export default function FeedbackPassengerScreen() {
                 },
                 token
             );
+            if (rating >= 4) {
+                try {
+                    const available = await StoreReview.isAvailableAsync();
+                    if (available) {
+                        await StoreReview.requestReview();
+                    }
+                } catch {
+                    // Ne bloque pas le flow feedback
+                }
+            }
             showAlert('Merci !', 'Votre avis a bien été enregistré.', [
                 { text: 'OK', onPress: () => router.back() },
             ]);
@@ -228,13 +242,13 @@ export default function FeedbackPassengerScreen() {
                                 });
                             }}
                             placeholder="Partagez votre expérience avec nous..."
-                            placeholderTextColor={colors.secondaryText}
+                            placeholderTextColor={colors.placeholder}
                             style={[
-                                styles.textArea,
+                                formFieldBaseStyles.inputMultiline,
                                 {
-                                    borderColor: colors.border,
                                     color: colors.text,
-                                    backgroundColor: colors.background,
+                                    backgroundColor: colors.inputBackground,
+                                    maxHeight: 140,
                                 },
                             ]}
                             multiline
@@ -340,16 +354,6 @@ const styles = StyleSheet.create({
     tagText: {
         fontSize: 13,
         fontFamily: 'Ubuntu_Regular',
-    },
-    textArea: {
-        borderWidth: 1,
-        borderRadius: 10,
-        paddingHorizontal: 14,
-        paddingVertical: 12,
-        fontSize: 14,
-        fontFamily: 'Ubuntu_Regular',
-        minHeight: 100,
-        maxHeight: 140,
     },
     charCount: {
         fontSize: 12,

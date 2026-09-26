@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { getBookingDetails } from '@/api/booking';
+import { TicketDetailsSkeleton } from '@/components/skeletons';
 import { DetailRow } from '@/components/ticket/DetailRow';
 import { PassengerCard } from '@/components/ticket/PassengerCard';
 import { QrCodeSection } from '@/components/ticket/QrCodeSection';
@@ -10,10 +11,11 @@ import {
     formatStatus,
     getStatusColor,
 } from '@/constants/functions';
-import { formatPaymentMethod } from '@/constants/paymentMethods';
+import { formatPaymentMethodDisplay } from '@/constants/paymentMethods';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { useTicketQrCode } from '@/hooks/useTicketQrCode';
+import { resolvePaymentProvider } from '@/utils/bookingDataTransformer';
 import { getAuthToken } from '@/utils/storage';
 import { formatDateForFileName, generateTicketHTML } from '@/utils/ticketPdfGenerator';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -23,7 +25,6 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
     Platform,
     Pressable,
     ScrollView,
@@ -37,6 +38,7 @@ import { captureRef } from 'react-native-view-shot';
 import { showAlert } from '@/utils/alert';
 import { AppButton } from '@/components/ui/AppButton';
 import { BackButton } from '@/components/ui/BackButton';
+import { SectionCardHeader } from '@/components/ui/SectionCardHeader';
 
 /**
  * Retourne la première ville non vide parmi les candidats.
@@ -188,9 +190,6 @@ const TicketDetails = () => {
     const ticket = ticketFetched !== undefined ? ticketFetched : ticketFromParams;
     const refreshed = route.params?.refreshed;
 
-    // Hook personnalisé pour le QR code
-    const { qrCode, isLoadingQrCode, error: qrCodeError, retry: retryQrCode } = useTicketQrCode(ticket?.id);
-
     // Référence pour capturer la section QR code
     const ticketViewRef = useRef<View>(null);
 
@@ -220,53 +219,53 @@ const TicketDetails = () => {
             statusColor: getStatusColor(ticket.status),
             routeText: buildRouteText(ticket, fallbackDepartureCity, fallbackArrivalCity),
             passengerCountText: ticket.passengers.length > 1 ? 'Passagers' : 'Passager',
-            formattedPaymentMethod: formatPaymentMethod(ticket.paymentProvider),
+            formattedPaymentMethod: formatPaymentMethodDisplay(
+                resolvePaymentProvider(
+                    (ticket as any)?.payment,
+                    ticket
+                ) || ticket.paymentProvider || (ticket as any)?.provider || (ticket as any)?.method
+            ),
         };
     }, [ticket, fallbackDepartureCity, fallbackArrivalCity]);
 
-    /**
-     * Vérifie si l'annulation est possible
-     * Retourne true si :
-     * - La date de départ n'est pas passée et qu'on est à plus de 24h avant
-     * - La réservation n'est pas déjà annulée
-     * - Tous les passagers ne sont pas annulés (au moins un passager actif)
-     */
-    const canCancelReservation = useMemo(() => {
-        if (!ticket) return false;
-
-        // Vérifier si la réservation elle-même est annulée
-        if (ticket.status && (ticket.status.toUpperCase() === 'CANCELLED' || ticket.status.toUpperCase() === 'CANCELED')) {
-            return false;
-        }
-
-        // Vérifier si tous les passagers sont annulés
-        const allPassengersCancelled = ticket.passengers.every(passenger =>
-            passenger.status &&
-            (passenger.status.toUpperCase() === 'CANCELLED' || passenger.status.toUpperCase() === 'CANCELED')
-        );
-
-        if (allPassengersCancelled) {
-            return false;
-        }
-
-        // Convertir la date de départ en objet Date
-        const departureDate = new Date(ticket.departureDateTime);
-        const now = new Date();
-
-        // Vérifier si la date de départ est passée
-        if (departureDate < now) {
-            return false;
-        }
-
-        // Calculer la différence en heures
-        const hoursUntilDeparture = (departureDate.getTime() - now.getTime()) / (1000 * 60 * 60);
-
-        // L'annulation est possible si on est à plus de 24h avant le départ
-        return hoursUntilDeparture >= 24;
-    }, [ticket]);
-
     const canGiveFeedback = useMemo(() => ticket?.status?.toUpperCase() === 'USED', [ticket]);
 
+    /** Billet non exploitable : pas d’agrandissement QR, reçu, ni bagages */
+    const actionsLocked = useMemo(() => {
+        const status = ticket?.status?.toUpperCase();
+        return (
+            status === 'FAILED' ||
+            status === 'CANCELLED' ||
+            status === 'CANCELED' ||
+            status === 'PENDING' ||
+            status === 'PROCESSING' ||
+            status === 'EXPIRED'
+        );
+    }, [ticket?.status]);
+
+    const canResumePayment = useMemo(() => {
+        const status = ticket?.status?.toUpperCase();
+        return status === 'PENDING' || status === 'PROCESSING';
+    }, [ticket?.status]);
+
+    const qrAllowed = useMemo(() => {
+        const status = ticket?.status?.toUpperCase();
+        return !(
+            status === 'FAILED' ||
+            status === 'CANCELLED' ||
+            status === 'CANCELED' ||
+            status === 'PENDING' ||
+            status === 'PROCESSING' ||
+            status === 'EXPIRED'
+        );
+    }, [ticket?.status]);
+
+    const { qrCode, isLoadingQrCode, error: qrCodeError, retry: retryQrCode } = useTicketQrCode(
+        ticket?.id,
+        { enabled: qrAllowed }
+    );
+
+    const actionIconColor = actionsLocked ? themeColors.secondaryTextColor : themeColors.primaryBlue;
     /**
      * Formate le prix avec la devise
      */
@@ -280,15 +279,14 @@ const TicketDetails = () => {
      * Navigue vers l'écran QR code
      */
     const handleViewQRCode = () => {
-        if (!ticket) return;
+        if (!ticket || actionsLocked) return;
         navigation.navigate('trip/ticket-qr' as never, { ticketCode: ticket.code, ticketId: ticket.id } as never);
     };
 
     if (loadingTicket) {
         return (
-            <View style={[styles.container, { backgroundColor: themeColors.scrollBackgroundColor, justifyContent: 'center', alignItems: 'center' }]}>
-                <ActivityIndicator size="large" color={themeColors.primaryBlue} />
-                <Text style={[styles.loadingTicketText, { color: textColor }]}>Chargement des détails...</Text>
+            <View style={[styles.container, { backgroundColor: themeColors.scrollBackgroundColor }]}>
+                <TicketDetailsSkeleton />
             </View>
         );
     }
@@ -316,7 +314,7 @@ const TicketDetails = () => {
      * Télécharge le ticket en PDF
      */
     const handleDownloadTicket = async () => {
-        if (!ticket) return;
+        if (!ticket || actionsLocked) return;
 
         setIsGeneratingPDF(true);
         try {
@@ -418,16 +416,6 @@ const TicketDetails = () => {
         }
     };
 
-    /**
-     * Navigue vers l'écran d'annulation de réservation
-     */
-    const handleCancelReservation = () => {
-        if (!ticket) return;
-        navigation.navigate('trip/cancel-reservation' as never, {
-            ticketDetails: JSON.stringify(ticket)
-        } as never);
-    };
-
     const handleGiveFeedback = () => {
         if (!ticket) return;
         navigation.navigate('trip/feedback-passenger' as never, { bookingId: ticket.id, departureId: ticket.departureId } as never);
@@ -496,6 +484,44 @@ const TicketDetails = () => {
                         </View>
                     </View>
 
+                    {canResumePayment ? (
+                        <View
+                            style={[
+                                styles.sectionCard,
+                                {
+                                    backgroundColor: themeColors.cardBackgroundColor,
+                                    borderColor: themeColors.borderColor,
+                                },
+                            ]}
+                        >
+                            <Text style={[styles.sectionTitle, { color: textColor, marginBottom: 8 }]}>
+                                Paiement à finaliser
+                            </Text>
+                            <Text
+                                style={{
+                                    color: themeColors.secondaryTextColor,
+                                    fontFamily: 'Ubuntu_Regular',
+                                    fontSize: 14,
+                                    lineHeight: 20,
+                                    marginBottom: 14,
+                                }}
+                            >
+                                Ce billet n’est pas encore confirmé. Finalisez le paiement Mobile Money
+                                pour obtenir votre QR code d’embarquement.
+                            </Text>
+                            <AppButton
+                                title="Finaliser le paiement"
+                                onPress={() => {
+                                    navigation.navigate('payment/success' as never, {
+                                        bookingId: ticket.id,
+                                        recovered: '1',
+                                    } as never);
+                                }}
+                                icon={<Icon name="wallet-outline" size={18} color="#FFFFFF" />}
+                            />
+                        </View>
+                    ) : null}
+
                     <View
                         style={[
                             styles.sectionCard,
@@ -505,18 +531,15 @@ const TicketDetails = () => {
                             },
                         ]}
                     >
-                        <View style={styles.sectionHeader}>
-                            <View style={styles.sectionIconBlock}>
-                                <Icon name="qrcode" size={22} color={themeColors.primaryBlue} />
-                            </View>
-                            <Text style={[styles.sectionTitle, { color: textColor }]}>
-                                Code QR de vérification
-                            </Text>
-                        </View>
+                        <SectionCardHeader
+                            title="Code QR de vérification"
+                            textColor={textColor}
+                            icon={<Icon name="qrcode" size={22} color={themeColors.primaryBlue} />}
+                        />
                         <QrCodeSection
-                            qrCode={qrCode}
-                            isLoadingQrCode={isLoadingQrCode}
-                            error={qrCodeError}
+                            qrCode={qrAllowed ? qrCode : ''}
+                            isLoadingQrCode={qrAllowed && isLoadingQrCode}
+                            error={qrAllowed ? qrCodeError : 'QR indisponible tant que le billet n’est pas confirmé'}
                             primaryBlue={themeColors.primaryBlue}
                             textColor={textColor}
                             secondaryTextColor={themeColors.secondaryTextColor}
@@ -524,6 +547,7 @@ const TicketDetails = () => {
                             borderColor={themeColors.borderColor}
                             onRetry={retryQrCode}
                             onViewQRCode={handleViewQRCode}
+                            actionsDisabled={actionsLocked}
                         />
                     </View>
                 </View>
@@ -537,12 +561,11 @@ const TicketDetails = () => {
                         },
                     ]}
                 >
-                    <View style={styles.sectionHeader}>
-                        <View style={styles.sectionIconBlock}>
-                            <Icon name="map-marker-path" size={22} color={themeColors.primaryBlue} />
-                        </View>
-                        <Text style={[styles.sectionTitle, { color: textColor }]}>Itinéraire</Text>
-                    </View>
+                    <SectionCardHeader
+                        title="Itinéraire"
+                        textColor={textColor}
+                        icon={<Icon name="map-marker-path" size={22} color={themeColors.primaryBlue} />}
+                    />
 
                     <View style={styles.stationsContainer}>
                         <StationRow
@@ -598,14 +621,11 @@ const TicketDetails = () => {
                         },
                     ]}
                 >
-                    <View style={styles.sectionHeader}>
-                        <View style={styles.sectionIconBlock}>
-                            <Icon name="account-group" size={22} color={themeColors.primaryBlue} />
-                        </View>
-                        <Text style={[styles.sectionTitle, { color: textColor }]}>
-                            {ticketDerivedValues.passengerCountText} ({ticket.passengers.length})
-                        </Text>
-                    </View>
+                    <SectionCardHeader
+                        title={`${ticketDerivedValues.passengerCountText} (${ticket.passengers.length})`}
+                        textColor={textColor}
+                        icon={<Icon name="account-group" size={22} color={themeColors.primaryBlue} />}
+                    />
                     {ticket.passengers.map((passenger, index) => (
                         <PassengerCard
                             key={passenger.id || index}
@@ -630,6 +650,7 @@ const TicketDetails = () => {
                             borderColor={themeColors.borderColor}
                             bookingItemId={passenger.id}
                             departureId={ticket.departureId}
+                            baggageDisabled={actionsLocked}
                         />
                     ))}
                 </View>
@@ -643,12 +664,11 @@ const TicketDetails = () => {
                         },
                     ]}
                 >
-                    <View style={styles.sectionHeader}>
-                        <View style={styles.sectionIconBlock}>
-                            <Icon name="wallet" size={22} color={themeColors.primaryBlue} />
-                        </View>
-                        <Text style={[styles.sectionTitle, { color: textColor }]}>Paiement</Text>
-                    </View>
+                    <SectionCardHeader
+                        title="Paiement"
+                        textColor={textColor}
+                        icon={<Icon name="credit-card-outline" size={22} color={themeColors.primaryBlue} />}
+                    />
 
                     <DetailRow
                         label="Prix du ticket"
@@ -658,7 +678,7 @@ const TicketDetails = () => {
                     />
                     <DetailRow
                         label="Méthode"
-                        value={ticketDerivedValues.formattedPaymentMethod.replaceAll('_', ' ')}
+                        value={ticketDerivedValues.formattedPaymentMethod}
                         textColor={textColor}
                         secondaryTextColor={themeColors.secondaryTextColor}
                     />
@@ -690,17 +710,10 @@ const TicketDetails = () => {
                         title="Télécharger le reçu"
                         onPress={handleDownloadTicket}
                         loading={isGeneratingPDF}
+                        disabled={actionsLocked}
                         variant="secondary"
-                        icon={<Icon name="download" size={20} color={themeColors.primaryBlue} />}
+                        icon={<Icon name="download" size={20} color={actionIconColor} />}
                     />
-                    {canCancelReservation && (
-                        <AppButton
-                            title="Annuler la réservation"
-                            onPress={handleCancelReservation}
-                            variant="danger"
-                            icon={<Icon name="cancel" size={20} color="#FFFFFF" />}
-                        />
-                    )}
                     {canGiveFeedback && (
                         <AppButton
                             title="Donner mon avis"
@@ -834,24 +847,6 @@ const styles = StyleSheet.create({
         padding: 16,
         borderWidth: 1,
         gap: 4,
-    },
-    sectionHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 14,
-        gap: 10,
-    },
-    sectionIconBlock: {
-        width: 40,
-        height: 40,
-        borderRadius: 10,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    sectionTitle: {
-        flex: 1,
-        fontSize: 17,
-        fontFamily: 'Ubuntu_Bold',
     },
     stationsContainer: {
         marginBottom: 4,

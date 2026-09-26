@@ -16,24 +16,24 @@ export function ConnectivityGuard({ children }: ConnectivityGuardProps) {
     const segments = useSegments();
 
     useEffect(() => {
-        // Construit le chemin actuel à partir des segments
         const currentPath = '/' + segments.join('/');
-        
-        // Liste des routes qui ne nécessitent pas de connexion internet
-        const routesWithoutInternet = ['/onboard', '/no-internet'];
 
-        // Vérifie si la route actuelle nécessite une connexion
-        const requiresInternet = !routesWithoutInternet.some(route => 
+        // Offline autorisé : onboarding, écran offline, parcours paiement (retour deeplink)
+        const routesWithoutInternet = [
+            '/onboard',
+            '/no-internet',
+            '/payment',
+            '/notification/payment-status',
+        ];
+
+        const requiresInternet = !routesWithoutInternet.some((route) =>
             currentPath.startsWith(route)
         );
 
-        // Si on est sur no-internet et que la connexion revient, laisser NoInternetScreen gérer la redirection
         if (currentPath === '/no-internet' && isConnected) {
-            return; // NoInternetScreen s'occupera de la redirection
+            return;
         }
 
-        // Si pas de connexion et que la route nécessite internet, rediriger vers no-internet
-        // On se base principalement sur isConnected car isInternetReachable peut être null/false
         if (requiresInternet && !isConnected) {
             if (currentPath !== '/no-internet') {
                 router.replace('/no-internet');

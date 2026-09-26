@@ -1,15 +1,23 @@
 // @ts-nocheck
 import { authGetUserInfo, createBusRentalRequest, getCompanyList } from '@/api/auth_register';
 import { getCities } from "@/api/city";
+import { AppButton } from '@/components/ui/AppButton';
+import { ScreenHeader } from '@/components/ui/ScreenHeader';
+import {
+    FORM_FIELD_HEIGHT,
+    FORM_FIELD_RADIUS,
+    FORM_FIELD_TEXTAREA_MIN_HEIGHT,
+    getFormFieldColors,
+} from '@/constants/formField';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { COUNTRY_CODES } from '@/interfaces';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { showAlert } from '@/utils/alert';
+import { getAuthToken, getUserId } from '@/utils/storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
     KeyboardAvoidingView,
     Modal,
     Platform,
@@ -22,9 +30,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import { showAlert } from '@/utils/alert';
-import { AppButton } from '@/components/ui/AppButton';
-import { ScreenHeader } from '@/components/ui/ScreenHeader';
+import { FormScreenSkeleton } from '@/components/skeletons';
 
 /** Options pour les listes de sélection */
 const TRIP_TYPE_OPTIONS = [
@@ -89,6 +95,7 @@ function dateToISO(ddMmYyyy: string): string {
 export default function BusRentalRequestScreen() {
     const insets = useSafeAreaInsets();
     const colorScheme = useColorScheme() ?? 'light';
+    const fieldColors = getFormFieldColors(colorScheme);
     const textColor = useThemeColor({}, 'text');
     const iconColor = useThemeColor({}, 'icon');
     const tintColor = useThemeColor({}, 'tint');
@@ -96,11 +103,12 @@ export default function BusRentalRequestScreen() {
     const cardBg = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
     const borderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
     const headerBg = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
-    const inputBg = colorScheme === 'dark' ? '#2C2C2E' : '#F3F3F7';
-    const placeholderColor = colorScheme === 'dark' ? '#9BA1A6' : '#A6A6AA';
+    const inputBg = fieldColors.background;
+    const placeholderColor = fieldColors.placeholder;
     const modalBg = colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF';
     const optionBorder = colorScheme === 'dark' ? '#3A3A3C' : '#F3F3F7';
     const accentColor = tintColor === '#fff' ? '#1776BA' : tintColor;
+    const dangerColor = fieldColors.danger;
 
     const [isLoading, setIsLoading] = useState(true);
     const [company, setCompany] = useState('');
@@ -209,8 +217,8 @@ export default function BusRentalRequestScreen() {
         let cancelled = false;
         (async () => {
             try {
-                const token = await AsyncStorage.getItem('token');
-                const userId = await AsyncStorage.getItem('user_id');
+                const token = await getAuthToken();
+                const userId = await getUserId();
                 if (!userId || !token) {
                     setIsLoading(false);
                     return;
@@ -247,7 +255,7 @@ export default function BusRentalRequestScreen() {
         let cancelled = false;
         (async () => {
             try {
-                const token = await AsyncStorage.getItem('token');
+                const token = await getAuthToken();
                 if (!token) return;
                 const res = await getCompanyList(token);
                 if (cancelled) return;
@@ -312,8 +320,8 @@ export default function BusRentalRequestScreen() {
                 showAlert('Attention', 'Veuillez accepter les conditions générales de location');
                 return;
             }
-            const token = await AsyncStorage.getItem('token');
-            const customerId = await AsyncStorage.getItem('user_id') ?? undefined;
+            const token = await getAuthToken();
+            const customerId = (await getUserId()) ?? undefined;
             const payload: Record<string, unknown> = {
                 firstName,
                 lastName,
@@ -375,11 +383,7 @@ export default function BusRentalRequestScreen() {
     };
 
     if (isLoading) {
-        return (
-            <View style={[styles.container, { backgroundColor: scrollBg }]}>
-                <ActivityIndicator size="large" color={accentColor} style={styles.loader} />
-            </View>
-        );
+        return <FormScreenSkeleton />;
     }
 
     return (
@@ -415,7 +419,11 @@ export default function BusRentalRequestScreen() {
                             <Pressable
                                 style={[
                                     styles.selectInput,
-                                    { backgroundColor: inputBg, borderColor: companyError ? '#DC3545' : borderColor },
+                                    {
+                                        backgroundColor: inputBg,
+                                        borderWidth: companyError ? 1 : 0,
+                                        borderColor: companyError ? dangerColor : 'transparent',
+                                    },
                                 ]}
                                 onPress={() =>
                                     openSelect(
@@ -445,7 +453,7 @@ export default function BusRentalRequestScreen() {
                                 <View style={styles.formField}>
                                     <Text style={[styles.formLabel, { color: textColor }]}>Prénom</Text>
                                     <TextInput
-                                        style={[styles.input, { backgroundColor: inputBg, borderColor, color: textColor }]}
+                                        style={[styles.input, { backgroundColor: inputBg, color: textColor }]}
                                         value={firstName}
                                         onChangeText={setFirstName}
                                         placeholder="Prénom"
@@ -457,7 +465,7 @@ export default function BusRentalRequestScreen() {
                                 <View style={styles.formField}>
                                     <Text style={[styles.formLabel, { color: textColor }]}>Nom</Text>
                                     <TextInput
-                                        style={[styles.input, { backgroundColor: inputBg, borderColor, color: textColor }]}
+                                        style={[styles.input, { backgroundColor: inputBg, color: textColor }]}
                                         value={lastName}
                                         onChangeText={setLastName}
                                         placeholder="Nom"
@@ -470,14 +478,16 @@ export default function BusRentalRequestScreen() {
                             <Text style={[styles.formLabel, { color: textColor }]}>Téléphone</Text>
                             <View style={styles.phoneRow}>
                                 <Pressable
-                                    style={[styles.countryCodeBtn, { backgroundColor: inputBg, borderColor }]}
+                                    style={[styles.countryCodeBtn, { backgroundColor: inputBg }]}
                                     onPress={() => openSelect('Code pays', countryCodeOptions, phoneCountryCode, setPhoneCountryCode)}
                                 >
-                                    <Text style={[styles.countryCodeText, { color: textColor }]}>{phoneCountryCode}</Text>
+                                    <Text style={[styles.countryCodeText, { color: textColor }]}>
+                                        {COUNTRY_CODES.find((c) => c.code === phoneCountryCode)?.label ?? phoneCountryCode}
+                                    </Text>
                                     <MaterialCommunityIcons name="chevron-down" size={16} color={iconColor} />
                                 </Pressable>
                                 <TextInput
-                                    style={[styles.phoneInput, { backgroundColor: inputBg, borderColor, color: textColor }]}
+                                    style={[styles.phoneInput, { backgroundColor: inputBg, color: textColor }]}
                                     value={phone}
                                     onChangeText={setPhone}
                                     placeholder="XX XX XX XX"
@@ -489,7 +499,7 @@ export default function BusRentalRequestScreen() {
                         <View style={styles.formField}>
                             <Text style={[styles.formLabel, { color: textColor }]}>Email</Text>
                             <TextInput
-                                style={[styles.input, { backgroundColor: inputBg, borderColor, color: textColor }]}
+                                style={[styles.input, { backgroundColor: inputBg, color: textColor }]}
                                 value={email}
                                 onChangeText={setEmail}
                                 placeholder="Email"
@@ -500,7 +510,7 @@ export default function BusRentalRequestScreen() {
                         <View style={styles.formField}>
                             <Text style={[styles.formLabel, { color: textColor }]}>Nom de l'entreprise (optionnel)</Text>
                             <TextInput
-                                style={[styles.input, { backgroundColor: inputBg, borderColor, color: textColor }]}
+                                style={[styles.input, { backgroundColor: inputBg, color: textColor }]}
                                 value={companyName}
                                 onChangeText={setCompanyName}
                                 placeholder="Nom de l'entreprise"
@@ -515,7 +525,7 @@ export default function BusRentalRequestScreen() {
                                 <View style={styles.formField}>
                                     <Text style={[styles.formLabel, { color: textColor }]}>Ville de départ</Text>
                                     <Pressable
-                                        style={[styles.selectInput, { backgroundColor: inputBg, borderColor }]}
+                                        style={[styles.selectInput, { backgroundColor: inputBg }]}
                                         onPress={() =>
                                             openSelect(
                                                 'Ville de départ',
@@ -536,7 +546,7 @@ export default function BusRentalRequestScreen() {
                                 <View style={styles.formField}>
                                     <Text style={[styles.formLabel, { color: textColor }]}>Ville d'arrivée</Text>
                                     <Pressable
-                                        style={[styles.selectInput, { backgroundColor: inputBg, borderColor }]}
+                                        style={[styles.selectInput, { backgroundColor: inputBg }]}
                                         onPress={() =>
                                             openSelect(
                                                 "Ville d'arrivée",
@@ -557,7 +567,7 @@ export default function BusRentalRequestScreen() {
                         <View style={styles.formField}>
                             <Text style={[styles.formLabel, { color: textColor }]}>Détail lieu de départ</Text>
                             <TextInput
-                                style={[styles.input, { backgroundColor: inputBg, borderColor, color: textColor }]}
+                                style={[styles.input, { backgroundColor: inputBg, color: textColor }]}
                                 value={departureDetail}
                                 onChangeText={setDepartureDetail}
                                 placeholder="Adresse, gare, etc."
@@ -567,7 +577,7 @@ export default function BusRentalRequestScreen() {
                         <View style={styles.formField}>
                             <Text style={[styles.formLabel, { color: textColor }]}>Détail lieu d'arrivée</Text>
                             <TextInput
-                                style={[styles.input, { backgroundColor: inputBg, borderColor, color: textColor }]}
+                                style={[styles.input, { backgroundColor: inputBg, color: textColor }]}
                                 value={arrivalDetail}
                                 onChangeText={setArrivalDetail}
                                 placeholder="Adresse, gare, etc."
@@ -579,7 +589,7 @@ export default function BusRentalRequestScreen() {
                                 <View style={styles.formField}>
                                     <Text style={[styles.formLabel, { color: textColor }]}>Type de trajet</Text>
                                     <Pressable
-                                        style={[styles.selectInput, { backgroundColor: inputBg, borderColor }]}
+                                        style={[styles.selectInput, { backgroundColor: inputBg }]}
                                         onPress={() => openSelect('Type de trajet', TRIP_TYPE_OPTIONS, tripType, setTripType)}
                                     >
                                         <Text style={[styles.selectText, { color: textColor }]}>{TRIP_TYPE_OPTIONS.find((o) => o.value === tripType)?.label ?? tripType}</Text>
@@ -591,7 +601,7 @@ export default function BusRentalRequestScreen() {
                                 <View style={styles.formField}>
                                     <Text style={[styles.formLabel, { color: textColor }]}>Date de départ</Text>
                                     <Pressable
-                                        style={[styles.dateInput, { backgroundColor: inputBg, borderColor }]}
+                                        style={[styles.dateInput, { backgroundColor: inputBg }]}
                                         onPress={() => setActiveDatePicker('departure')}
                                     >
                                         <Text style={[styles.dateInputText, { color: departureDate ? textColor : placeholderColor }]}>
@@ -606,7 +616,7 @@ export default function BusRentalRequestScreen() {
                             <View style={styles.formField}>
                                 <Text style={[styles.formLabel, { color: textColor }]}>Date de retour</Text>
                                 <Pressable
-                                    style={[styles.dateInput, { backgroundColor: inputBg, borderColor }]}
+                                    style={[styles.dateInput, { backgroundColor: inputBg }]}
                                     onPress={() => setActiveDatePicker('return')}
                                 >
                                     <Text style={[styles.dateInputText, { color: returnDate ? textColor : placeholderColor }]}>
@@ -619,7 +629,7 @@ export default function BusRentalRequestScreen() {
                         <View style={styles.formField}>
                             <Text style={[styles.formLabel, { color: textColor }]}>Durée estimée (optionnel)</Text>
                             <TextInput
-                                style={[styles.input, { backgroundColor: inputBg, borderColor, color: textColor }]}
+                                style={[styles.input, { backgroundColor: inputBg, color: textColor }]}
                                 value={duration}
                                 onChangeText={setDuration}
                                 placeholder="Ex: 2h30"
@@ -633,7 +643,7 @@ export default function BusRentalRequestScreen() {
                             <View style={styles.half}>
                                 <View style={styles.formField}>
                                     <Text style={[styles.formLabel, { color: textColor }]}>Nombre de passagers</Text>
-                                    <View style={[styles.stepperRow, { backgroundColor: inputBg, borderColor }]}>
+                                    <View style={[styles.stepperRow, { backgroundColor: inputBg }]}>
                                         <Pressable onPress={() => setPassengerCount((c) => Math.max(1, c - 1))}>
                                             <MaterialCommunityIcons name="chevron-down" size={24} color={iconColor} />
                                         </Pressable>
@@ -648,7 +658,7 @@ export default function BusRentalRequestScreen() {
                                 <View style={styles.formField}>
                                     <Text style={[styles.formLabel, { color: textColor }]}>Type de passagers</Text>
                                     <Pressable
-                                        style={[styles.selectInput, { backgroundColor: inputBg, borderColor }]}
+                                        style={[styles.selectInput, { backgroundColor: inputBg }]}
                                         onPress={() =>
                                             openSelect('Type de passagers', PASSENGER_TYPE_OPTIONS, passengerType, setPassengerType)
                                         }
@@ -669,7 +679,7 @@ export default function BusRentalRequestScreen() {
                                 <View style={styles.formField}>
                                     <Text style={[styles.formLabel, { color: textColor }]}>Type de bus</Text>
                                     <Pressable
-                                        style={[styles.selectInput, { backgroundColor: inputBg, borderColor }]}
+                                        style={[styles.selectInput, { backgroundColor: inputBg }]}
                                         onPress={() => openSelect('Type de bus', BUS_TYPE_OPTIONS, busType, setBusType)}
                                     >
                                         <Text style={[styles.selectText, { color: textColor }]}>
@@ -682,7 +692,7 @@ export default function BusRentalRequestScreen() {
                             <View style={styles.half}>
                                 <View style={styles.formField}>
                                     <Text style={[styles.formLabel, { color: textColor }]}>Capacité requise</Text>
-                                    <View style={[styles.stepperRow, { backgroundColor: inputBg, borderColor }]}>
+                                    <View style={[styles.stepperRow, { backgroundColor: inputBg }]}>
                                         <Pressable onPress={() => setCapacity((c) => Math.max(1, c - 1))}>
                                             <MaterialCommunityIcons name="chevron-down" size={24} color={iconColor} />
                                         </Pressable>
@@ -699,7 +709,7 @@ export default function BusRentalRequestScreen() {
                                 <View style={styles.formField}>
                                     <Text style={[styles.formLabel, { color: textColor }]}>Bagages</Text>
                                     <Pressable
-                                        style={[styles.selectInput, { backgroundColor: inputBg, borderColor }]}
+                                        style={[styles.selectInput, { backgroundColor: inputBg }]}
                                         onPress={() => openSelect('Bagages', LUGGAGE_OPTIONS, luggage, setLuggage)}
                                     >
                                         <Text style={[styles.selectText, { color: textColor }]}>
@@ -713,7 +723,7 @@ export default function BusRentalRequestScreen() {
                                 <View style={styles.formField}>
                                     <Text style={[styles.formLabel, { color: textColor }]}>Accessibilité</Text>
                                     <Pressable
-                                        style={[styles.selectInput, { backgroundColor: inputBg, borderColor }]}
+                                        style={[styles.selectInput, { backgroundColor: inputBg }]}
                                         onPress={() =>
                                             openSelect('Accessibilité', ACCESSIBILITY_OPTIONS, accessibility, setAccessibility)
                                         }
@@ -734,7 +744,7 @@ export default function BusRentalRequestScreen() {
                                 <View style={styles.formField}>
                                     <Text style={[styles.formLabel, { color: textColor }]}>Objectif</Text>
                                     <Pressable
-                                        style={[styles.selectInput, { backgroundColor: inputBg, borderColor }]}
+                                        style={[styles.selectInput, { backgroundColor: inputBg }]}
                                         onPress={() =>
                                             openSelect('Objectif', OBJECTIVE_OPTIONS, travelObjective, setTravelObjective)
                                         }
@@ -751,7 +761,7 @@ export default function BusRentalRequestScreen() {
                                     <View style={styles.formField}>
                                         <Text style={[styles.formLabel, { color: textColor }]}>Précision</Text>
                                         <TextInput
-                                            style={[styles.input, { backgroundColor: inputBg, borderColor, color: textColor }]}
+                                            style={[styles.input, { backgroundColor: inputBg, color: textColor }]}
                                             value={objectiveDetail}
                                             onChangeText={setObjectiveDetail}
                                             placeholder="Précision"
@@ -798,7 +808,7 @@ export default function BusRentalRequestScreen() {
                                     <View style={styles.formField}>
                                         <Text style={[styles.formLabel, { color: textColor }]}>Min (FCFA)</Text>
                                         <TextInput
-                                            style={[styles.input, { backgroundColor: inputBg, borderColor, color: textColor }]}
+                                            style={[styles.input, { backgroundColor: inputBg, color: textColor }]}
                                             value={budgetMin}
                                             onChangeText={setBudgetMin}
                                             placeholder="Min"
@@ -811,7 +821,7 @@ export default function BusRentalRequestScreen() {
                                     <View style={styles.formField}>
                                         <Text style={[styles.formLabel, { color: textColor }]}>Max (FCFA)</Text>
                                         <TextInput
-                                            style={[styles.input, { backgroundColor: inputBg, borderColor, color: textColor }]}
+                                            style={[styles.input, { backgroundColor: inputBg, color: textColor }]}
                                             value={budgetMax}
                                             onChangeText={setBudgetMax}
                                             placeholder="Max"
@@ -829,7 +839,7 @@ export default function BusRentalRequestScreen() {
                             <TextInput
                                 style={[
                                     styles.textArea,
-                                    { backgroundColor: inputBg, borderColor, color: textColor },
+                                    { backgroundColor: inputBg, color: textColor },
                                 ]}
                                 value={specialInstructions}
                                 onChangeText={setSpecialInstructions}
@@ -998,38 +1008,39 @@ const styles = StyleSheet.create({
     sectionTitle: { fontSize: 22, fontFamily: 'Ubuntu_Bold', marginBottom: 16, marginTop: 8 },
     formField: { marginBottom: 16 },
     formLabel: { fontSize: 14, fontFamily: 'Ubuntu_Medium', marginBottom: 8 },
-    required: { color: '#FF0000' },
-    errorText: { color: '#DC3545', fontSize: 12, marginTop: 4, fontFamily: 'Ubuntu_Regular' },
+    required: { color: '#C44747' },
+    errorText: { color: '#C44747', fontSize: 12, marginTop: 4, fontFamily: 'Ubuntu_Regular' },
     row: { flexDirection: 'row', gap: 12 },
     half: { flex: 1 },
     input: {
-        borderRadius: 16,
+        borderRadius: FORM_FIELD_RADIUS,
         paddingHorizontal: 16,
         paddingVertical: 12,
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        borderWidth: 1,
-        height: 50,
+        borderWidth: 0,
+        height: FORM_FIELD_HEIGHT,
     },
     selectInput: {
-        borderRadius: 16,
-        paddingHorizontal: 16,
-        paddingVertical: 14,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        borderWidth: 1,
-    },
-    selectText: { fontSize: 14, fontFamily: 'Ubuntu_Regular' },
-    dateInput: {
-        borderRadius: 16,
+        borderRadius: FORM_FIELD_RADIUS,
         paddingHorizontal: 16,
         paddingVertical: 12,
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        borderWidth: 1,
-        minHeight: 50,
+        borderWidth: 0,
+        height: FORM_FIELD_HEIGHT,
+    },
+    selectText: { fontSize: 14, fontFamily: 'Ubuntu_Regular' },
+    dateInput: {
+        borderRadius: FORM_FIELD_RADIUS,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        borderWidth: 0,
+        minHeight: FORM_FIELD_HEIGHT,
     },
     dateInputText: { fontSize: 14, fontFamily: 'Ubuntu_Regular', flex: 1 },
     datePickerOverlay: {
@@ -1059,45 +1070,45 @@ const styles = StyleSheet.create({
     },
     phoneRow: { flexDirection: 'row', gap: 8 },
     countryCodeBtn: {
-        borderRadius: 16,
+        borderRadius: FORM_FIELD_RADIUS,
         paddingHorizontal: 12,
-        paddingVertical: 12,
+        height: FORM_FIELD_HEIGHT,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 1,
+        borderWidth: 0,
         gap: 4,
     },
     countryCodeText: { fontSize: 14, fontFamily: 'Ubuntu_Medium' },
     phoneInput: {
         flex: 1,
-        borderRadius: 16,
+        borderRadius: FORM_FIELD_RADIUS,
         paddingHorizontal: 16,
         paddingVertical: 12,
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        borderWidth: 1,
-        height: 50,
+        borderWidth: 0,
+        height: FORM_FIELD_HEIGHT,
     },
     stepperRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        borderRadius: 16,
+        borderRadius: FORM_FIELD_RADIUS,
         paddingHorizontal: 16,
         paddingVertical: 12,
-        borderWidth: 1,
-        height: 50,
+        borderWidth: 0,
+        height: FORM_FIELD_HEIGHT,
     },
     stepperValue: { fontSize: 14, fontFamily: 'Ubuntu_Bold' },
     textArea: {
-        borderRadius: 16,
+        borderRadius: FORM_FIELD_RADIUS,
         paddingHorizontal: 16,
         paddingVertical: 12,
         fontSize: 14,
         fontFamily: 'Ubuntu_Regular',
-        borderWidth: 1,
-        minHeight: 100,
+        borderWidth: 0,
+        minHeight: FORM_FIELD_TEXTAREA_MIN_HEIGHT,
     },
     tagsContent: { flexDirection: 'row', gap: 8, paddingVertical: 4 },
     tag: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20, borderWidth: 1 },

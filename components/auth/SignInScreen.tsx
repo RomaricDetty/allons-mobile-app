@@ -2,7 +2,6 @@
 import { authLogin } from '@/api/auth_register';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -22,8 +21,8 @@ import { PasswordField } from './PasswordField';
 import { showAlert } from '@/utils/alert';
 import { useAuth } from '@/contexts/AuthContext';
 import { AppButton } from '@/components/ui/AppButton';
-// const logoImage = require('@/assets/images/allon-logo.png');
-// const logoImageWhite = require('@/assets/images/allon-logo-white.png');
+import { saveAuthSession } from '@/utils/storage';
+import { normalizeLoginIdentifier } from '@/utils/normalizeLoginIdentifier';
 
 interface ContactUrgent {
     fullName: string;
@@ -169,8 +168,10 @@ export const SignInScreen = ({ onSignIn, onSwitchToSignUp, onForgotPassword }: S
         setIsLoading(true);
 
         try {
-            const response = await authLogin({ emailOrUsername: email.trim().toLowerCase(), password: password.trim() });
-            console.log('Réponse de la connexion : ', response);
+            const response = await authLogin({
+                emailOrUsername: normalizeLoginIdentifier(email),
+                password: password.trim(),
+            });
 
             // Vérifier que la réponse est valide
             if (response && response.status === 200 && response.data) {
@@ -189,24 +190,15 @@ export const SignInScreen = ({ onSignIn, onSwitchToSignUp, onForgotPassword }: S
                     throw new Error('Informations utilisateur manquantes dans la réponse');
                 }
 
-                // Stocker les tokens de manière sécurisée
+                // Stocker les tokens (SecureStore) + profil
                 try {
-                    await AsyncStorage.setItem('token', accessToken);
-
-                    if (refreshToken && refreshToken.trim() !== '') {
-                        await AsyncStorage.setItem('refresh_token', refreshToken);
-                    }
-
-                    if (expiresIn !== undefined && expiresIn !== null) {
-                        await AsyncStorage.setItem('expires_at', String(expiresIn));
-                    }
-
-                    if (tokenType && tokenType.trim() !== '') {
-                        await AsyncStorage.setItem('token_type', tokenType);
-                    }
-
-                    await AsyncStorage.setItem('user_id', user.id);
-                    console.log('user_id : ', user.id);
+                    await saveAuthSession({
+                        accessToken,
+                        refreshToken,
+                        expiresIn,
+                        tokenType,
+                        userId: user.id,
+                    });
 
                     await setSessionUser(user);
                     onSignIn();
@@ -217,10 +209,9 @@ export const SignInScreen = ({ onSignIn, onSwitchToSignUp, onForgotPassword }: S
             } else {
                 const errorMessage = response?.data?.message || 'Erreur lors de la connexion';
                 showAlert('Attention !', errorMessage);
-                console.log('Erreur lors de la connexion : ', response?.data);
             }
         } catch (error: any) {
-            console.error('Erreur lors de la connexion : ', error);
+            console.error('Erreur lors de la connexion');
 
             // Afficher un message d'erreur plus spécifique
             let errorMessage = 'Une erreur est survenue lors de la connexion, veuillez vérifier vos informations et réessayer.';

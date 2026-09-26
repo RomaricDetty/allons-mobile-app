@@ -9,6 +9,11 @@ dist/
 web-build/
 expo-env.d.ts
 
+# Env secrets (Mapbox sk.*, etc.)
+.env
+.env.*
+!.env.example
+
 # Native
 .kotlin/
 *.orig.*
