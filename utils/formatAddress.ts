@@ -19,6 +19,7 @@ export type AddressCountry =
 export type UserAddress =
     | string
     | {
+          complement?: string | null;
           street?: string | null;
           city?: string | null;
           zipCode?: string | null;
@@ -67,12 +68,14 @@ export const formatUserAddress = (address: UserAddress): string => {
         return toDisplayPart(address);
     }
 
+    const complement = toDisplayPart(address.complement);
     const street = toDisplayPart(address.street);
-    const city = toDisplayPart(address.city);
     const zip = toDisplayPart(address.zipCode ?? address.postalCode);
     const country = toDisplayPart(address.country);
+    const city = toDisplayPart(address.city);
 
-    const parts = [street, city, zip, country].filter(Boolean);
+    // Ordre affichage : appart/immeuble → rue → CP → pays → ville
+    const parts = [complement, street, zip, country, city].filter(Boolean);
     return parts.join(', ');
 };
 

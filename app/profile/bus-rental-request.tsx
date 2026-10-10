@@ -11,6 +11,8 @@ import {
 } from '@/constants/formField';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
+import { FormScreenSkeleton } from '@/components/skeletons';
+import { isValidEmail } from '@/constants/functions';
 import { COUNTRY_CODES } from '@/interfaces';
 import { showAlert } from '@/utils/alert';
 import { getAuthToken, getUserId } from '@/utils/storage';
@@ -30,7 +32,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import { FormScreenSkeleton } from '@/components/skeletons';
+
+type FieldErrors = Record<string, string>;
 
 /** Options pour les listes de sélection */
 const TRIP_TYPE_OPTIONS = [
@@ -111,8 +114,10 @@ export default function BusRentalRequestScreen() {
     const dangerColor = fieldColors.danger;
 
     const [isLoading, setIsLoading] = useState(true);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [showErrors, setShowErrors] = useState(false);
+    const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
     const [company, setCompany] = useState('');
-    const [companyError, setCompanyError] = useState('');
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
     const [phone, setPhone] = useState('');
@@ -308,69 +313,125 @@ export default function BusRentalRequestScreen() {
         });
     }, []);
 
+    /**
+     * Valide les champs requis CreateBusRentalRequestDto.
+     * @returns erreurs par clé de champ
+     */
+    const validateForm = useCallback((): FieldErrors => {
+        const errors: FieldErrors = {};
+        if (!String(company ?? '').trim()) errors.company = 'Compagnie requise';
+        if (!firstName.trim()) errors.firstName = 'Prénom requis';
+        if (!lastName.trim()) errors.lastName = 'Nom requis';
+        const phoneDigits = phone.replace(/\s/g, '');
+        if (!phoneCountryCode.trim()) errors.phone = 'Code pays requis';
+        else if (!phoneDigits) errors.phone = 'Téléphone requis';
+        else if (!/^\d{8,15}$/.test(phoneDigits)) errors.phone = 'Téléphone invalide';
+        if (!email.trim()) errors.email = 'Email requis';
+        else if (!isValidEmail(email.trim())) errors.email = 'Email invalide';
+        if (!String(departureCity ?? '').trim()) errors.departureCity = 'Ville requise';
+        if (!departureDetail.trim()) errors.departureDetail = 'Détail du départ requis';
+        if (!String(arrivalCity ?? '').trim()) errors.arrivalCity = 'Ville requise';
+        if (!arrivalDetail.trim()) errors.arrivalDetail = "Détail de l'arrivée requis";
+        if (!tripType) errors.tripType = 'Type de trajet requis';
+        if (!departureDate.trim() || !dateToISO(departureDate)) errors.departureDate = 'Date de départ requise';
+        if (!passengerCount || passengerCount < 1) errors.passengerCount = 'Nombre de passagers requis';
+        if (!busType) errors.busType = 'Type de bus requis';
+        if (!capacity || capacity < 1) errors.capacity = 'Capacité requise';
+        if (!luggage) errors.luggage = 'Bagages requis';
+        if (!accessibility) errors.accessibility = 'Accessibilité requise';
+        if (!acceptTerms) errors.acceptTerms = 'Vous devez accepter les conditions';
+        return errors;
+    }, [
+        company, firstName, lastName, phone, phoneCountryCode, email,
+        departureCity, departureDetail, arrivalCity, arrivalDetail,
+        tripType, departureDate, passengerCount, busType, capacity,
+        luggage, accessibility, acceptTerms,
+    ]);
+
+    /**
+     * Marque tous les champs comme touchés et affiche les erreurs.
+     */
+    const markAllAsTouched = useCallback(() => {
+        setShowErrors(true);
+        setFieldErrors(validateForm());
+    }, [validateForm]);
+
+    /** Message d’erreur sous un champ (si formulaire soumis / touché). */
+    const err = useCallback(
+        (key: string) => (showErrors ? fieldErrors[key] || '' : ''),
+        [showErrors, fieldErrors],
+    );
+
     /** Construit le payload conforme à CreateBusRentalRequestDto et soumet */
     const handleSubmit = useCallback(async () => {
+        if (isSubmitting) return;
+        const errors = validateForm();
+        setShowErrors(true);
+        setFieldErrors(errors);
+        markAllAsTouched();
+        if (Object.keys(errors).length > 0) return;
+
         try {
-            if (!String(company ?? '').trim()) {
-                setCompanyError('Veuillez sélectionner une compagnie');
-                return;
-            }
-            setCompanyError('');
-            if (!acceptTerms) {
-                showAlert('Attention', 'Veuillez accepter les conditions générales de location');
-                return;
-            }
+            setIsSubmitting(true);
             const token = await getAuthToken();
             const customerId = (await getUserId()) ?? undefined;
             const payload: Record<string, unknown> = {
-                firstName,
-                lastName,
-                phone: { countryCode: phoneCountryCode, digits: phone.trim(), type: 'mobile' },
-                email,
-                companyName: companyName.trim() || undefined,
+                companyId: company,
+                firstName: firstName.trim(),
+                lastName: lastName.trim(),
+                phone: { type: 'mobile', digits: phone.trim(), countryCode: phoneCountryCode },
+                email: email.trim(),
                 departureCityId: departureCity,
                 departureCityDetail: departureDetail.trim(),
                 arrivalCityId: arrivalCity,
                 arrivalCityDetail: arrivalDetail.trim(),
                 tripType,
                 departureDate: dateToISO(departureDate),
-                returnDate: returnDate ? dateToISO(returnDate) : undefined,
-                estimatedDuration: duration.trim() || undefined,
                 passengerCount,
-                passengerType,
                 busType,
                 requiredCapacity: capacity,
                 luggageNeeds: luggage,
                 accessibilityNeeds: accessibility,
+                termsAccepted: acceptTerms,
+                customerId: customerId || undefined,
+                // optionnels
+                companyName: companyName.trim() || undefined,
+                returnDate: returnDate ? dateToISO(returnDate) : undefined,
+                estimatedDuration: duration.trim() || undefined,
+                passengerType,
                 tripPurpose: travelObjective,
                 tripPurposeOther: objectiveDetail.trim() || undefined,
                 additionalServices: Array.from(selectedServices).length > 0 ? Array.from(selectedServices) : undefined,
                 budgetMin: budgetMin.trim() ? Number(budgetMin) : undefined,
                 budgetMax: budgetMax.trim() ? Number(budgetMax) : undefined,
                 specialInstructions: specialInstructions.trim() || undefined,
-                termsAccepted: acceptTerms,
-                companyId: company || undefined,
-                customerId: customerId || undefined,
             };
-            setIsLoading(true);
             console.log('Bus rental payload (CreateBusRentalRequestDto):', payload);
             const response = await createBusRentalRequest(payload, token);
-            console.log("createBusRentalRequest response ==>, ", response);
+            console.log('createBusRentalRequest response ==>, ', response);
             if (response.status !== 200 && response.status !== 201) {
-                setIsLoading(false);
-                showAlert('Erreur', 'Une erreur est survenue lors de l\'enregistrement de la demande');
+                showAlert('Erreur', "Une erreur est survenue lors de l'enregistrement de la demande");
                 return;
             }
-            setIsLoading(false);
-            showAlert('Demande envoyée', 'Votre demande de location a bien été enregistrée.');  
+            showAlert('Demande envoyée', 'Votre demande de location a bien été enregistrée.');
             router.back();
         } catch (error: any) {
-            setIsLoading(false);
-            showAlert('Erreur', error?.response?.data?.message || error?.message || 'Une erreur est survenue lors de l\'enregistrement de la demande');
-            return;
+            showAlert(
+                'Erreur',
+                error?.response?.data?.message ||
+                    error?.message ||
+                    "Une erreur est survenue lors de l'enregistrement de la demande",
+            );
+        } finally {
+            setIsSubmitting(false);
         }
-    }, [company, firstName, lastName, phone, phoneCountryCode, email, companyName, departureCity, departureDetail, arrivalCity, arrivalDetail, tripType, departureDate, returnDate, duration, passengerCount, passengerType, busType, capacity, luggage, accessibility, travelObjective, objectiveDetail, selectedServices, budgetMin, budgetMax, specialInstructions, acceptTerms]);
-    
+    }, [
+        isSubmitting, validateForm, markAllAsTouched, company, firstName, lastName, phone,
+        phoneCountryCode, email, companyName, departureCity, departureDetail, arrivalCity,
+        arrivalDetail, tripType, departureDate, returnDate, duration, passengerCount,
+        passengerType, busType, capacity, luggage, accessibility, travelObjective,
+        objectiveDetail, selectedServices, budgetMin, budgetMax, specialInstructions, acceptTerms,
+    ]);
 
     const selectCompany = (v: string) => {
         setCompany(v);
@@ -381,6 +442,12 @@ export default function BusRentalRequestScreen() {
         const opt = companyOptions.find((o) => String(o.value) === String(v));
         setSelectedCompanyLabel(opt?.label ?? v);
     };
+
+    /** Recalcule les erreurs une fois le formulaire soumis (messages live). */
+    useEffect(() => {
+        if (!showErrors) return;
+        setFieldErrors(validateForm());
+    }, [showErrors, validateForm]);
 
     if (isLoading) {
         return <FormScreenSkeleton />;
@@ -421,8 +488,8 @@ export default function BusRentalRequestScreen() {
                                     styles.selectInput,
                                     {
                                         backgroundColor: inputBg,
-                                        borderWidth: companyError ? 1 : 0,
-                                        borderColor: companyError ? dangerColor : 'transparent',
+                                        borderWidth: err('company') ? 1 : 0,
+                                        borderColor: err('company') ? dangerColor : 'transparent',
                                     },
                                 ]}
                                 onPress={() =>
@@ -443,7 +510,7 @@ export default function BusRentalRequestScreen() {
                                 </Text>
                                 <MaterialCommunityIcons name="chevron-down" size={20} color={iconColor} />
                             </Pressable>
-                            {companyError ? <Text style={styles.errorText}>{companyError}</Text> : null}
+                            {err('company') ? <Text style={[styles.errorText, { color: dangerColor }]}>{err('company')}</Text> : null}
                         </View>
 
                         {/* Section 2 - Informations client */}
@@ -451,34 +518,65 @@ export default function BusRentalRequestScreen() {
                         <View style={styles.row}>
                             <View style={styles.half}>
                                 <View style={styles.formField}>
-                                    <Text style={[styles.formLabel, { color: textColor }]}>Prénom</Text>
+                                    <Text style={[styles.formLabel, { color: textColor }]}>
+                                        Prénom <Text style={styles.required}>*</Text>
+                                    </Text>
                                     <TextInput
-                                        style={[styles.input, { backgroundColor: inputBg, color: textColor }]}
+                                        style={[
+                                            styles.input,
+                                            {
+                                                backgroundColor: inputBg,
+                                                color: textColor,
+                                                borderWidth: err('firstName') ? 1 : 0,
+                                                borderColor: err('firstName') ? dangerColor : 'transparent',
+                                            },
+                                        ]}
                                         value={firstName}
                                         onChangeText={setFirstName}
                                         placeholder="Prénom"
                                         placeholderTextColor={placeholderColor}
                                     />
+                                    {err('firstName') ? <Text style={[styles.errorText, { color: dangerColor }]}>{err('firstName')}</Text> : null}
                                 </View>
                             </View>
                             <View style={styles.half}>
                                 <View style={styles.formField}>
-                                    <Text style={[styles.formLabel, { color: textColor }]}>Nom</Text>
+                                    <Text style={[styles.formLabel, { color: textColor }]}>
+                                        Nom <Text style={styles.required}>*</Text>
+                                    </Text>
                                     <TextInput
-                                        style={[styles.input, { backgroundColor: inputBg, color: textColor }]}
+                                        style={[
+                                            styles.input,
+                                            {
+                                                backgroundColor: inputBg,
+                                                color: textColor,
+                                                borderWidth: err('lastName') ? 1 : 0,
+                                                borderColor: err('lastName') ? dangerColor : 'transparent',
+                                            },
+                                        ]}
                                         value={lastName}
                                         onChangeText={setLastName}
                                         placeholder="Nom"
                                         placeholderTextColor={placeholderColor}
                                     />
+                                    {err('lastName') ? <Text style={[styles.errorText, { color: dangerColor }]}>{err('lastName')}</Text> : null}
                                 </View>
                             </View>
                         </View>
                         <View style={styles.formField}>
-                            <Text style={[styles.formLabel, { color: textColor }]}>Téléphone</Text>
+                            <Text style={[styles.formLabel, { color: textColor }]}>
+                                Téléphone <Text style={styles.required}>*</Text>
+                            </Text>
                             <View style={styles.phoneRow}>
                                 <Pressable
-                                    style={[styles.countryCodeBtn, { backgroundColor: inputBg }]}
+                                    style={[
+                                        styles.countryCodeBtn,
+                                        {
+                                            backgroundColor: inputBg,
+                                            borderWidth: err('phone') ? 1 : 0,
+                                            borderColor: err('phone') ? dangerColor : 'transparent',
+                                        },
+                                    ]}
                                     onPress={() => openSelect('Code pays', countryCodeOptions, phoneCountryCode, setPhoneCountryCode)}
                                 >
                                     <Text style={[styles.countryCodeText, { color: textColor }]}>
@@ -487,7 +585,15 @@ export default function BusRentalRequestScreen() {
                                     <MaterialCommunityIcons name="chevron-down" size={16} color={iconColor} />
                                 </Pressable>
                                 <TextInput
-                                    style={[styles.phoneInput, { backgroundColor: inputBg, color: textColor }]}
+                                    style={[
+                                        styles.phoneInput,
+                                        {
+                                            backgroundColor: inputBg,
+                                            color: textColor,
+                                            borderWidth: err('phone') ? 1 : 0,
+                                            borderColor: err('phone') ? dangerColor : 'transparent',
+                                        },
+                                    ]}
                                     value={phone}
                                     onChangeText={setPhone}
                                     placeholder="XX XX XX XX"
@@ -495,17 +601,29 @@ export default function BusRentalRequestScreen() {
                                     keyboardType="numeric"
                                 />
                             </View>
+                            {err('phone') ? <Text style={[styles.errorText, { color: dangerColor }]}>{err('phone')}</Text> : null}
                         </View>
                         <View style={styles.formField}>
-                            <Text style={[styles.formLabel, { color: textColor }]}>Email</Text>
+                            <Text style={[styles.formLabel, { color: textColor }]}>
+                                Email <Text style={styles.required}>*</Text>
+                            </Text>
                             <TextInput
-                                style={[styles.input, { backgroundColor: inputBg, color: textColor }]}
+                                style={[
+                                    styles.input,
+                                    {
+                                        backgroundColor: inputBg,
+                                        color: textColor,
+                                        borderWidth: err('email') ? 1 : 0,
+                                        borderColor: err('email') ? dangerColor : 'transparent',
+                                    },
+                                ]}
                                 value={email}
                                 onChangeText={setEmail}
                                 placeholder="Email"
                                 placeholderTextColor={placeholderColor}
                                 keyboardType="email-address"
                             />
+                            {err('email') ? <Text style={[styles.errorText, { color: dangerColor }]}>{err('email')}</Text> : null}
                         </View>
                         <View style={styles.formField}>
                             <Text style={[styles.formLabel, { color: textColor }]}>Nom de l'entreprise (optionnel)</Text>
@@ -523,9 +641,18 @@ export default function BusRentalRequestScreen() {
                         <View style={styles.row}>
                             <View style={styles.half}>
                                 <View style={styles.formField}>
-                                    <Text style={[styles.formLabel, { color: textColor }]}>Ville de départ</Text>
+                                    <Text style={[styles.formLabel, { color: textColor }]}>
+                                        Ville de départ <Text style={styles.required}>*</Text>
+                                    </Text>
                                     <Pressable
-                                        style={[styles.selectInput, { backgroundColor: inputBg }]}
+                                        style={[
+                                            styles.selectInput,
+                                            {
+                                                backgroundColor: inputBg,
+                                                borderWidth: err('departureCity') ? 1 : 0,
+                                                borderColor: err('departureCity') ? dangerColor : 'transparent',
+                                            },
+                                        ]}
                                         onPress={() =>
                                             openSelect(
                                                 'Ville de départ',
@@ -540,13 +667,23 @@ export default function BusRentalRequestScreen() {
                                         </Text>
                                         <MaterialCommunityIcons name="chevron-down" size={20} color={iconColor} />
                                     </Pressable>
+                                    {err('departureCity') ? <Text style={[styles.errorText, { color: dangerColor }]}>{err('departureCity')}</Text> : null}
                                 </View>
                             </View>
                             <View style={styles.half}>
                                 <View style={styles.formField}>
-                                    <Text style={[styles.formLabel, { color: textColor }]}>Ville d'arrivée</Text>
+                                    <Text style={[styles.formLabel, { color: textColor }]}>
+                                        Ville d'arrivée <Text style={styles.required}>*</Text>
+                                    </Text>
                                     <Pressable
-                                        style={[styles.selectInput, { backgroundColor: inputBg }]}
+                                        style={[
+                                            styles.selectInput,
+                                            {
+                                                backgroundColor: inputBg,
+                                                borderWidth: err('arrivalCity') ? 1 : 0,
+                                                borderColor: err('arrivalCity') ? dangerColor : 'transparent',
+                                            },
+                                        ]}
                                         onPress={() =>
                                             openSelect(
                                                 "Ville d'arrivée",
@@ -561,47 +698,89 @@ export default function BusRentalRequestScreen() {
                                         </Text>
                                         <MaterialCommunityIcons name="chevron-down" size={20} color={iconColor} />
                                     </Pressable>
+                                    {err('arrivalCity') ? <Text style={[styles.errorText, { color: dangerColor }]}>{err('arrivalCity')}</Text> : null}
                                 </View>
                             </View>
                         </View>
                         <View style={styles.formField}>
-                            <Text style={[styles.formLabel, { color: textColor }]}>Détail lieu de départ</Text>
+                            <Text style={[styles.formLabel, { color: textColor }]}>
+                                Détail lieu de départ <Text style={styles.required}>*</Text>
+                            </Text>
                             <TextInput
-                                style={[styles.input, { backgroundColor: inputBg, color: textColor }]}
+                                style={[
+                                    styles.input,
+                                    {
+                                        backgroundColor: inputBg,
+                                        color: textColor,
+                                        borderWidth: err('departureDetail') ? 1 : 0,
+                                        borderColor: err('departureDetail') ? dangerColor : 'transparent',
+                                    },
+                                ]}
                                 value={departureDetail}
                                 onChangeText={setDepartureDetail}
                                 placeholder="Adresse, gare, etc."
                                 placeholderTextColor={placeholderColor}
                             />
+                            {err('departureDetail') ? <Text style={[styles.errorText, { color: dangerColor }]}>{err('departureDetail')}</Text> : null}
                         </View>
                         <View style={styles.formField}>
-                            <Text style={[styles.formLabel, { color: textColor }]}>Détail lieu d'arrivée</Text>
+                            <Text style={[styles.formLabel, { color: textColor }]}>
+                                Détail lieu d'arrivée <Text style={styles.required}>*</Text>
+                            </Text>
                             <TextInput
-                                style={[styles.input, { backgroundColor: inputBg, color: textColor }]}
+                                style={[
+                                    styles.input,
+                                    {
+                                        backgroundColor: inputBg,
+                                        color: textColor,
+                                        borderWidth: err('arrivalDetail') ? 1 : 0,
+                                        borderColor: err('arrivalDetail') ? dangerColor : 'transparent',
+                                    },
+                                ]}
                                 value={arrivalDetail}
                                 onChangeText={setArrivalDetail}
                                 placeholder="Adresse, gare, etc."
                                 placeholderTextColor={placeholderColor}
                             />
+                            {err('arrivalDetail') ? <Text style={[styles.errorText, { color: dangerColor }]}>{err('arrivalDetail')}</Text> : null}
                         </View>
                         <View style={styles.row}>
                             <View style={styles.half}>
                                 <View style={styles.formField}>
-                                    <Text style={[styles.formLabel, { color: textColor }]}>Type de trajet</Text>
+                                    <Text style={[styles.formLabel, { color: textColor }]}>
+                                        Type de trajet <Text style={styles.required}>*</Text>
+                                    </Text>
                                     <Pressable
-                                        style={[styles.selectInput, { backgroundColor: inputBg }]}
+                                        style={[
+                                            styles.selectInput,
+                                            {
+                                                backgroundColor: inputBg,
+                                                borderWidth: err('tripType') ? 1 : 0,
+                                                borderColor: err('tripType') ? dangerColor : 'transparent',
+                                            },
+                                        ]}
                                         onPress={() => openSelect('Type de trajet', TRIP_TYPE_OPTIONS, tripType, setTripType)}
                                     >
                                         <Text style={[styles.selectText, { color: textColor }]}>{TRIP_TYPE_OPTIONS.find((o) => o.value === tripType)?.label ?? tripType}</Text>
                                         <MaterialCommunityIcons name="chevron-down" size={20} color={iconColor} />
                                     </Pressable>
+                                    {err('tripType') ? <Text style={[styles.errorText, { color: dangerColor }]}>{err('tripType')}</Text> : null}
                                 </View>
                             </View>
                             <View style={styles.half}>
                                 <View style={styles.formField}>
-                                    <Text style={[styles.formLabel, { color: textColor }]}>Date de départ</Text>
+                                    <Text style={[styles.formLabel, { color: textColor }]}>
+                                        Date de départ <Text style={styles.required}>*</Text>
+                                    </Text>
                                     <Pressable
-                                        style={[styles.dateInput, { backgroundColor: inputBg }]}
+                                        style={[
+                                            styles.dateInput,
+                                            {
+                                                backgroundColor: inputBg,
+                                                borderWidth: err('departureDate') ? 1 : 0,
+                                                borderColor: err('departureDate') ? dangerColor : 'transparent',
+                                            },
+                                        ]}
                                         onPress={() => setActiveDatePicker('departure')}
                                     >
                                         <Text style={[styles.dateInputText, { color: departureDate ? textColor : placeholderColor }]}>
@@ -609,6 +788,7 @@ export default function BusRentalRequestScreen() {
                                         </Text>
                                         <MaterialCommunityIcons name="calendar" size={20} color={iconColor} />
                                     </Pressable>
+                                    {err('departureDate') ? <Text style={[styles.errorText, { color: dangerColor }]}>{err('departureDate')}</Text> : null}
                                 </View>
                             </View>
                         </View>
@@ -642,8 +822,19 @@ export default function BusRentalRequestScreen() {
                         <View style={styles.row}>
                             <View style={styles.half}>
                                 <View style={styles.formField}>
-                                    <Text style={[styles.formLabel, { color: textColor }]}>Nombre de passagers</Text>
-                                    <View style={[styles.stepperRow, { backgroundColor: inputBg }]}>
+                                    <Text style={[styles.formLabel, { color: textColor }]}>
+                                        Nombre de passagers <Text style={styles.required}>*</Text>
+                                    </Text>
+                                    <View
+                                        style={[
+                                            styles.stepperRow,
+                                            {
+                                                backgroundColor: inputBg,
+                                                borderWidth: err('passengerCount') ? 1 : 0,
+                                                borderColor: err('passengerCount') ? dangerColor : 'transparent',
+                                            },
+                                        ]}
+                                    >
                                         <Pressable onPress={() => setPassengerCount((c) => Math.max(1, c - 1))}>
                                             <MaterialCommunityIcons name="chevron-down" size={24} color={iconColor} />
                                         </Pressable>
@@ -652,6 +843,7 @@ export default function BusRentalRequestScreen() {
                                             <MaterialCommunityIcons name="chevron-up" size={24} color={iconColor} />
                                         </Pressable>
                                     </View>
+                                    {err('passengerCount') ? <Text style={[styles.errorText, { color: dangerColor }]}>{err('passengerCount')}</Text> : null}
                                 </View>
                             </View>
                             <View style={styles.half}>
@@ -677,9 +869,18 @@ export default function BusRentalRequestScreen() {
                         <View style={styles.row}>
                             <View style={styles.half}>
                                 <View style={styles.formField}>
-                                    <Text style={[styles.formLabel, { color: textColor }]}>Type de bus</Text>
+                                    <Text style={[styles.formLabel, { color: textColor }]}>
+                                        Type de bus <Text style={styles.required}>*</Text>
+                                    </Text>
                                     <Pressable
-                                        style={[styles.selectInput, { backgroundColor: inputBg }]}
+                                        style={[
+                                            styles.selectInput,
+                                            {
+                                                backgroundColor: inputBg,
+                                                borderWidth: err('busType') ? 1 : 0,
+                                                borderColor: err('busType') ? dangerColor : 'transparent',
+                                            },
+                                        ]}
                                         onPress={() => openSelect('Type de bus', BUS_TYPE_OPTIONS, busType, setBusType)}
                                     >
                                         <Text style={[styles.selectText, { color: textColor }]}>
@@ -687,12 +888,24 @@ export default function BusRentalRequestScreen() {
                                         </Text>
                                         <MaterialCommunityIcons name="chevron-down" size={20} color={iconColor} />
                                     </Pressable>
+                                    {err('busType') ? <Text style={[styles.errorText, { color: dangerColor }]}>{err('busType')}</Text> : null}
                                 </View>
                             </View>
                             <View style={styles.half}>
                                 <View style={styles.formField}>
-                                    <Text style={[styles.formLabel, { color: textColor }]}>Capacité requise</Text>
-                                    <View style={[styles.stepperRow, { backgroundColor: inputBg }]}>
+                                    <Text style={[styles.formLabel, { color: textColor }]}>
+                                        Capacité requise <Text style={styles.required}>*</Text>
+                                    </Text>
+                                    <View
+                                        style={[
+                                            styles.stepperRow,
+                                            {
+                                                backgroundColor: inputBg,
+                                                borderWidth: err('capacity') ? 1 : 0,
+                                                borderColor: err('capacity') ? dangerColor : 'transparent',
+                                            },
+                                        ]}
+                                    >
                                         <Pressable onPress={() => setCapacity((c) => Math.max(1, c - 1))}>
                                             <MaterialCommunityIcons name="chevron-down" size={24} color={iconColor} />
                                         </Pressable>
@@ -701,15 +914,25 @@ export default function BusRentalRequestScreen() {
                                             <MaterialCommunityIcons name="chevron-up" size={24} color={iconColor} />
                                         </Pressable>
                                     </View>
+                                    {err('capacity') ? <Text style={[styles.errorText, { color: dangerColor }]}>{err('capacity')}</Text> : null}
                                 </View>
                             </View>
                         </View>
                         <View style={styles.row}>
                             <View style={styles.half}>
                                 <View style={styles.formField}>
-                                    <Text style={[styles.formLabel, { color: textColor }]}>Bagages</Text>
+                                    <Text style={[styles.formLabel, { color: textColor }]}>
+                                        Bagages <Text style={styles.required}>*</Text>
+                                    </Text>
                                     <Pressable
-                                        style={[styles.selectInput, { backgroundColor: inputBg }]}
+                                        style={[
+                                            styles.selectInput,
+                                            {
+                                                backgroundColor: inputBg,
+                                                borderWidth: err('luggage') ? 1 : 0,
+                                                borderColor: err('luggage') ? dangerColor : 'transparent',
+                                            },
+                                        ]}
                                         onPress={() => openSelect('Bagages', LUGGAGE_OPTIONS, luggage, setLuggage)}
                                     >
                                         <Text style={[styles.selectText, { color: textColor }]}>
@@ -717,13 +940,23 @@ export default function BusRentalRequestScreen() {
                                         </Text>
                                         <MaterialCommunityIcons name="chevron-down" size={20} color={iconColor} />
                                     </Pressable>
+                                    {err('luggage') ? <Text style={[styles.errorText, { color: dangerColor }]}>{err('luggage')}</Text> : null}
                                 </View>
                             </View>
                             <View style={styles.half}>
                                 <View style={styles.formField}>
-                                    <Text style={[styles.formLabel, { color: textColor }]}>Accessibilité</Text>
+                                    <Text style={[styles.formLabel, { color: textColor }]}>
+                                        Accessibilité <Text style={styles.required}>*</Text>
+                                    </Text>
                                     <Pressable
-                                        style={[styles.selectInput, { backgroundColor: inputBg }]}
+                                        style={[
+                                            styles.selectInput,
+                                            {
+                                                backgroundColor: inputBg,
+                                                borderWidth: err('accessibility') ? 1 : 0,
+                                                borderColor: err('accessibility') ? dangerColor : 'transparent',
+                                            },
+                                        ]}
                                         onPress={() =>
                                             openSelect('Accessibilité', ACCESSIBILITY_OPTIONS, accessibility, setAccessibility)
                                         }
@@ -733,6 +966,7 @@ export default function BusRentalRequestScreen() {
                                         </Text>
                                         <MaterialCommunityIcons name="chevron-down" size={20} color={iconColor} />
                                     </Pressable>
+                                    {err('accessibility') ? <Text style={[styles.errorText, { color: dangerColor }]}>{err('accessibility')}</Text> : null}
                                 </View>
                             </View>
                         </View>
@@ -856,12 +1090,15 @@ export default function BusRentalRequestScreen() {
                             <MaterialCommunityIcons
                                 name={acceptTerms ? 'checkbox-marked' : 'checkbox-blank'}
                                 size={24}
-                                color={acceptTerms ? accentColor : iconColor}
+                                color={err('acceptTerms') ? dangerColor : acceptTerms ? accentColor : iconColor}
                             />
                             <Text style={[styles.checkLabel, { color: textColor }]}>
-                                J'accepte les conditions générales de location
+                                J'accepte les conditions générales de location <Text style={styles.required}>*</Text>
                             </Text>
                         </Pressable>
+                        {err('acceptTerms') ? (
+                            <Text style={[styles.errorText, { color: dangerColor, marginBottom: 8 }]}>{err('acceptTerms')}</Text>
+                        ) : null}
 
                         {/* Actions */}
                         <View style={styles.actions}>
@@ -871,8 +1108,8 @@ export default function BusRentalRequestScreen() {
                             <AppButton
                                 title="Envoyer la demande"
                                 onPress={handleSubmit}
-                                loading={isLoading}
-                                disabled={isLoading}
+                                loading={isSubmitting}
+                                disabled={isSubmitting}
                                 style={{ backgroundColor: accentColor }}
                             />
                         </View>

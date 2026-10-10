@@ -493,8 +493,8 @@ const styles = StyleSheet.create({
     },
     locationsTopButtonWrap: {
         paddingHorizontal: 16,
-        paddingTop: 12,
-        paddingBottom: 8,
+        paddingTop: 16,
+        paddingBottom: 4,
     },
     tabScrollView: {
         flex: 1,

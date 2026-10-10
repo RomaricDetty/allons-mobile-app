@@ -23,6 +23,8 @@ export interface User {
     role?: string | null;
     company?: string | null;
     address?: string | null | {
+        /** Appartement / suite / n° immeuble */
+        complement?: string | null;
         street?: string | null;
         city?: string | null;
         zipCode?: string | null;

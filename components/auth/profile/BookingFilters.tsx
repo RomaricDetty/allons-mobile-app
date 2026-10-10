@@ -214,7 +214,7 @@ export const BookingFilters: React.FC<BookingFiltersProps> = ({
                             />
                         </Pressable>
 
-                        <Pressable
+                        {/* <Pressable
                             style={styles.legendToggle}
                             onPress={() => setLegendOpen((v) => !v)}
                             hitSlop={8}
@@ -231,7 +231,7 @@ export const BookingFilters: React.FC<BookingFiltersProps> = ({
                                     ? 'Masquer la légende des statuts'
                                     : 'Que signifient les statuts ?'}
                             </Text>
-                        </Pressable>
+                        </Pressable> */}
 
                         {legendOpen && (
                             <ScrollView

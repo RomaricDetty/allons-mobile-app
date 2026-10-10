@@ -70,9 +70,10 @@ export const EditProfileBottomSheet = ({
         email: '',
         dateOfBirth: '',
         phone: '',
+        complement: '',
         street: '',
-        city: '',
         postalCode: '',
+        city: '',
         emergencyContactName: '',
         emergencyContactFullName: '',
         emergencyContactPhone: '',
@@ -107,14 +108,15 @@ export const EditProfileBottomSheet = ({
                 phoneNumber = phoneNumber.replace('+225', '');
             }
             
-            // Extraire la rue et la ville de l'adresse si elle existe
-            const addressParts = user.address?.split(',') || [];
-            const street = addressParts[0]?.trim() || '';
-            const city = addressParts[1]?.trim() || '';
-            
+            const addr = typeof user.address === 'object' && user.address ? user.address : null;
+            const complement = addr?.complement || '';
+            const street = addr?.street || (typeof user.address === 'string' ? user.address.split(',')[0]?.trim() || '' : '');
+            const city = addr?.city || (typeof user.address === 'string' ? user.address.split(',')[1]?.trim() || '' : '');
+            const postalCode = addr?.zipCode || addr?.postalCode || '';
+
             // Extraire le numéro du contact d'urgence (sans le code pays)
             let emergencyPhone = user.contactUrgent?.phone || '';
-            if (emergencyPhone.startsWith('+225')) {
+            if (typeof emergencyPhone === 'string' && emergencyPhone.startsWith('+225')) {
                 emergencyPhone = emergencyPhone.replace('+225', '');
             }
             
@@ -124,9 +126,10 @@ export const EditProfileBottomSheet = ({
                 email: user.email || '',
                 dateOfBirth: user.dateOfBirth ? formatDateForInput(user.dateOfBirth) : '',
                 phone: phoneNumber,
-                street: street,
-                city: city,
-                postalCode: '', // Non disponible dans l'interface User actuelle
+                complement,
+                street,
+                postalCode,
+                city,
                 emergencyContactName: user.contactUrgent?.fullName?.split(' ')[0] || '',
                 emergencyContactFullName: user.contactUrgent?.fullName || '',
                 emergencyContactPhone: emergencyPhone,
@@ -233,9 +236,13 @@ export const EditProfileBottomSheet = ({
                         digits: formData.phone.trim(),
                     },
                 ],
-                address: formData.street.trim()
-                    ? `${formData.street.trim()}${formData.city.trim() ? `, ${formData.city.trim()}` : ''}`
-                    : user?.address || null,
+                address: {
+                    complement: formData.complement.trim() || undefined,
+                    street: formData.street.trim() || undefined,
+                    zipCode: formData.postalCode.trim() || undefined,
+                    city: formData.city.trim() || undefined,
+                    country: 'Côte d\'Ivoire',
+                },
                 contactUrgent: {
                     fullName: formData.emergencyContactFullName.trim() || formData.emergencyContactName.trim(),
                     phone: `+225${formData.emergencyContactPhone.trim()}`,
@@ -453,6 +460,34 @@ export const EditProfileBottomSheet = ({
                                     </Pressable>
                                 </View>
 
+                                <FormField
+                                    label="Appartement ou numéro d'immeuble"
+                                    value={formData.complement}
+                                    onChangeText={(text) =>
+                                        setFormData((prev) => ({ ...prev, complement: text }))
+                                    }
+                                    placeholder="Ex: Apt 12B / Imm. Les Palmiers"
+                                />
+
+                                <FormField
+                                    label="Rue"
+                                    value={formData.street}
+                                    onChangeText={(text) =>
+                                        setFormData((prev) => ({ ...prev, street: text }))
+                                    }
+                                    placeholder="Votre rue"
+                                />
+
+                                <FormField
+                                    label="Code postal"
+                                    value={formData.postalCode}
+                                    onChangeText={(text) =>
+                                        setFormData((prev) => ({ ...prev, postalCode: text }))
+                                    }
+                                    placeholder="Votre code postal"
+                                    keyboardType="numeric"
+                                />
+
                                 <View style={styles.formField}>
                                     <Text style={[styles.formLabel, { color: fieldColors.text }]}>Pays</Text>
                                     <View
@@ -473,31 +508,12 @@ export const EditProfileBottomSheet = ({
                                 </View>
 
                                 <FormField
-                                    label="Rue"
-                                    value={formData.street}
-                                    onChangeText={(text) =>
-                                        setFormData((prev) => ({ ...prev, street: text }))
-                                    }
-                                    placeholder="Votre rue"
-                                />
-
-                                <FormField
                                     label="Ville"
                                     value={formData.city}
                                     onChangeText={(text) =>
                                         setFormData((prev) => ({ ...prev, city: text }))
                                     }
                                     placeholder="Votre ville"
-                                />
-
-                                <FormField
-                                    label="Code postal"
-                                    value={formData.postalCode}
-                                    onChangeText={(text) =>
-                                        setFormData((prev) => ({ ...prev, postalCode: text }))
-                                    }
-                                    placeholder="Votre code postal"
-                                    keyboardType="numeric"
                                 />
 
                                 <FormField

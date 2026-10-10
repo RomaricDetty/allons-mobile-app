@@ -106,8 +106,8 @@ export default function EditProfileScreen() {
         dateOfBirth: '',
         phone: '',
         phoneCountryCode: '+225',
+        complement: '',
         street: '',
-        apartment: '',
         city: '',
         postalCode: '',
         country: { id: '', name: '' },
@@ -207,7 +207,8 @@ export default function EditProfileScreen() {
 
                     // Extraire la rue et la ville de l'adresse si elle existe
                     // Le format de address est un objet : { city: "Abidjan", country: { id, name } }
-                    const street = userData.address?.street || ''; // La rue n'est pas disponible dans le format actuel
+                    const complement = userData.address?.complement || '';
+                    const street = userData.address?.street || '';
                     const city = userData.address?.city || '';
                     // Récupérer le pays : peut être un objet { id, name } ou juste un nom (chaîne)
                     const countryName = typeof userData.address?.country === 'string'
@@ -216,7 +217,7 @@ export default function EditProfileScreen() {
                     const countryId = typeof userData.address?.country === 'object' && userData.address?.country?.id
                         ? userData.address.country.id
                         : '';
-                    const postalCode = userData.address?.zipCode || '';
+                    const postalCode = userData.address?.zipCode || userData.address?.postalCode || '';
 
                     // Extraire le numéro du contact d'urgence et le code pays
                     let emergencyPhone = '';
@@ -261,8 +262,8 @@ export default function EditProfileScreen() {
                         dateOfBirth: userData.dateOfBirth ? formatDateForInput(userData.dateOfBirth) : '',
                         phone: phoneNumber,
                         phoneCountryCode: phoneCountryCode,
+                        complement: complement,
                         street: street,
-                        apartment: '',
                         city: city,
                         postalCode: postalCode,
                         emergencyContactFirstName: emergencyFirstName,
@@ -477,15 +478,11 @@ export default function EditProfileScreen() {
                 ],
                 address: formData.country && formData.country.id
                     ? {
-                        city: formData.city.trim(),
-                        street: [
-                            formData.street.trim(),
-                            formData.apartment.trim() ? `Apt ${formData.apartment.trim()}` : '',
-                        ]
-                            .filter(Boolean)
-                            .join(', '),
+                        complement: formData.complement.trim() || undefined,
+                        street: formData.street.trim() || undefined,
                         zipCode: formData.postalCode.trim() || '',
                         country: formData.country.name || '',
+                        city: formData.city.trim(),
                     }
                     : null,
                 contactUrgent: {
@@ -669,30 +666,21 @@ export default function EditProfileScreen() {
                             <SectionHeader number={2} title="Adresse" />
 
                             <FormField
+                                label="Appartement ou numéro d'immeuble"
+                                value={formData.complement}
+                                onChangeText={(text) =>
+                                    setFormData((prev) => ({ ...prev, complement: text }))
+                                }
+                                placeholder="Ex: Apt 12B / Imm. Les Palmiers"
+                            />
+
+                            <FormField
                                 label="Rue"
                                 value={formData.street}
                                 onChangeText={(text) =>
                                     setFormData((prev) => ({ ...prev, street: text }))
                                 }
                                 placeholder="Votre rue"
-                            />
-
-                            <FormField
-                                label="Appartement / suite (optionnel)"
-                                value={formData.apartment}
-                                onChangeText={(text) =>
-                                    setFormData((prev) => ({ ...prev, apartment: text }))
-                                }
-                                placeholder="Ex: Apt 12B"
-                            />
-
-                            <FormField
-                                label="Ville"
-                                value={formData.city}
-                                onChangeText={(text) =>
-                                    setFormData((prev) => ({ ...prev, city: text }))
-                                }
-                                placeholder="Votre ville"
                             />
 
                             <FormField
@@ -725,6 +713,15 @@ export default function EditProfileScreen() {
                                     }));
                                 }}
                                 onOpenBottomSheet={openSelectionBottomSheet}
+                            />
+
+                            <FormField
+                                label="Ville"
+                                value={formData.city}
+                                onChangeText={(text) =>
+                                    setFormData((prev) => ({ ...prev, city: text }))
+                                }
+                                placeholder="Votre ville"
                             />
                         </View>
 

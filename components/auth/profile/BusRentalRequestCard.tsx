@@ -1,45 +1,32 @@
 // @ts-nocheck
+import { AppButton } from '@/components/ui/AppButton';
 import { formatBookingDate } from '@/constants/functions';
 import { useAppColors } from '@/hooks/use-app-colors';
-import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useMemo } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 /** Libellés pour les types de bus (API → affichage) */
 const BUS_TYPE_LABELS: Record<string, string> = {
+    BUS: 'Bus standard',
     STANDARD: 'Bus standard',
     LUXURY_BUS: 'Bus de luxe',
     MINIBUS: 'Minibus',
 };
 
-/** Statuts des demandes de location (alignés sur BusRentalRequestStatus backend) */
+const TRIP_TYPE_LABELS: Record<string, string> = {
+    ONE_WAY: 'Aller simple',
+    ROUND_TRIP: 'Aller-retour',
+};
+
+/** Badge statut (court) */
 const STATUS_LABELS: Record<string, string> = {
-    PENDING: 'En attente de réponse',
+    PENDING: 'En attente',
     ACCEPTED: 'Accepté',
     REFUSED: 'Refusé',
     CONFIRMED: 'Confirmé',
     CANCELLED: 'Annulé',
 };
-
-/** Texte principal du statut (sous-titre) */
-const STATUS_MAIN_LABELS: Record<string, string> = {
-    PENDING: 'En attente de devis',
-    ACCEPTED: 'Demande acceptée',
-    REFUSED: 'Demande refusée',
-    CONFIRMED: 'Demande confirmée (payée)',
-    CANCELLED: 'Demande annulée',
-};
-
-/** Couleurs du badge par statut */
-const STATUS_BADGE_COLORS: Record<string, { backgroundColor: string; color: string }> = {
-    PENDING: { backgroundColor: '#F5E6C8', color: '#5C4A32' },
-    ACCEPTED: { backgroundColor: '#CCE5FF', color: '#004085' },
-    REFUSED: { backgroundColor: '#F8D7DA', color: '#721C24' },
-    CANCELLED: { backgroundColor: '#F8D7DA', color: '#721C24' },
-    CONFIRMED: { backgroundColor: '#D4EDDA', color: '#155724' },
-};
-
-const DEFAULT_STATUS_BADGE_COLORS = { backgroundColor: '#F5E6C8', color: '#5C4A32' };
 
 export interface BusRentalRequestItem {
     id: string;
@@ -64,197 +51,256 @@ interface BusRentalRequestCardProps {
 }
 
 /**
- * Carte d'affichage d'une demande de location de bus.
- * Design type carte trajet : DÉPART | timeline | ARRIVÉE, badge places, type bus, statut.
+ * Formate la date de location : masque l’heure si 00:00.
  */
-export const BusRentalRequestCard: React.FC<BusRentalRequestCardProps> = ({ item, onViewDetails, onPayRequest }) => {
+function formatRentalDate(dateString?: string): string {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return '';
+    const isMidnight = date.getHours() === 0 && date.getMinutes() === 0;
+    if (isMidnight) {
+        return date.toLocaleDateString('fr-FR', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+        });
+    }
+    return formatBookingDate(dateString);
+}
+
+/**
+ * Ton visuel du badge selon le statut.
+ */
+function getStatusTone(status: string, colors: ReturnType<typeof useAppColors>) {
+    switch (status) {
+        case 'CONFIRMED':
+            return { backgroundColor: colors.successMuted, color: colors.success };
+        case 'ACCEPTED':
+            return { backgroundColor: colors.infoMuted, color: colors.activeTabColor };
+        case 'PENDING':
+            return { backgroundColor: 'rgba(184, 110, 0, 0.12)', color: '#B86E00' };
+        case 'REFUSED':
+        case 'CANCELLED':
+            return { backgroundColor: colors.dangerMuted, color: colors.danger };
+        default:
+            return { backgroundColor: colors.inputBackground, color: colors.secondaryText };
+    }
+}
+
+/**
+ * Extrait le motif de refus depuis les champs API possibles.
+ */
+function getRefusalReason(item: BusRentalRequestItem): string {
+    const raw =
+        (item as any)?.refusalReason ||
+        (item as any)?.rejectReason ||
+        (item as any)?.refusalMessage ||
+        (item as any)?.rejectionReason ||
+        (item as any)?.reason;
+    return raw ? String(raw).trim() : '';
+}
+
+/**
+ * Carte demande de location — alignée sur BookingCard (route / meta / actions).
+ */
+export const BusRentalRequestCard: React.FC<BusRentalRequestCardProps> = ({
+    item,
+    onViewDetails,
+    onPayRequest,
+}) => {
     const colors = useAppColors();
-    const departureDateFormatted = item.departureDate ? formatBookingDate(item.departureDate) : '';
-    const returnDateFormatted = item.returnDate ? formatBookingDate(item.returnDate) : '';
+    const fromCity = item.departureCity?.name || '—';
+    const toCity = item.arrivalCity?.name || '—';
+    const departureDateFormatted = formatRentalDate(item.departureDate);
+    const returnDateFormatted = formatRentalDate(item.returnDate || undefined);
     const isRoundTrip = item.tripType === 'ROUND_TRIP';
-    const busTypeLabel = item.busType ? (BUS_TYPE_LABELS[item.busType] ?? item.busType) : '—';
+    const busTypeLabel = item.busType ? BUS_TYPE_LABELS[item.busType] ?? item.busType : '—';
+    const tripTypeLabel = item.tripType ? TRIP_TYPE_LABELS[item.tripType] ?? item.tripType : '';
     const status = item.status ?? 'PENDING';
-    const statusMainText = STATUS_MAIN_LABELS[status] ?? 'En attente de réponse';
+    const statusTone = getStatusTone(status, colors);
     const statusBadgeText = STATUS_LABELS[status] ?? 'En attente';
-    const badgeColors = STATUS_BADGE_COLORS[status] ?? DEFAULT_STATUS_BADGE_COLORS;
-    const capacity = item.requiredCapacity ?? 0;
+    const capacity = item.requiredCapacity ?? item.passengerCount ?? 0;
     const isPayable = status === 'ACCEPTED' && typeof onPayRequest === 'function';
+    const refusalReason = useMemo(
+        () => (status === 'REFUSED' ? getRefusalReason(item) : ''),
+        [status, item],
+    );
+
+    const scheduleLine = [
+        departureDateFormatted,
+        tripTypeLabel,
+        isRoundTrip && returnDateFormatted ? `Retour ${returnDateFormatted}` : '',
+    ]
+        .filter(Boolean)
+        .join(' · ');
 
     const cardContent = (
         <>
-            {/* Section trajet : DÉPART | timeline | ARRIVÉE */}
-            <View style={styles.tripRow}>
-                <View style={styles.departureCol}>
-                    <Text style={[styles.label, { color: colors.secondaryText }]}>DÉPART</Text>
-                    {departureDateFormatted ? (
-                        <Text style={[styles.mainValue, { color: colors.text }]}>{item.departureCity.name}</Text>
-                    ) : null}
-                    {item.departureCity?.name ? (
-                        <Text style={[styles.secondaryValue, { color: colors.text }]}>{departureDateFormatted}</Text>
-                    ) : null}
-                </View>
-
-                <View style={styles.timelineCol}>
-                    <View style={[styles.timelineDot, { backgroundColor: colors.text }]} />
-                    <View style={[styles.timelineLine, { backgroundColor: colors.text }]} />
-                    <View style={[styles.timelineDot, { backgroundColor: colors.text }]} />
-                </View>
-
-                <View style={[styles.arrivalCol, { alignItems: 'flex-end' }]}>
-                    <Text style={[styles.label, { color: colors.secondaryText }]}>ARRIVÉE</Text>
-                    {item.arrivalCity?.name ? (
-                        <Text style={[styles.mainValue, styles.arrivalText, { color: colors.text }]}>{item.arrivalCity.name}</Text>
-                    ) : null}
-                    {isRoundTrip && returnDateFormatted ? (
-                        <Text style={[styles.secondaryValue, styles.arrivalText, { color: colors.text }]}>
-                            {returnDateFormatted}
+            <View style={styles.topRow}>
+                <View style={styles.routeBlock}>
+                    <Text style={[styles.routeText, { color: colors.text }]} numberOfLines={2}>
+                        {fromCity} → {toCity}
+                    </Text>
+                    {scheduleLine ? (
+                        <Text style={[styles.scheduleText, { color: colors.secondaryText }]} numberOfLines={2}>
+                            {scheduleLine}
                         </Text>
                     ) : null}
                 </View>
-            </View>
-
-            {/* Statut (sous la section trajet) */}
-            <View style={styles.statusRow}>
-                <Text style={[styles.statusMainText, { color: colors.text }]}>{statusMainText}</Text>
-                <View style={[styles.statusBadge, { backgroundColor: badgeColors.backgroundColor }]}>
-                    <Text style={[styles.statusBadgeText, { color: badgeColors.color }]}>{statusBadgeText}</Text>
+                <View style={[styles.statusBadge, { backgroundColor: statusTone.backgroundColor }]}>
+                    <Text style={[styles.statusBadgeText, { color: statusTone.color }]}>
+                        {statusBadgeText}
+                    </Text>
                 </View>
             </View>
 
-            {/* Bas : badge places + type bus */}
-            <View style={styles.footerRow}>
+            <View style={[styles.metaBlock, { borderColor: colors.border }]}>
+                <View style={styles.metaRow}>
+                    <View style={[styles.metaIcon, { backgroundColor: colors.infoMuted }]}>
+                        <MaterialCommunityIcons name="bus" size={18} color={colors.activeTabColor} />
+                    </View>
+                    <Text style={[styles.metaText, { color: colors.text }]} numberOfLines={1}>
+                        {busTypeLabel}
+                    </Text>
+                </View>
                 {capacity > 0 ? (
-                    <View style={styles.placesBadge}>
-                        <Text style={styles.placesBadgeText}>{capacity} place{capacity > 1 ? 's' : ''} demandée{capacity > 1 ? 's' : ''}</Text>
+                    <View style={styles.metaRow}>
+                        <View style={[styles.metaIcon, { backgroundColor: colors.infoMuted }]}>
+                            <MaterialCommunityIcons
+                                name="seat-passenger"
+                                size={18}
+                                color={colors.activeTabColor}
+                            />
+                        </View>
+                        <Text style={[styles.metaText, { color: colors.secondaryText }]}>
+                            {capacity} place{capacity > 1 ? 's' : ''} demandée{capacity > 1 ? 's' : ''}
+                        </Text>
                     </View>
                 ) : null}
-                <Text style={[styles.busTypeText, { color: colors.text }]}>{busTypeLabel}</Text>
             </View>
 
-            {isPayable ? (
-                <Pressable style={styles.payRow} onPress={() => onPayRequest?.(item)}>
-                    <Text style={[styles.payLabel, { color: colors.activeTabColor }]}>Payer</Text>
-                    <MaterialCommunityIcons name="chevron-right" size={20} color={colors.activeTabColor} />
-                </Pressable>
+            {refusalReason ? (
+                <View style={[styles.refusalBox, { backgroundColor: colors.dangerMuted }]}>
+                    <Text style={[styles.refusalLabel, { color: colors.danger }]}>Motif du refus</Text>
+                    <Text style={[styles.refusalText, { color: colors.danger }]} numberOfLines={3}>
+                        {refusalReason}
+                    </Text>
+                </View>
             ) : null}
+
+            <View style={styles.actions}>
+                {isPayable ? (
+                    <AppButton
+                        title="Payer"
+                        onPress={() => onPayRequest?.(item)}
+                        icon={<MaterialCommunityIcons name="wallet-outline" size={18} color="#FFFFFF" />}
+                    />
+                ) : null}
+                {onViewDetails ? (
+                    <AppButton
+                        title="Voir le détail"
+                        onPress={() => onViewDetails(item)}
+                        variant={isPayable ? 'secondary' : 'primary'}
+                        icon={
+                            <MaterialCommunityIcons
+                                name="file-document-outline"
+                                size={18}
+                                color={isPayable ? colors.activeTabColor : '#FFFFFF'}
+                            />
+                        }
+                    />
+                ) : null}
+            </View>
         </>
     );
 
-    const cardStyle = [styles.card, { backgroundColor: colors.cardBackground, borderWidth: 1, borderColor: colors.border }];
-
-    if (onViewDetails) {
-        return (
-            <Pressable style={cardStyle} onPress={() => onViewDetails(item)}>
-                {cardContent}
-            </Pressable>
-        );
-    }
-    return <View style={cardStyle}>{cardContent}</View>;
+    return (
+        <View
+            style={[
+                styles.card,
+                { backgroundColor: colors.cardBackground, borderColor: colors.border },
+            ]}
+        >
+            {cardContent}
+        </View>
+    );
 };
 
 const styles = StyleSheet.create({
     card: {
-        borderRadius: 16,
+        borderRadius: 12,
         padding: 16,
-        marginBottom: 16,
+        marginBottom: 14,
+        borderWidth: 1,
+        gap: 14,
     },
-    tripRow: {
+    topRow: {
         flexDirection: 'row',
         alignItems: 'flex-start',
-        marginBottom: 16,
+        gap: 10,
     },
-    departureCol: {
+    routeBlock: {
         flex: 1,
+        minWidth: 0,
+        gap: 6,
     },
-    timelineCol: {
-        paddingHorizontal: 12,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    timelineDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-    },
-    timelineLine: {
-        width: 2,
-        height: 28,
-    },
-    arrivalCol: {
-        flex: 1,
-    },
-    label: {
-        fontSize: 11,
-        fontFamily: 'Ubuntu_Medium',
-        letterSpacing: 0.5,
-        marginBottom: 4,
-    },
-    /** Valeur principale (date départ, ville arrivée) : gras, même taille */
-    mainValue: {
-        fontSize: 16,
+    routeText: {
+        fontSize: 18,
         fontFamily: 'Ubuntu_Bold',
-        marginBottom: 2,
+        lineHeight: 24,
     },
-    /** Valeur secondaire (ville départ, date retour) : même taille, même graisse */
-    secondaryValue: {
-        fontSize: 14,
-        fontFamily: 'Ubuntu_Regular',
-    },
-    arrivalText: {
-        textAlign: 'right',
-    },
-    statusRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: 12,
-    },
-    statusMainText: {
+    scheduleText: {
         fontSize: 13,
         fontFamily: 'Ubuntu_Regular',
+        lineHeight: 18,
     },
     statusBadge: {
         paddingHorizontal: 10,
-        paddingVertical: 4,
+        paddingVertical: 5,
         borderRadius: 8,
     },
     statusBadgeText: {
         fontSize: 12,
-        fontFamily: 'Ubuntu_Medium',
-        color: '#5C4A32',
-    },
-    footerRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-    },
-    payRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'flex-end',
-        marginTop: 12,
-        paddingTop: 12,
-        borderTopWidth: 1,
-        borderTopColor: 'rgba(0,0,0,0.08)',
-        gap: 4,
-    },
-    payLabel: {
-        fontSize: 14,
         fontFamily: 'Ubuntu_Bold',
     },
-    placesBadge: {
-        backgroundColor: 'rgba(76, 175, 80, 0.25)',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 10,
+    metaBlock: {
+        borderTopWidth: StyleSheet.hairlineWidth,
+        paddingTop: 12,
+        gap: 10,
     },
-    placesBadgeText: {
-        fontSize: 12,
-        fontFamily: 'Ubuntu_Medium',
-        color: '#2E7D32',
+    metaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
     },
-    busTypeText: {
+    metaIcon: {
+        width: 32,
+        height: 32,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    metaText: {
+        flex: 1,
         fontSize: 14,
         fontFamily: 'Ubuntu_Medium',
+    },
+    refusalBox: {
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        gap: 4,
+    },
+    refusalLabel: {
+        fontSize: 12,
+        fontFamily: 'Ubuntu_Bold',
+    },
+    refusalText: {
+        fontSize: 13,
+        fontFamily: 'Ubuntu_Regular',
+        lineHeight: 18,
+    },
+    actions: {
+        gap: 10,
     },
 });
