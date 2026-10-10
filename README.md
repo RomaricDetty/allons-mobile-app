@@ -1,56 +1,105 @@
-# Welcome to your Expo app 👋
+# AllOn — Application mobile
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Application client **AllOn** (Expo / React Native) pour la réservation de trajets interurbains en Côte d’Ivoire : recherche, billetterie, paiement, suivi de trajet, location de bus et espace profil.
 
-## Get started
+## Stack
 
-1. Use appropriate version of nodejs
+- **Expo SDK 54** + **expo-router** (file-based routing)
+- **React Native 0.81** / React 19
+- **Axios** → API `https://api.allon-apps.com`
+- **SecureStore** + AsyncStorage (tokens / prefs)
+- **Mapbox** / cartes, **Socket.IO** (suivi temps réel)
+- **expo-image**, Reanimated, etc.
 
-   ```bash
-   nvm use 22
-   ```
+## Prérequis
 
-2. Install dependencies
+- Node.js **22** (recommandé via `nvm`)
+- Compte Expo / Xcode (iOS) / Android Studio selon la cible
 
-   ```bash
-   npm install
-   ```
-
-3. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Démarrage
 
 ```bash
-npm run reset-project
+nvm use 22
+npm install
+npx expo start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Scripts utiles :
 
-## Learn more
+| Commande | Description |
+| --- | --- |
+| `npm start` | Metro / Expo |
+| `npm run ios` | Build / run iOS |
+| `npm run android` | Build / run Android |
+| `npm run lint` | Lint Expo |
 
-To learn more about developing your project with Expo, look at the following resources:
+## Structure (aperçu)
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```
+app/                 # Écrans (expo-router) : tabs, trip, payment, profile, auth
+api/                 # Clients HTTP (auth, trips, bookings, …)
+components/          # UI réutilisable (auth, tickets, skeletons, …)
+contexts/            # AuthContext (session globale)
+hooks/               # Profil, paiement, idle session, …
+utils/
+  authSession.ts      # Refresh access token + retry 401
+  sessionActivity.ts # Idle 30 min (aligné backend)
+  storage.ts         # SecureStore / session persistée
+assets/              # Images, splash, onboarding
+```
 
-## Join the community
+## Authentification & session
 
-Join our community of developers creating universal apps.
+Le backend invalide l’**access token** après **30 minutes d’inactivité**. L’app gère cela via le **refresh token** (pas de déconnexion sur simple idle).
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+| Comportement | Détail |
+| --- | --- |
+| TTL access local | Plafonné à **30 min** (`expires_at`) |
+| Refresh proactif | Après ~**25 min** d’idle, ou si `expires_at` proche |
+| Retour au premier plan | Renouvellement de l’access si besoin |
+| 401 API | Refresh forcé + **1 retry** avant abandon |
+| Déconnexion | Uniquement si le **refresh token** est absent ou rejeté (401/403) |
+
+Fichiers clés :
+
+- `utils/authSession.ts` — `ensureValidAccessToken`, `withValidAccessToken`
+- `utils/sessionActivity.ts` — suivi d’activité / seuils idle
+- `contexts/AuthContext.tsx` — user global, `ensureSession`, `signOut`
+- `hooks/useSessionIdleTimeout.ts` — bump activité + refresh au resume (pas de `signOut` idle)
+
+Login / register envoient `X-App-Audience: frontoffice_mobile`. Refresh : `POST /auth/refresh-token` avec `{ refreshToken }`.
+
+## Configuration API
+
+```ts
+// api/config.ts
+export const baseUrl = 'https://api.allon-apps.com';
+```
+
+## Fonctionnalités principales
+
+- Onboarding + auth (connexion / inscription / mot de passe oublié)
+- Accueil : salutation, recherche, top itinéraires, voyages de la semaine, CTA location bus
+- Parcours réservation : recherche → sièges → passagers → paiement → ticket / QR
+- Profil : infos, billets (filtres), demandes de location de bus
+- Suivi de trajet / cartes, notifications, reçus PDF
+
+## Performances (notes)
+
+- Images home compressées + `expo-image` (cache mémoire/disque)
+- Listes en `FlatList` (tickets, locations, trajets retour)
+- Skeleton d’accueil aligné sur le layout réel
+- Splash allégé (assets critiques + délai court)
+- Cache / TTL silencieux sur refetch focus (profil, home)
+
+## Conventions
+
+- Réponses et UI en **français**
+- Commenter les nouvelles fonctions en **JSDoc**
+- Respecter le style existant (Clean Code : KISS, DRY, YAGNI)
+- Ne pas committer de secrets (`.env`, credentials)
+
+## Ressources
+
+- [Documentation Expo](https://docs.expo.dev/)
+- [Expo Router](https://docs.expo.dev/router/introduction/)
