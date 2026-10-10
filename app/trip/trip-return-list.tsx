@@ -8,8 +8,9 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
+    FlatList,
+    Platform,
     Pressable,
-    ScrollView,
     StyleSheet,
     Text,
     View
@@ -184,6 +185,71 @@ const TripReturnList = () => {
         navigation.goBack();
     }, [navigation]);
 
+    const tripKeyExtractor = useCallback((item: Trip) => String(item.id), []);
+
+    const renderTripItem = useCallback(
+        ({ item }: { item: Trip }) => (
+            <TripCard
+                item={item}
+                cardBackgroundColor={themeColors.cardBackgroundColor}
+                borderColor={themeColors.borderColor}
+                textColor={textColor}
+                secondaryTextColor={themeColors.secondaryTextColor}
+                tintColor={tintColor}
+                onSelectTrip={handleSelectReturnTrip}
+            />
+        ),
+        [themeColors, textColor, tintColor, handleSelectReturnTrip],
+    );
+
+    const listHeader = useMemo(
+        () => (
+            <>
+                <View style={styles.routeContainer}>
+                    <Text style={[styles.routeCity, { color: textColor }]}>{routeCities.departureCity}</Text>
+                    <Icon name="arrow-right" size={24} color={tintColor} />
+                    <Text style={[styles.routeCity, { color: textColor }]}>{routeCities.arrivalCity}</Text>
+                </View>
+
+                <View style={styles.titleContainer}>
+                    <Text style={[styles.title, { color: textColor }]}>Voyages retour disponibles</Text>
+                </View>
+
+                <View style={styles.summaryContainer}>
+                    <Text style={[styles.summaryText, { color: themeColors.secondaryTextColor }]}>
+                        {totalTrips} {totalTrips > 1 ? 'trajets disponibles' : 'trajet disponible'}
+                    </Text>
+                    <Pressable style={styles.sortButton} onPress={handleOpenSortModal}>
+                        <Text style={[styles.sortButtonText, { color: textColor }]}>{selectedSort}</Text>
+                        <Icon name="chevron-down" size={16} color={iconColor} />
+                    </Pressable>
+                </View>
+            </>
+        ),
+        [
+            routeCities.departureCity,
+            routeCities.arrivalCity,
+            textColor,
+            tintColor,
+            themeColors.secondaryTextColor,
+            totalTrips,
+            selectedSort,
+            handleOpenSortModal,
+            iconColor,
+        ],
+    );
+
+    const listEmpty = useMemo(
+        () => (
+            <View style={styles.emptyContainer}>
+                <MaterialIcons name="directions-bus" size={40} color={tintColor} />
+                <Text style={[styles.emptyText, { color: themeColors.secondaryTextColor }]}>
+                    Aucun trajet disponible
+                </Text>
+            </View>
+        ),
+        [tintColor, themeColors.secondaryTextColor],
+    );
 
     return (
         <>
@@ -200,60 +266,20 @@ const TripReturnList = () => {
                     <BackButton onPress={handleGoBack} color={iconColor} />
                 </View>
 
-                <ScrollView
+                <FlatList
                     style={styles.scrollView}
                     contentContainerStyle={styles.scrollContent}
+                    data={sortedTrips}
+                    keyExtractor={tripKeyExtractor}
+                    renderItem={renderTripItem}
+                    ListHeaderComponent={listHeader}
+                    ListEmptyComponent={listEmpty}
                     showsVerticalScrollIndicator={false}
-                >
-                    {/* Route */}
-                    <View style={styles.routeContainer}>
-                        <Text style={[styles.routeCity, { color: textColor }]}>{routeCities.departureCity}</Text>
-                        <Icon name="arrow-right" size={24} color={tintColor} />
-                        <Text style={[styles.routeCity, { color: textColor }]}>{routeCities.arrivalCity}</Text>
-                    </View>
-
-                    {/* Titre */}
-                    <View style={styles.titleContainer}>
-                        <Text style={[styles.title, { color: textColor }]}>Voyages retour disponibles</Text>
-                    </View>
-
-                    {/* Résumé et Tri */}
-                    <View style={styles.summaryContainer}>
-                        <Text style={[styles.summaryText, { color: themeColors.secondaryTextColor }]}>
-                            {totalTrips} {totalTrips > 1 ? 'trajets disponibles' : 'trajet disponible'}
-                        </Text>
-                        <Pressable
-                            style={styles.sortButton}
-                            onPress={handleOpenSortModal}
-                        >
-                            <Text style={[styles.sortButtonText, { color: textColor }]}>{selectedSort}</Text>
-                            <Icon name="chevron-down" size={16} color={iconColor} />
-                        </Pressable>
-                    </View>
-
-                    {/* Liste des trajets */}
-                    {sortedTrips.length > 0 ? (
-                        <View style={styles.tripsList}>
-                            {sortedTrips.map((item) => (
-                                <TripCard
-                                    key={item.id}
-                                    item={item}
-                                    cardBackgroundColor={themeColors.cardBackgroundColor}
-                                    borderColor={themeColors.borderColor}
-                                    textColor={textColor}
-                                    secondaryTextColor={themeColors.secondaryTextColor}
-                                    tintColor={tintColor}
-                                    onSelectTrip={handleSelectReturnTrip}
-                                />
-                            ))}
-                        </View>
-                    ) : (
-                        <View style={styles.emptyContainer}>
-                            <MaterialIcons name="directions-bus" size={40} color={tintColor} />
-                            <Text style={[styles.emptyText, { color: themeColors.secondaryTextColor }]}>Aucun trajet disponible</Text>
-                        </View>
-                    )}
-                </ScrollView>
+                    initialNumToRender={8}
+                    maxToRenderPerBatch={8}
+                    windowSize={7}
+                    removeClippedSubviews={Platform.OS === 'android'}
+                />
             </View>
             {/* BottomSheet de tri */}
             <BottomSheet<SortOption>

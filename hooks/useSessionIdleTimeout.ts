@@ -1,9 +1,11 @@
 import { useAuth } from '@/contexts/AuthContext';
+import {
+    bumpSessionActivity,
+    PROACTIVE_REFRESH_IDLE_MS,
+} from '@/utils/sessionActivity';
 import { usePathname } from 'expo-router';
 import { useEffect, useRef } from 'react';
-import { AppState, AppStateStatus, InteractionManager } from 'react-native';
-
-const IDLE_MS = 45 * 60 * 1000;
+import { AppState, AppStateStatus } from 'react-native';
 
 const PAYMENT_PATH_PREFIXES = ['/payment', 'payment/'];
 
@@ -13,13 +15,14 @@ function isPaymentPath(pathname: string | null | undefined): boolean {
 }
 
 /**
- * Déconnexion après 45 min d'inactivité (navigation / retour app).
- * N'agit pas sur les écrans /payment/* (anti-régression checkout).
+ * Suit l’inactivité pour coller aux 30 min backend :
+ * - bump d’activité à la navigation / retour au premier plan
+ * - si idle ≥ 25 min au resume → refresh access (jamais de signOut sur idle seul)
+ * Les écrans /payment/* ne déclenchent pas de refresh agressif.
  */
 export function useSessionIdleTimeout(enabled = true) {
-    const { isAuthenticated, signOut } = useAuth();
+    const { isAuthenticated, ensureSession } = useAuth();
     const pathname = usePathname();
-    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const lastActiveRef = useRef(Date.now());
     const pathnameRef = useRef(pathname);
 
@@ -27,58 +30,38 @@ export function useSessionIdleTimeout(enabled = true) {
         pathnameRef.current = pathname;
     }, [pathname]);
 
+    // Navigation = activité
+    useEffect(() => {
+        if (!enabled || !isAuthenticated) return;
+        lastActiveRef.current = Date.now();
+        void bumpSessionActivity();
+    }, [enabled, isAuthenticated, pathname]);
+
     useEffect(() => {
         if (!enabled || !isAuthenticated) {
-            if (timerRef.current) clearTimeout(timerRef.current);
             return;
         }
 
-        const clearTimer = () => {
-            if (timerRef.current) {
-                clearTimeout(timerRef.current);
-                timerRef.current = null;
-            }
-        };
+        const onAppState = (state: AppStateStatus) => {
+            if (state !== 'active') return;
 
-        const schedule = () => {
-            clearTimer();
-            timerRef.current = setTimeout(async () => {
-                if (isPaymentPath(pathnameRef.current)) {
-                    schedule();
-                    return;
-                }
-                await signOut();
-            }, IDLE_MS);
-        };
-
-        const bump = () => {
+            const idle = Date.now() - lastActiveRef.current;
             lastActiveRef.current = Date.now();
+
             if (isPaymentPath(pathnameRef.current)) {
-                clearTimer();
+                void bumpSessionActivity();
                 return;
             }
-            schedule();
-        };
 
-        bump();
-
-        const onAppState = (state: AppStateStatus) => {
-            if (state === 'active') {
-                const idle = Date.now() - lastActiveRef.current;
-                if (idle >= IDLE_MS && !isPaymentPath(pathnameRef.current)) {
-                    InteractionManager.runAfterInteractions(() => {
-                        void signOut();
-                    });
-                    return;
-                }
-                bump();
+            // Idle proche/au‑delà du seuil backend → renouveler l’access, pas déconnecter
+            if (idle >= PROACTIVE_REFRESH_IDLE_MS) {
+                void ensureSession();
+            } else {
+                void bumpSessionActivity();
             }
         };
 
         const sub = AppState.addEventListener('change', onAppState);
-        return () => {
-            clearTimer();
-            sub.remove();
-        };
-    }, [enabled, isAuthenticated, signOut, pathname]);
+        return () => sub.remove();
+    }, [enabled, isAuthenticated, ensureSession]);
 }

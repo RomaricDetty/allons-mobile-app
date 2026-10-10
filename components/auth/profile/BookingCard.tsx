@@ -4,7 +4,7 @@ import { formatBookingDate, formatStatus } from '@/constants/functions';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { Booking } from '@/interfaces';
 import { useNavigation } from '@react-navigation/native';
-import React, { useCallback, useMemo } from 'react';
+import React, { memo, useCallback, useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
@@ -67,9 +67,9 @@ function canFinalizePayment(status?: string): boolean {
 }
 
 /**
- * Carte de réservation — hiérarchie route / horaire / prix / actions
+ * Carte de réservation — hiérarchie route / horaire / prix / actions (mémoisée)
  */
-export const BookingCard: React.FC<BookingCardProps> = ({ booking }) => {
+export const BookingCard = memo(function BookingCard({ booking }: BookingCardProps) {
     const colors = useAppColors();
     const navigation = useNavigation();
 
@@ -197,7 +197,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({ booking }) => {
             </View>
         </View>
     );
-};
+});
 
 const styles = StyleSheet.create({
     card: {

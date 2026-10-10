@@ -86,32 +86,45 @@ export default function RootLayout() {
                     console.warn('Erreur de chargement des fonts:', fontsError);
                 }
 
-                // Précharge les images avec timeout global de 10 secondes
+                // Assets critiques uniquement (logo + fond) — photos onboarding en lazy
                 const loadAssetsWithTimeout = Promise.race([
                     Promise.all([
-                        Asset.fromModule(require('@/assets/images/onboarding/logo-allon-blanc.png')).downloadAsync(),
-                        Asset.fromModule(require('@/assets/images/onboarding/bg_voyage.png')).downloadAsync(),
-                        Asset.fromModule(require('@/assets/images/onboarding/person_travel_1.png')).downloadAsync(),
-                        Asset.fromModule(require('@/assets/images/onboarding/person_travel_2.png')).downloadAsync(),
-                        Asset.fromModule(require('@/assets/images/onboarding/person_travel_3.png')).downloadAsync(),
-                        Asset.fromModule(require('@/assets/images/onboarding/logo-allon-blanc.png')).downloadAsync(),
+                        Asset.fromModule(
+                            require('@/assets/images/onboarding/logo-allon-blanc.png'),
+                        ).downloadAsync(),
+                        Asset.fromModule(
+                            require('@/assets/images/onboarding/bg_voyage.png'),
+                        ).downloadAsync(),
                     ]),
-                    new Promise((_, reject) => 
-                        setTimeout(() => reject(new Error('Timeout de chargement des assets')), 10000)
-                    )
+                    new Promise((_, reject) =>
+                        setTimeout(
+                            () => reject(new Error('Timeout de chargement des assets')),
+                            5000,
+                        ),
+                    ),
                 ]);
 
                 await loadAssetsWithTimeout;
-                console.log('Tous les assets de l\'onboarding sont chargés');
 
+                // Précharge les photos onboarding en arrière-plan (non bloquant)
+                void Promise.all([
+                    Asset.fromModule(
+                        require('@/assets/images/onboarding/person_travel_1.png'),
+                    ).downloadAsync(),
+                    Asset.fromModule(
+                        require('@/assets/images/onboarding/person_travel_2.png'),
+                    ).downloadAsync(),
+                    Asset.fromModule(
+                        require('@/assets/images/onboarding/person_travel_3.png'),
+                    ).downloadAsync(),
+                ]).catch(() => undefined);
             } catch (error) {
                 console.warn('Erreur lors du préchargement des assets:', error);
-                // Continue quand même pour ne pas bloquer l'app
             } finally {
-                // Garde le custom splash au minimum 2 secondes pour une bonne UX
+                // Splash court (évite le délai artificiel de 2,5 s)
                 setTimeout(() => {
                     setIsAppReady(true);
-                }, 2500);
+                }, 600);
             }
         }
 

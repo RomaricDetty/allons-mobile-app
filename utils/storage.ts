@@ -81,14 +81,24 @@ export const getAuthToken = async (): Promise<string | null> => {
 };
 
 /**
- * Récupère le refresh token
+ * Récupère le refresh token (SecureStore, avec repli AsyncStorage legacy)
  */
 export const getRefreshToken = async (): Promise<string | null> => {
     try {
-        return await secureGet(REFRESH_TOKEN_KEY);
+        const fromSecure = await secureGet(REFRESH_TOKEN_KEY);
+        if (fromSecure && fromSecure.trim() !== '') {
+            return fromSecure;
+        }
+        // Repli explicite (sessions antérieures / écriture partielle)
+        const legacy = await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
+        if (legacy && legacy.trim() !== '') {
+            await secureSet(REFRESH_TOKEN_KEY, legacy.trim());
+            return legacy.trim();
+        }
+        return null;
     } catch (error) {
         console.error('Erreur lors de la récupération du refresh token:', error);
-        return null;
+        return AsyncStorage.getItem(REFRESH_TOKEN_KEY);
     }
 };
 
@@ -138,34 +148,41 @@ export type AuthSessionPayload = {
 
 /**
  * Persiste une session complète après login / refresh.
- * `expires_at` = now + expires_in (epoch secondes).
+ * `expires_at` plafonné à 30 min (idle backend), même si expires_in API est plus long.
  */
 export const saveAuthSession = async (session: AuthSessionPayload): Promise<void> => {
+    const { BACKEND_ACCESS_IDLE_SEC, bumpSessionActivity } = await import('@/utils/sessionActivity');
     const { accessToken, refreshToken, expiresIn, tokenType, userId } = session;
+    const nowSec = Math.floor(Date.now() / 1000);
+    const maxExpiresAt = nowSec + BACKEND_ACCESS_IDLE_SEC;
 
     await secureSet(TOKEN_KEY, accessToken);
 
     if (refreshToken && String(refreshToken).trim() !== '') {
-        await secureSet(REFRESH_TOKEN_KEY, String(refreshToken).trim());
+        const value = String(refreshToken).trim();
+        await secureSet(REFRESH_TOKEN_KEY, value);
+        await AsyncStorage.setItem(REFRESH_TOKEN_KEY, value);
     }
 
+    let expiresAt = maxExpiresAt;
     if (expiresIn !== undefined && expiresIn !== null && String(expiresIn).trim() !== '') {
-        const ttlSec = Number(expiresIn);
-        if (!Number.isNaN(ttlSec) && ttlSec > 0) {
-            // Si la valeur ressemble déjà à un epoch (> année ~2020), on la garde
-            const looksLikeEpoch = ttlSec > 1_600_000_000;
-            const expiresAt = looksLikeEpoch
-                ? Math.floor(ttlSec)
-                : Math.floor(Date.now() / 1000) + ttlSec;
-            await AsyncStorage.setItem(EXPIRES_AT_KEY, String(expiresAt));
+        const parsed = Number(expiresIn);
+        if (!Number.isNaN(parsed) && parsed > 0) {
+            if (parsed > 1_600_000_000) {
+                expiresAt = Math.min(Math.floor(parsed), maxExpiresAt);
+            } else {
+                expiresAt = Math.min(nowSec + parsed, maxExpiresAt);
+            }
         }
     }
+    await AsyncStorage.setItem(EXPIRES_AT_KEY, String(expiresAt));
 
     if (tokenType && String(tokenType).trim() !== '') {
         await AsyncStorage.setItem(TOKEN_TYPE_KEY, String(tokenType).trim());
     }
 
     await AsyncStorage.setItem(USER_ID_KEY, userId);
+    await bumpSessionActivity();
 };
 
 /**
@@ -185,6 +202,7 @@ export const removeAuthToken = async (): Promise<void> => {
 export const clearAuthData = async (): Promise<void> => {
     try {
         const { clearPendingPayment } = await import('@/utils/pendingPayment');
+        const { clearSessionActivity } = await import('@/utils/sessionActivity');
         await Promise.all([
             secureDelete(TOKEN_KEY),
             secureDelete(REFRESH_TOKEN_KEY),
@@ -198,6 +216,7 @@ export const clearAuthData = async (): Promise<void> => {
                 'userToken',
             ]),
             clearPendingPayment(),
+            clearSessionActivity(),
         ]);
     } catch (error) {
         console.error("Erreur lors de la suppression des données d'authentification:", error);

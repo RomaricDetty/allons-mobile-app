@@ -9,7 +9,7 @@ import { useAppColors } from '@/hooks/use-app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Booking } from '@/interfaces';
 import { PopularTrip } from '@/types';
-import { getAuthToken } from '@/utils/storage';
+import { ensureValidAccessToken } from '@/utils/authSession';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -33,6 +33,9 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
  * CONSTANTES
  * =================================================================
  */
+
+/** TTL focus home — évite refetch user/nextTrip à chaque retour d'onglet */
+const HOME_FOCUS_TTL_MS = 45_000;
 
 const FLATLIST_CONFIG = {
     removeClippedSubviews: true,
@@ -295,6 +298,7 @@ export default function HomeScreen() {
     const colorScheme = useColorScheme() ?? 'light';
     const insets = useSafeAreaInsets();
     const navigation = useNavigation();
+    const lastHomeFocusFetchRef = useRef(0);
 
     const greetingFirstName = useMemo(() => {
         const name = user?.firstName?.trim();
@@ -317,23 +321,47 @@ export default function HomeScreen() {
         [colors, colorScheme],
     );
 
+    /**
+     * Prochains voyages — utilise refresh token si l’access a expiré
+     */
     const fetchNextTripInfo = useCallback(async () => {
         try {
-            const token = await getAuthToken();
-            if (!token || token.trim() === '') {
+            let token = await ensureValidAccessToken();
+            if (!token) {
                 setNextTrip([]);
                 return false;
             }
-            const response = await getNextTrip(token);
-            const raw = response.data;
-            const extracted = Array.isArray(raw) ? raw : raw?.data;
-            const list: Booking[] = Array.isArray(extracted)
-                ? extracted
-                : extracted != null
-                  ? [extracted as Booking]
-                  : [];
-            setNextTrip(list);
-            return true;
+
+            /**
+             * Appelle l’API upcoming ; retente après refresh forcé si 401
+             */
+            const load = async (accessToken: string) => {
+                const response = await getNextTrip(accessToken);
+                const raw = response.data;
+                const extracted = Array.isArray(raw) ? raw : raw?.data;
+                const list: Booking[] = Array.isArray(extracted)
+                    ? extracted
+                    : extracted != null
+                      ? [extracted as Booking]
+                      : [];
+                setNextTrip(list);
+                return true;
+            };
+
+            try {
+                return await load(token);
+            } catch (error: any) {
+                const status = error?.response?.status;
+                if (status !== 401 && status !== 403) {
+                    throw error;
+                }
+                token = await ensureValidAccessToken({ force: true });
+                if (!token) {
+                    setNextTrip([]);
+                    return false;
+                }
+                return await load(token);
+            }
         } catch (error) {
             console.error('Erreur récupération prochain voyage:', error);
             return false;
@@ -381,6 +409,7 @@ export default function HomeScreen() {
         setLoading(true);
         try {
             await Promise.all([refreshUser(), fetchPopularTrips(), fetchNextTripInfo()]);
+            lastHomeFocusFetchRef.current = Date.now();
         } catch (error) {
             console.error('Erreur chargement données:', error);
         } finally {
@@ -392,6 +421,7 @@ export default function HomeScreen() {
         setRefreshing(true);
         try {
             await Promise.all([refreshUser(), fetchPopularTrips(), fetchNextTripInfo()]);
+            lastHomeFocusFetchRef.current = Date.now();
         } catch (error) {
             console.error('Erreur rafraîchissement:', error);
         } finally {
@@ -403,10 +433,18 @@ export default function HomeScreen() {
         loadInitialData();
     }, [loadInitialData]);
 
+    /**
+     * Au focus : refetch silencieux user + prochain voyage, avec TTL 45s
+     */
     useFocusEffect(
         useCallback(() => {
-            refreshUser();
-            fetchNextTripInfo();
+            const now = Date.now();
+            if (now - lastHomeFocusFetchRef.current < HOME_FOCUS_TTL_MS) {
+                return;
+            }
+            lastHomeFocusFetchRef.current = now;
+            void refreshUser();
+            void fetchNextTripInfo();
         }, [refreshUser, fetchNextTripInfo]),
     );
 

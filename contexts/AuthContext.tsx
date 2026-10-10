@@ -4,8 +4,9 @@
  */
 import { authGetUserInfo } from '@/api/auth_register';
 import { User } from '@/interfaces';
-import { ensureValidAccessToken } from '@/utils/authSession';
-import { clearAuthData, getAuthToken, getUserId } from '@/utils/storage';
+import { ensureValidAccessToken, wasLastRefreshFatal } from '@/utils/authSession';
+import { bumpSessionActivity } from '@/utils/sessionActivity';
+import { clearAuthData, getRefreshToken, getUserId } from '@/utils/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, {
     createContext,
@@ -81,27 +82,41 @@ export function AuthProvider({ children }: AuthProviderProps) {
         await clearAuthData();
     }, []);
 
-    const ensureSession = useCallback(async () => {
-        const token = await ensureValidAccessToken();
-        if (!token) {
+    /**
+     * Déconnecte uniquement si le refresh token est absent ou invalidé (401).
+     * Une erreur réseau ne doit pas effacer la session.
+     */
+    const clearSessionIfDead = useCallback(async () => {
+        const refresh = await getRefreshToken();
+        if (!refresh?.trim() || wasLastRefreshFatal()) {
             setUser(null);
             await writeCachedUser(null);
             await clearAuthData();
+            return true;
+        }
+        return false;
+    }, []);
+
+    const ensureSession = useCallback(async () => {
+        const token = await ensureValidAccessToken();
+        if (!token) {
+            await clearSessionIfDead();
             return null;
         }
         return token;
-    }, []);
+    }, [clearSessionIfDead]);
 
     const refreshUser = useCallback(async () => {
         try {
-            const token = await ensureValidAccessToken();
+            let token = await ensureValidAccessToken();
             const userId = await getUserId();
 
             if (!token?.trim() || !userId?.trim() || userId === 'unknown') {
-                setUser(null);
-                await writeCachedUser(null);
                 if (!token?.trim()) {
-                    await clearAuthData();
+                    await clearSessionIfDead();
+                } else if (!userId?.trim() || userId === 'unknown') {
+                    // Token OK mais id manquant : on garde la session, pas de profil
+                    setUser(null);
                 }
                 return;
             }
@@ -112,36 +127,64 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 setUser((prev) => prev ?? cached);
             }
 
-            const response = await authGetUserInfo(userId, token);
-            if (response?.status === 200 && response.data) {
-                setUser(response.data);
-                await writeCachedUser(response.data);
-                return;
-            }
+            /**
+             * Charge le profil ; en 401, force un refresh token puis retente une fois.
+             */
+            const fetchProfile = async (accessToken: string) => {
+                const response = await authGetUserInfo(userId, accessToken);
+                if (response?.status === 200 && response.data) {
+                    setUser(response.data);
+                    await writeCachedUser(response.data);
+                    await bumpSessionActivity();
+                    return true;
+                }
+                if (response?.status === 401 || response?.status === 403) {
+                    return false;
+                }
+                return true;
+            };
 
-            if (response?.status === 401 || response?.status === 403) {
-                setUser(null);
-                await writeCachedUser(null);
-                await clearAuthData();
+            try {
+                const ok = await fetchProfile(token);
+                if (ok) return;
+
+                token = await ensureValidAccessToken({ force: true });
+                if (!token?.trim()) {
+                    await clearSessionIfDead();
+                    return;
+                }
+                const retried = await fetchProfile(token);
+                if (!retried && wasLastRefreshFatal()) {
+                    await clearSessionIfDead();
+                }
+            } catch (error: any) {
+                const status = error?.response?.status;
+                if (status === 401 || status === 403) {
+                    token = await ensureValidAccessToken({ force: true });
+                    if (!token?.trim()) {
+                        await clearSessionIfDead();
+                        return;
+                    }
+                    try {
+                        const retried = await fetchProfile(token);
+                        if (!retried && wasLastRefreshFatal()) {
+                            await clearSessionIfDead();
+                        }
+                    } catch (retryError: any) {
+                        const retryStatus = retryError?.response?.status;
+                        if (retryStatus === 401 || retryStatus === 403) {
+                            await clearSessionIfDead();
+                        }
+                    }
+                    return;
+                }
+                throw error;
             }
         } catch (error: any) {
             console.error('Erreur refresh utilisateur:', error);
-            const status = error?.response?.status;
-            if (status === 401 || status === 403) {
-                setUser(null);
-                await writeCachedUser(null);
-                await clearAuthData();
-                return;
-            }
-            const token = await getAuthToken();
-            if (!token?.trim()) {
-                setUser(null);
-                await writeCachedUser(null);
-                await clearAuthData();
-            }
             // Erreur réseau : on conserve le user en cache déjà affiché
         }
-    }, []);
+    }, [clearSessionIfDead]);
 
     useEffect(() => {
         let cancelled = false;
@@ -152,9 +195,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 if (cancelled) return;
 
                 if (!token) {
-                    setUser(null);
-                    await writeCachedUser(null);
-                    await clearAuthData();
+                    await clearSessionIfDead();
+                    const cached = await readCachedUser();
+                    const refresh = await getRefreshToken();
+                    if (cached && refresh?.trim()) {
+                        setUser(cached);
+                    }
                 } else {
                     const cached = await readCachedUser();
                     if (cached) {
@@ -172,26 +218,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return () => {
             cancelled = true;
         };
-    }, [refreshUser]);
+    }, [refreshUser, clearSessionIfDead]);
 
-    // Au retour au premier plan : prolonger la session via refresh_token si besoin
+    // Au retour au premier plan : refresh access si idle / expiry (30 min backend)
     useEffect(() => {
         const onAppState = (state: AppStateStatus) => {
             if (state !== 'active') return;
             void (async () => {
+                // ensureValidAccessToken gère idle ≥ 25 min + expires_at
                 const token = await ensureValidAccessToken();
                 if (!token) {
-                    setUser(null);
-                    await writeCachedUser(null);
-                    await clearAuthData();
+                    await clearSessionIfDead();
                     return;
                 }
-                await refreshUser();
+                // Pas de refetch profil systématique : évite faux 401 en rafale
             })();
         };
         const sub = AppState.addEventListener('change', onAppState);
         return () => sub.remove();
-    }, [refreshUser]);
+    }, [clearSessionIfDead]);
 
     const value = useMemo<AuthContextType>(
         () => ({

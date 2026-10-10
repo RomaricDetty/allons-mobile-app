@@ -457,10 +457,12 @@ export const SignUpScreen = ({ onSignUp, onSwitchToSignIn }: SignUpScreenProps) 
                 // L'API retourne un status 201 pour une création réussie
                 if (response && (response.status === 201 || response.status === 200) && response.data) {
                     // Vérifier que tous les champs nécessaires sont présents
-                    const accessToken = response.data.access_token;
-                    const refreshToken = response.data.refresh_token;
-                    const expiresIn = response.data.expires_in;
-                    const tokenType = response.data.token_type;
+                    const accessToken =
+                        response.data.access_token || response.data.accessToken;
+                    const refreshToken =
+                        response.data.refresh_token || response.data.refreshToken;
+                    const expiresIn = response.data.expires_in ?? response.data.expiresIn;
+                    const tokenType = response.data.token_type || response.data.tokenType;
                     const user = response.data.user;
 
                     if (!accessToken || accessToken.trim() === '') {

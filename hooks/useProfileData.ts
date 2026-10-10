@@ -2,9 +2,12 @@ import { authGetUserInfo, bookingListInfo } from '@/api/auth_register';
 import { useAuth } from '@/contexts/AuthContext';
 import { Booking, User } from '@/interfaces';
 import { showAlert } from '@/utils/alert';
-import { ensureValidAccessToken } from '@/utils/authSession';
-import { getUserId } from '@/utils/storage';
-import { useCallback, useState } from 'react';
+import { wasLastRefreshFatal, withValidAccessToken } from '@/utils/authSession';
+import { getRefreshToken, getUserId } from '@/utils/storage';
+import { useCallback, useRef, useState } from 'react';
+
+/** TTL cache profil / réservations (évite refetch full-screen à chaque focus) */
+const PROFILE_CACHE_TTL_MS = 45_000;
 
 /**
  * Hook personnalisé pour gérer les données du profil utilisateur
@@ -16,7 +19,12 @@ export const useProfileData = () => {
     const [bookingList, setBookingList] = useState<Booking[]>([]);
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [refreshing, setRefreshing] = useState<boolean>(false);
+    const lastFetchAtRef = useRef(0);
+    const hasDataRef = useRef(false);
 
+    /**
+     * Déconnexion uniquement si le refresh token est mort / absent.
+     */
     const forceReauth = useCallback(
         async (message: string) => {
             await signOut();
@@ -26,49 +34,63 @@ export const useProfileData = () => {
     );
 
     /**
-     * Récupère les informations de l'utilisateur
+     * Après échec auth : déconnecte seulement si refresh invalide, sinon alerte soft.
+     */
+    const handleAuthFailure = useCallback(async () => {
+        const refresh = await getRefreshToken();
+        if (!refresh?.trim() || wasLastRefreshFatal()) {
+            await forceReauth('Session expirée. Veuillez vous reconnecter.');
+            return;
+        }
+        showAlert(
+            'Connexion',
+            'Impossible de rafraîchir la session pour le moment. Réessayez dans un instant.',
+        );
+    }, [forceReauth]);
+
+    /**
+     * Récupère les informations de l'utilisateur (refresh token + retry 401 inclus)
      */
     const getUserInfo = useCallback(async () => {
         try {
-            const token = await ensureValidAccessToken();
             const userId = await getUserId();
 
-            if (!token || token.trim() === '') {
-                await forceReauth(
-                    "Token d'authentification manquant. Veuillez vous reconnecter.",
-                );
-                return null;
-            }
-
             if (!userId || userId.trim() === '' || userId === 'unknown') {
-                await forceReauth(
-                    "ID utilisateur manquant. Veuillez vous reconnecter.",
-                );
+                const refresh = await getRefreshToken();
+                if (!refresh?.trim()) {
+                    await forceReauth(
+                        'ID utilisateur manquant. Veuillez vous reconnecter.',
+                    );
+                }
                 return null;
             }
 
-            const response = await authGetUserInfo(userId, token);
-            if (response.status === 200) {
-                return response.data;
+            const data = await withValidAccessToken(async (token) => {
+                const response = await authGetUserInfo(userId, token);
+                if (response.status === 200) {
+                    return response.data as User;
+                }
+                if (response.status === 401 || response.status === 403) {
+                    const err: any = new Error('Unauthorized');
+                    err.response = { status: response.status };
+                    throw err;
+                }
+                throw new Error('USER_INFO_ERROR');
+            });
+
+            if (data) {
+                return data;
             }
 
-            if (response.status === 401 || response.status === 403) {
-                await forceReauth(
-                    'Session expirée. Veuillez vous reconnecter.',
-                );
-                return null;
-            }
-
-            showAlert(
-                'Erreur',
-                "Une erreur est survenue lors de la récupération des informations de l'utilisateur",
-            );
+            await handleAuthFailure();
             return null;
         } catch (error: any) {
             console.error('Erreur lors de la récupération des informations utilisateur:', error);
-            const status = error?.response?.status;
-            if (status === 401 || status === 403) {
-                await forceReauth('Session expirée. Veuillez vous reconnecter.');
+            if (error?.message === 'USER_INFO_ERROR') {
+                showAlert(
+                    'Erreur',
+                    "Une erreur est survenue lors de la récupération des informations de l'utilisateur",
+                );
                 return null;
             }
             showAlert(
@@ -78,50 +100,45 @@ export const useProfileData = () => {
             );
             return null;
         }
-    }, [forceReauth]);
+    }, [forceReauth, handleAuthFailure]);
 
     /**
      * Récupère la liste des réservations de l'utilisateur
      */
     const getBookingList = useCallback(async () => {
         try {
-            const token = await ensureValidAccessToken();
             const userId = await getUserId();
 
-            if (!token || token.trim() === '') {
-                await forceReauth(
-                    "Token d'authentification manquant. Veuillez vous reconnecter.",
-                );
-                return;
-            }
-
             if (!userId || userId.trim() === '' || userId === 'unknown') {
-                await forceReauth(
-                    "ID utilisateur manquant. Veuillez vous reconnecter.",
-                );
                 return;
             }
 
-            const response = await bookingListInfo(userId, token);
-            if (response.status === 200 && response.data?.items) {
-                setBookingList(response.data.items);
+            const ok = await withValidAccessToken(async (token) => {
+                const response = await bookingListInfo(userId, token);
+                if (response.status === 200 && response.data?.items) {
+                    setBookingList(response.data.items);
+                    return true;
+                }
+                if (response.status === 401 || response.status === 403) {
+                    const err: any = new Error('Unauthorized');
+                    err.response = { status: response.status };
+                    throw err;
+                }
+                throw new Error('BOOKING_LIST_ERROR');
+            });
+
+            if (ok) {
                 return;
             }
 
-            if (response.status === 401 || response.status === 403) {
-                await forceReauth('Session expirée. Veuillez vous reconnecter.');
-                return;
-            }
-
-            showAlert(
-                'Erreur',
-                'Une erreur est survenue lors de la récupération de la liste des réservations',
-            );
+            await handleAuthFailure();
         } catch (error: any) {
             console.error('Erreur lors de la récupération de la liste des réservations:', error);
-            const status = error?.response?.status;
-            if (status === 401 || status === 403) {
-                await forceReauth('Session expirée. Veuillez vous reconnecter.');
+            if (error?.message === 'BOOKING_LIST_ERROR') {
+                showAlert(
+                    'Erreur',
+                    'Une erreur est survenue lors de la récupération de la liste des réservations',
+                );
                 return;
             }
             showAlert(
@@ -130,28 +147,47 @@ export const useProfileData = () => {
                     'Une erreur est survenue lors de la récupération de la liste des réservations',
             );
         }
-    }, [forceReauth]);
+    }, [handleAuthFailure]);
 
     /**
-     * Charge les données initiales
+     * Charge les données (skeleton uniquement au 1er chargement ou force).
+     * @param options.force ignore le TTL cache
+     * @param options.silent ne montre pas le loader plein écran
      */
-    const fetchData = useCallback(async () => {
-        setIsLoading(true);
-        try {
-            const userInfo = await getUserInfo();
-            setUser(userInfo);
-            if (userInfo) {
-                await getBookingList();
+    const fetchData = useCallback(
+        async (options?: { force?: boolean; silent?: boolean }) => {
+            const force = options?.force === true;
+            const silent = options?.silent === true || hasDataRef.current;
+            const now = Date.now();
+
+            if (
+                !force &&
+                hasDataRef.current &&
+                now - lastFetchAtRef.current < PROFILE_CACHE_TTL_MS
+            ) {
+                return;
             }
-        } catch (error) {
-            console.error('Erreur lors du chargement des données:', error);
-        } finally {
-            setIsLoading(false);
-        }
-    }, [getUserInfo, getBookingList]);
+
+            if (!silent) setIsLoading(true);
+            try {
+                const userInfo = await getUserInfo();
+                setUser(userInfo);
+                if (userInfo) {
+                    await getBookingList();
+                    hasDataRef.current = true;
+                    lastFetchAtRef.current = Date.now();
+                }
+            } catch (error) {
+                console.error('Erreur lors du chargement des données:', error);
+            } finally {
+                setIsLoading(false);
+            }
+        },
+        [getUserInfo, getBookingList],
+    );
 
     /**
-     * Gère le pull to refresh
+     * Gère le pull to refresh (force toujours)
      */
     const handleRefresh = useCallback(async () => {
         setRefreshing(true);
@@ -160,6 +196,8 @@ export const useProfileData = () => {
             setUser(userInfo);
             if (userInfo) {
                 await getBookingList();
+                hasDataRef.current = true;
+                lastFetchAtRef.current = Date.now();
             }
         } catch (error) {
             console.error('Erreur lors du rafraîchissement des données:', error);
@@ -168,6 +206,13 @@ export const useProfileData = () => {
         }
     }, [getUserInfo, getBookingList]);
 
+    /**
+     * Invalide le cache (après édition profil, nouvelle réservation, etc.)
+     */
+    const invalidateCache = useCallback(() => {
+        lastFetchAtRef.current = 0;
+    }, []);
+
     return {
         user,
         bookingList,
@@ -175,5 +220,6 @@ export const useProfileData = () => {
         refreshing,
         fetchData,
         handleRefresh,
+        invalidateCache,
     };
 };

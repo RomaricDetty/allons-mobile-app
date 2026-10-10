@@ -4,6 +4,7 @@ import { SignInScreen } from '@/components/auth/SignInScreen';
 import { SignUpScreen } from '@/components/auth/SignUpScreen';
 import { ProfileInfoSkeleton } from '@/components/skeletons';
 import { useAuth } from '@/contexts/AuthContext';
+import { getRefreshToken } from '@/utils/storage';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -35,6 +36,13 @@ export default function TabTwoScreen() {
 
                 if (token) {
                     setIsSignedIn(true);
+                    return;
+                }
+
+                // Access indisponible mais refresh encore là → rester connecté
+                const refresh = await getRefreshToken();
+                if (refresh?.trim()) {
+                    setIsSignedIn(true);
                 } else {
                     setIsSignedIn(false);
                     setCurrentScreen('signin');
@@ -42,9 +50,13 @@ export default function TabTwoScreen() {
             } catch (error) {
                 console.error('Erreur vérification session profil:', error);
                 if (!cancelled) {
-                    await signOut();
-                    setIsSignedIn(false);
-                    setCurrentScreen('signin');
+                    const refresh = await getRefreshToken();
+                    if (refresh?.trim()) {
+                        setIsSignedIn(true);
+                    } else {
+                        setIsSignedIn(false);
+                        setCurrentScreen('signin');
+                    }
                 }
             } finally {
                 if (!cancelled) setIsLoading(false);
@@ -54,7 +66,7 @@ export default function TabTwoScreen() {
         return () => {
             cancelled = true;
         };
-    }, [isAuthReady, ensureSession, signOut]);
+    }, [isAuthReady, ensureSession]);
 
     /**
      * Aligne l'UI locale sur la session globale (idle logout, 401, etc.)

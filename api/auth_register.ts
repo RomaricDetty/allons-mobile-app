@@ -90,8 +90,17 @@ export const bookingListInfo = async (userId: string, token: string): Promise<Ax
  * @returns AxiosResponse<any>
  */
 export const refreshTokenApi = async (token: string): Promise<AxiosResponse<any>> => {
-    return await axios.post(`${baseUrl}/auth/refresh-token`, { refreshToken: token });
-}
+    return await axios.post(
+        `${baseUrl}/auth/refresh-token`,
+        { refreshToken: token },
+        {
+            headers: {
+                'Content-Type': 'application/json',
+                'X-App-Audience': 'frontoffice_mobile',
+            },
+        },
+    );
+};
 
 /**
  * Update user info

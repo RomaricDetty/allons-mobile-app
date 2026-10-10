@@ -176,10 +176,12 @@ export const SignInScreen = ({ onSignIn, onSwitchToSignUp, onForgotPassword }: S
             // Vérifier que la réponse est valide
             if (response && response.status === 200 && response.data) {
                 // Vérifier que tous les champs nécessaires sont présents
-                const accessToken = response.data.access_token;
-                const refreshToken = response.data.refresh_token;
-                const expiresIn = response.data.expires_in;
-                const tokenType = response.data.token_type;
+                const accessToken =
+                    response.data.access_token || response.data.accessToken;
+                const refreshToken =
+                    response.data.refresh_token || response.data.refreshToken;
+                const expiresIn = response.data.expires_in ?? response.data.expiresIn;
+                const tokenType = response.data.token_type || response.data.tokenType;
                 const user = response.data.user;
 
                 if (!accessToken || accessToken.trim() === '') {
@@ -188,6 +190,10 @@ export const SignInScreen = ({ onSignIn, onSwitchToSignUp, onForgotPassword }: S
 
                 if (!user || !user.id) {
                     throw new Error('Informations utilisateur manquantes dans la réponse');
+                }
+
+                if (!refreshToken || String(refreshToken).trim() === '') {
+                    console.warn('Login: refresh_token absent dans la réponse API');
                 }
 
                 // Stocker les tokens (SecureStore) + profil

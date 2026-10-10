@@ -1,7 +1,11 @@
 import { Skeleton, SkeletonBlock, SkeletonCircle, SkeletonLine } from '@/components/ui/Skeleton';
+import { useAuth } from '@/contexts/AuthContext';
 import { useAppColors } from '@/hooks/use-app-colors';
 import React from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const HOME_PRIMARY = '#1776BA';
 
 /** Profil — onglet Infos (carte identité + coins + lignes settings) */
 export function ProfileInfoSkeleton() {
@@ -93,46 +97,109 @@ export function ProfileBookingsSkeleton() {
     );
 }
 
-/** Accueil */
+/**
+ * Accueil — miroir exact des zones (greeting, titre, search, itinéraires, carrousel, location bus)
+ */
 export function HomeSkeleton() {
     const colors = useAppColors();
+    const insets = useSafeAreaInsets();
+    const { width } = useWindowDimensions();
+    const { user } = useAuth();
+    const showGreeting = Boolean(user?.firstName?.trim());
+
+    const itineraryCardWidth = (width - 40 - 15) / 2;
+    const itineraryCardHeight = itineraryCardWidth / 0.85;
+    const nextTripCardWidth = (width - 100) / 2.2;
+
     return (
         <ScrollView
-            style={{ flex: 1, backgroundColor: colors.scrollBackground }}
-            contentContainerStyle={styles.pad}
+            style={{ flex: 1, backgroundColor: colors.background, paddingTop: insets.top }}
+            contentContainerStyle={homeStyles.scrollContent}
             showsVerticalScrollIndicator={false}
         >
-            <SkeletonLine width="45%" height={28} />
-            <SkeletonLine width="70%" height={14} style={styles.mt10} />
+            {showGreeting ? (
+                <View style={homeStyles.nameContainer}>
+                    <SkeletonLine width="42%" height={16} />
+                </View>
+            ) : null}
 
-            <SkeletonBlock style={[styles.mt16, styles.mb]} height={120}>
-                <SkeletonLine width="40%" height={12} />
-                <SkeletonLine width="80%" height={18} style={styles.mt10} />
-                <SkeletonLine width="55%" height={12} style={styles.mt10} />
-            </SkeletonBlock>
-
-            <SkeletonLine width="50%" height={16} style={styles.mb} />
-            <View style={styles.row}>
-                {[0, 1].map((i) => (
-                    <SkeletonBlock key={i} style={[styles.flex, i === 0 && styles.mr8]}>
-                        <Skeleton height={72} borderRadius={12} />
-                        <SkeletonLine width="70%" height={12} style={styles.mt10} />
-                    </SkeletonBlock>
-                ))}
+            <View style={homeStyles.titleContainer}>
+                <SkeletonLine width="72%" height={34} />
+                <SkeletonLine width="38%" height={34} />
             </View>
 
-            <SkeletonLine width="40%" height={16} style={[styles.mt16, styles.mb]} />
-            {[0, 1].map((i) => (
-                <SkeletonBlock key={i} style={styles.mb}>
-                    <View style={styles.row}>
-                        <Skeleton width={56} height={56} borderRadius={12} />
-                        <View style={styles.flex}>
-                            <SkeletonLine width="50%" height={11} />
-                            <SkeletonLine width="85%" height={15} style={styles.mt8} />
+            <View style={homeStyles.searchSection}>
+                <Skeleton height={52} borderRadius={12} />
+            </View>
+
+            <View style={homeStyles.itinerarySection}>
+                <SkeletonLine width="48%" height={17} style={homeStyles.sectionTitle} />
+                <View style={homeStyles.cardsContainer}>
+                    {[0, 1, 2, 3].map((i) => (
+                        <Skeleton
+                            key={i}
+                            width={itineraryCardWidth}
+                            height={itineraryCardHeight}
+                            borderRadius={12}
+                        />
+                    ))}
+                </View>
+            </View>
+
+            {user ? (
+                <View style={homeStyles.nextTripContainer}>
+                    <View style={homeStyles.itinerarySection}>
+                        <View style={homeStyles.carouselWrapper}>
+                            <View style={homeStyles.carouselTitleRow}>
+                                <SkeletonLine width="55%" height={16} />
+                            </View>
+                            <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                contentContainerStyle={homeStyles.carouselContent}
+                            >
+                                {[0, 1, 2].map((i) => (
+                                    <View
+                                        key={i}
+                                        style={[
+                                            homeStyles.nextTripCard,
+                                            {
+                                                width: nextTripCardWidth,
+                                                backgroundColor: colors.cardBackground,
+                                                borderColor: colors.border,
+                                                marginRight: i < 2 ? 10 : 0,
+                                            },
+                                        ]}
+                                    >
+                                        <Skeleton height={72} borderRadius={0} style={homeStyles.nextTripImage} />
+                                        <View style={homeStyles.nextTripBody}>
+                                            <SkeletonLine width="80%" height={12} />
+                                            <SkeletonLine width="90%" height={13} style={homeStyles.mt4} />
+                                        </View>
+                                    </View>
+                                ))}
+                            </ScrollView>
                         </View>
                     </View>
-                </SkeletonBlock>
-            ))}
+                </View>
+            ) : null}
+
+            <View
+                style={[
+                    homeStyles.locationBusCard,
+                    {
+                        backgroundColor: colors.cardBackground,
+                        borderColor: colors.border,
+                    },
+                ]}
+            >
+                <Skeleton width={40} height={40} borderRadius={10} />
+                <View style={styles.flex}>
+                    <SkeletonLine width="55%" height={16} />
+                    <SkeletonLine width="90%" height={13} style={homeStyles.mt4} />
+                </View>
+                <Skeleton width={22} height={22} borderRadius={6} />
+            </View>
         </ScrollView>
     );
 }
@@ -359,6 +426,86 @@ export function MapScreenSkeleton() {
         </View>
     );
 }
+
+const homeStyles = StyleSheet.create({
+    scrollContent: {
+        paddingBottom: 110,
+    },
+    nameContainer: {
+        width: '100%',
+        paddingHorizontal: 20,
+        paddingTop: 12,
+    },
+    titleContainer: {
+        width: '100%',
+        paddingHorizontal: 20,
+        paddingTop: 8,
+        paddingBottom: 4,
+    },
+    searchSection: {
+        width: '100%',
+        paddingHorizontal: 20,
+        paddingTop: 16,
+        paddingBottom: 28,
+    },
+    itinerarySection: {
+        width: '100%',
+        paddingHorizontal: 20,
+        paddingBottom: 16,
+    },
+    sectionTitle: {
+        marginBottom: 14,
+    },
+    cardsContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        gap: 12,
+    },
+    nextTripContainer: {
+        width: '100%',
+        paddingBottom: 8,
+    },
+    carouselWrapper: {
+        width: '100%',
+        borderRadius: 12,
+        paddingVertical: 16,
+        marginTop: 4,
+        backgroundColor: HOME_PRIMARY,
+    },
+    carouselTitleRow: {
+        paddingHorizontal: 16,
+        paddingBottom: 12,
+    },
+    carouselContent: {
+        paddingHorizontal: 16,
+    },
+    nextTripCard: {
+        borderRadius: 12,
+        overflow: 'hidden',
+        borderWidth: 1,
+    },
+    nextTripImage: {
+        width: '100%',
+    },
+    nextTripBody: {
+        padding: 12,
+    },
+    mt4: {
+        marginTop: 4,
+    },
+    locationBusCard: {
+        marginHorizontal: 20,
+        marginBottom: 24,
+        borderRadius: 12,
+        borderWidth: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 16,
+        paddingHorizontal: 14,
+        gap: 12,
+    },
+});
 
 const styles = StyleSheet.create({
     flex: { flex: 1 },

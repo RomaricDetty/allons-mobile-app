@@ -1,7 +1,8 @@
 // @ts-nocheck
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import React from 'react';
-import { ImageBackground, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Image } from 'expo-image';
+import React, { memo, useMemo } from 'react';
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 /**
@@ -63,47 +64,63 @@ function getImageForRoute(origin: string, destination: string): ReturnType<typeo
 }
 
 /**
- * Composant de carte d'itinéraire.
- * Accepte le format affichage (route, image, tarif) ou le format API (stationFrom, stationTo, basePrice).
+ * Carte d'itinéraire (expo-image + mémo pour perf scroll/home).
  */
-export function ItineraryCard({ item, onPress }: ItineraryCardProps) {
+export const ItineraryCard = memo(function ItineraryCard({ item, onPress }: ItineraryCardProps) {
     const { width } = useWindowDimensions();
     const cardWidth = (width - 40 - 15) / 2;
-
-    const routeStr =
-        item.route ??
-        (item.stationFrom?.cityName && item.stationTo?.cityName
-            ? `${item.stationFrom.cityName} → ${item.stationTo.cityName}`
-            : '');
-    const destination = routeStr ? (routeStr.split('→')[1]?.trim() || routeStr) : '—';
-    const origin = routeStr ? (routeStr.split('→')[0]?.trim() || '') : '—';
-
-    const imageSource = item.image ?? getImageForRoute(origin, destination);
-
-    const tarif = item.tarif ?? (item.basePrice != null ? `${Number(item.basePrice).toLocaleString('fr-FR')} XOF` : '—');
-    const duree =
-        item.duree ??
-        (item.durationMinutes != null
-            ? `${Math.floor(item.durationMinutes / 60)}h${item.durationMinutes % 60 ? String(item.durationMinutes % 60).padStart(2, '0') : '00'}`
-            : null);
-
     const colorScheme = useColorScheme() ?? 'light';
     const borderColor = colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0';
+
+    const { origin, destination, imageSource, tarif, duree } = useMemo(() => {
+        const routeStr =
+            item.route ??
+            (item.stationFrom?.cityName && item.stationTo?.cityName
+                ? `${item.stationFrom.cityName} → ${item.stationTo.cityName}`
+                : '');
+        const dest = routeStr ? routeStr.split('→')[1]?.trim() || routeStr : '—';
+        const orig = routeStr ? routeStr.split('→')[0]?.trim() || '' : '—';
+        return {
+            origin: orig,
+            destination: dest,
+            imageSource: item.image ?? getImageForRoute(orig, dest),
+            tarif:
+                item.tarif ??
+                (item.basePrice != null
+                    ? `${Number(item.basePrice).toLocaleString('fr-FR')} XOF`
+                    : '—'),
+            duree:
+                item.duree ??
+                (item.durationMinutes != null
+                    ? `${Math.floor(item.durationMinutes / 60)}h${
+                          item.durationMinutes % 60
+                              ? String(item.durationMinutes % 60).padStart(2, '0')
+                              : '00'
+                      }`
+                    : null),
+        };
+    }, [item]);
 
     return (
         <Pressable
             style={[styles.card, { width: cardWidth, borderColor }]}
-            onPress={() => onPress?.(item)}>
-            <ImageBackground
-                source={imageSource}
-                style={styles.image}
-                resizeMode="cover">
+            onPress={() => onPress?.(item)}
+        >
+            <View style={styles.image}>
+                <Image
+                    source={imageSource}
+                    style={StyleSheet.absoluteFillObject}
+                    contentFit="cover"
+                    cachePolicy="memory-disk"
+                    recyclingKey={String(item.id)}
+                    transition={120}
+                />
                 <View style={styles.overlay} />
-                
+
                 <View style={styles.priceBadge}>
                     <Text style={styles.priceText}>{tarif}</Text>
                 </View>
-                
+
                 <View style={styles.bottomContent}>
                     <View style={styles.locationContainer}>
                         <View style={styles.locationTextContainer}>
@@ -111,38 +128,38 @@ export function ItineraryCard({ item, onPress }: ItineraryCardProps) {
                             <Text style={styles.locationDestination}>{destination}</Text>
                         </View>
                     </View>
-                    
+
                     <View style={styles.infoRow}>
-                        {duree && (
+                        {duree ? (
                             <View style={styles.infoBadge}>
-                                <MaterialCommunityIcons 
-                                    name="clock" 
-                                    size={12} 
-                                    color="#FFFFFF" 
-                                />
+                                <MaterialCommunityIcons name="clock" size={12} color="#FFFFFF" />
                                 <Text style={styles.infoText}>{duree}</Text>
                             </View>
-                        )}
-                        
-                        {item.placesDisponibles != null && item.placesDisponibles !== undefined && (
-                            <View style={[
-                                styles.infoBadge,
-                                item.placesDisponibles < 5 && styles.infoBadgeUrgent
-                            ]}>
-                                <MaterialCommunityIcons 
-                                    name="seat-passenger" 
-                                    size={12} 
-                                    color="#FFFFFF" 
+                        ) : null}
+
+                        {item.placesDisponibles != null ? (
+                            <View
+                                style={[
+                                    styles.infoBadge,
+                                    item.placesDisponibles < 5 && styles.infoBadgeUrgent,
+                                ]}
+                            >
+                                <MaterialCommunityIcons
+                                    name="seat-passenger"
+                                    size={12}
+                                    color="#FFFFFF"
                                 />
-                                <Text style={styles.infoText}>{item.placesDisponibles} places</Text>
+                                <Text style={styles.infoText}>
+                                    {item.placesDisponibles} places
+                                </Text>
                             </View>
-                        )}
+                        ) : null}
                     </View>
                 </View>
-            </ImageBackground>
+            </View>
         </Pressable>
     );
-}
+});
 
 const styles = StyleSheet.create({
     card: {
@@ -158,11 +175,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
     },
     overlay: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: '100%',
+        ...StyleSheet.absoluteFillObject,
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
     },
     priceBadge: {
@@ -173,6 +186,7 @@ const styles = StyleSheet.create({
         alignSelf: 'flex-start',
         margin: 12,
         marginBottom: 'auto',
+        zIndex: 1,
     },
     priceText: {
         color: '#FFFFFF',
@@ -182,6 +196,7 @@ const styles = StyleSheet.create({
     bottomContent: {
         paddingHorizontal: 10,
         paddingBottom: 15,
+        zIndex: 1,
     },
     locationContainer: {
         flexDirection: 'row',

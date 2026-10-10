@@ -7,7 +7,8 @@ import { showAlert, showConfirm } from '@/utils/alert';
 import { useAuth } from '@/contexts/AuthContext';
 import { AppButton } from '@/components/ui/AppButton';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getAuthToken, getUserId } from '@/utils/storage';
+import { ensureValidAccessToken } from '@/utils/authSession';
+import { getUserId } from '@/utils/storage';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
@@ -16,6 +17,7 @@ import { ProfileInfoSkeleton } from '@/components/skeletons';
 import {
     Animated,
     Dimensions,
+    FlatList,
     NativeScrollEvent,
     NativeSyntheticEvent,
     Platform,
@@ -98,27 +100,65 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
         );
     }, [confirmLogout]);
 
-    /**
-     * Charge les données au montage et au focus de l'écran (profil + réservations + demandes de location)
-     */
-    useFocusEffect(
-        useCallback(() => {
-            fetchData();
-            fetchLocationList();
-        }, [fetchData, fetchLocationList])
-    );
+    const locationsLastFetchRef = useRef(0);
+    const hasLocationsCacheRef = useRef(false);
 
     /**
      * Charge la liste des demandes de location de bus (onglet Locations bus)
      */
-    const fetchLocationList = useCallback(async () => {
-        const token = await getAuthToken();
-        const userId = await getUserId();
-        if (!token || !userId) return;
-        const queryParams = `customerId=${userId}&pageSize=50`;
-        const res = await getLocationList(token, queryParams);
-        if (res?.data?.items) setLocationList(res.data.items);
+    const fetchLocationList = useCallback(async (options?: { force?: boolean }) => {
+        const force = options?.force === true;
+        const now = Date.now();
+        if (
+            !force &&
+            hasLocationsCacheRef.current &&
+            now - locationsLastFetchRef.current < 45_000
+        ) {
+            return;
+        }
+        try {
+            let token = await ensureValidAccessToken();
+            const userId = await getUserId();
+            if (!token || !userId) return;
+            const queryParams = `customerId=${userId}&pageSize=50`;
+
+            /**
+             * Appelle la liste locations ; retente après refresh forcé si 401
+             */
+            const load = async (accessToken: string) => {
+                const res = await getLocationList(accessToken, queryParams);
+                if (res?.data?.items) {
+                    setLocationList(res.data.items);
+                    hasLocationsCacheRef.current = true;
+                    locationsLastFetchRef.current = Date.now();
+                }
+            };
+
+            try {
+                await load(token);
+            } catch (error: any) {
+                const status = error?.response?.status;
+                if (status !== 401 && status !== 403) {
+                    throw error;
+                }
+                token = await ensureValidAccessToken({ force: true });
+                if (!token) return;
+                await load(token);
+            }
+        } catch (error) {
+            console.error('Erreur liste locations bus:', error);
+        }
     }, []);
+
+    /**
+     * Charge les données au focus — silent + TTL (pas de skeleton à chaque retour)
+     */
+    useFocusEffect(
+        useCallback(() => {
+            void fetchData({ silent: true });
+            void fetchLocationList();
+        }, [fetchData, fetchLocationList]),
+    );
 
     /**
      * Initialise la position du scroll
@@ -215,6 +255,43 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
     }, []);
 
     /**
+     * Rafraîchit la liste des demandes de location
+     */
+    const handleRefreshLocations = useCallback(async () => {
+        setLocationsRefreshing(true);
+        await fetchLocationList({ force: true });
+        setLocationsRefreshing(false);
+    }, [fetchLocationList]);
+
+    const handlePayBusRequest = useCallback((req: any) => {
+        setSelectedBusRequest(null);
+        router.push({
+            pathname: '/profile/bus-rental-payment',
+            params: { item: JSON.stringify(req) },
+        });
+    }, []);
+
+    const renderBookingItem = useCallback(
+        ({ item }: { item: Booking }) => <BookingCard booking={item} />,
+        [],
+    );
+
+    const bookingKeyExtractor = useCallback((item: Booking) => item.id, []);
+
+    const renderLocationItem = useCallback(
+        ({ item }: { item: any }) => (
+            <BusRentalRequestCard
+                item={item}
+                onViewDetails={setSelectedBusRequest}
+                onPayRequest={handlePayBusRequest}
+            />
+        ),
+        [handlePayBusRequest],
+    );
+
+    const locationKeyExtractor = useCallback((item: any) => String(item.id), []);
+
+    /**
      * Rendu onglet réservations :
      * - filtres fixes en haut (animés)
      * - liste scrollable en dessous
@@ -231,13 +308,20 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                 onCollapse={collapseBookingFilters}
             />
 
-            <ScrollView
+            <FlatList
                 style={styles.scrollView}
                 contentContainerStyle={[styles.bookingsList, { paddingBottom: 100, flexGrow: 1 }]}
+                data={filteredBookings}
+                keyExtractor={bookingKeyExtractor}
+                renderItem={renderBookingItem}
                 showsVerticalScrollIndicator={false}
                 scrollEventThrottle={16}
                 onScroll={handleTicketsScroll}
                 keyboardShouldPersistTaps="handled"
+                initialNumToRender={6}
+                maxToRenderPerBatch={8}
+                windowSize={7}
+                removeClippedSubviews={Platform.OS === 'android'}
                 refreshControl={
                     <RefreshControl
                         refreshing={refreshing}
@@ -246,8 +330,7 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                         colors={[colors.activeTabColor]}
                     />
                 }
-            >
-                {filteredBookings.length === 0 ? (
+                ListEmptyComponent={
                     <View style={styles.emptyStateContainer}>
                         <View style={[styles.emptyIconBlock, { borderColor: colors.border }]}>
                             <MaterialCommunityIcons
@@ -263,12 +346,8 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                             Vos billets de voyage apparaîtront ici
                         </Text>
                     </View>
-                ) : (
-                    filteredBookings.map((booking: Booking) => (
-                        <BookingCard key={booking.id} booking={booking} />
-                    ))
-                )}
-            </ScrollView>
+                }
+            />
 
             <StatusModal
                 visible={showStatusModal}
@@ -278,15 +357,6 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
             />
         </View>
     );
-
-    /**
-     * Rafraîchit la liste des demandes de location
-     */
-    const handleRefreshLocations = useCallback(async () => {
-        setLocationsRefreshing(true);
-        await fetchLocationList();
-        setLocationsRefreshing(false);
-    }, [fetchLocationList]);
 
     /**
      * Rendu de l'onglet Locations bus (bouton Nouvelle demande en haut, puis liste ou état vide)
@@ -301,43 +371,39 @@ export const ProfileScreen = ({ onLogout }: ProfileScreenProps) => {
                 />
             </View>
 
-            {locationList.length > 0 ? (
-                <ScrollView
-                    style={styles.scrollView}
-                    contentContainerStyle={styles.scrollContent}
-                    showsVerticalScrollIndicator={false}
-                    refreshControl={
-                        <RefreshControl
-                            refreshing={locationsRefreshing}
-                            onRefresh={handleRefreshLocations}
-                            tintColor={colors.activeTabColor}
-                            colors={[colors.activeTabColor]}
-                        />
-                    }
-                >
-                    {locationList.map((item: any) => (
-                        <BusRentalRequestCard
-                            key={item.id}
-                            item={item}
-                            onViewDetails={setSelectedBusRequest}
-                            onPayRequest={(req) => {
-                                setSelectedBusRequest(null);
-                                router.push({ pathname: '/profile/bus-rental-payment', params: { item: JSON.stringify(req) } });
-                            }}
-                        />
-                    ))}
-                </ScrollView>
-            ) : (
-                <View style={styles.emptyStateContainer}>
-                    <View style={[styles.emptyIconBlock, { borderColor: colors.border }]}>
-                        <MaterialCommunityIcons name="bus" size={28} color={colors.activeTabColor} />
+            <FlatList
+                style={styles.scrollView}
+                contentContainerStyle={styles.scrollContent}
+                data={locationList}
+                keyExtractor={locationKeyExtractor}
+                renderItem={renderLocationItem}
+                showsVerticalScrollIndicator={false}
+                initialNumToRender={6}
+                maxToRenderPerBatch={8}
+                windowSize={7}
+                removeClippedSubviews={Platform.OS === 'android'}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={locationsRefreshing}
+                        onRefresh={handleRefreshLocations}
+                        tintColor={colors.activeTabColor}
+                        colors={[colors.activeTabColor]}
+                    />
+                }
+                ListEmptyComponent={
+                    <View style={styles.emptyStateContainer}>
+                        <View style={[styles.emptyIconBlock, { borderColor: colors.border }]}>
+                            <MaterialCommunityIcons name="bus" size={28} color={colors.activeTabColor} />
+                        </View>
+                        <Text style={[styles.emptyStateText, { color: colors.text }]}>
+                            Aucune demande de location
+                        </Text>
+                        <Text style={[styles.emptyStateSubtext, { color: colors.secondaryText }]}>
+                            Créez une demande pour louer un bus.
+                        </Text>
                     </View>
-                    <Text style={[styles.emptyStateText, { color: colors.text }]}>Aucune demande de location</Text>
-                    <Text style={[styles.emptyStateSubtext, { color: colors.secondaryText }]}>
-                        Créez une demande pour louer un bus.
-                    </Text>
-                </View>
-            )}
+                }
+            />
         </View>
     );
 
